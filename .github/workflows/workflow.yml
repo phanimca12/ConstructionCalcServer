@@ -1,0 +1,20 @@
+name: CI
+on:
+  push:
+    branches: [ "develop", "release/*", "main", "feature/*" ]
+  delete:
+    branches: [ "feature/*" ]
+  workflow_dispatch:
+jobs:
+  sync-with-template:
+    uses: intelligentautomation/Reusable-Workflows/.github/workflows/sync-codecommit.yml@main
+    with:
+      codecommit-repo: BPM-SchemaService
+      workflow-repo-org: ${{ github.repository_owner }}
+      workflow-repo: ${{ github.repository }}
+      workflow-repo-branch: ${{ github.ref_name }}
+      parent-event-type: ${{ github.event_name }}
+      keyvault-name: github-ia-kv
+      secrets-to-pull: AWS-Access-Key-ID,AWS-Secret-Access-Key,GitHub-Token,CodeCommit-Username,CodeCommit-Password
+    secrets:
+      AZURE_CREDS: ${{ secrets.AZURE_CREDS }}

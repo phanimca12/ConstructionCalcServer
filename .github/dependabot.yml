@@ -1,0 +1,12 @@
+## https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  - package-ecosystem: "maven"
+    directory: "/" 
+    schedule:
+      interval: "daily"
+      time: "07:30"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
