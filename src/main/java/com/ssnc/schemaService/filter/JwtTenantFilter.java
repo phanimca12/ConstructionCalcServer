@@ -29,7 +29,7 @@ public class JwtTenantFilter extends OncePerRequestFilter {
                 String tenantId = jwt.getClaimAsString("tenant_id");
                 TenantContext.setTenantId(tenantId);
             }*/
-            TenantContext.setTenantId("client1Id");
+            TenantContext.setTenantName("client1Id");
             filterChain.doFilter(request, response);
 
         } finally {

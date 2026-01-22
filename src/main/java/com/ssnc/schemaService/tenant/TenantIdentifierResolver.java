@@ -11,7 +11,7 @@ public class TenantIdentifierResolver
 
     @Override
     public String resolveCurrentTenantIdentifier() {
-        return TenantContext.getTenantId() != null ? TenantContext.getTenantId() :"client1";
+        return TenantContext.getTenantName() != null ? TenantContext.getTenantName() :"client1";
     }
 
     @Override
