@@ -2,6 +2,7 @@ package com.ssnc.schemaService.controller;
 
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmData;
+import com.ssnc.schemaService.entity.SchmDataId;
 import com.ssnc.schemaService.repo.SchmFilterCriteria;
 import com.ssnc.schemaService.service.SchemaService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,9 +61,11 @@ public class SchemaController {
     @PostMapping("/{id}/version")
     @ResponseStatus(HttpStatus.CREATED)
     public SchmData createOrUpdateSchemaData(@PathVariable("namespace") String namespace,
-                                     @PathVariable("id") String id,
-                                     @RequestBody SchmData request) {
-        request.getId().setSchmId(UUID.fromString(id));
+                                             @PathVariable("id") String id,
+                                             @RequestBody SchmData request) {
+        SchmDataId schmDataId = new SchmDataId();
+        schmDataId.setSchmId(UUID.fromString(id));
+        request.setId(schmDataId);
         return schemaService.createOrUpdateSchemaData(request);
     }
 
