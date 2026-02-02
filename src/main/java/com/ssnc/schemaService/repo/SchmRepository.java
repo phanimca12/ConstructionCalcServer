@@ -5,8 +5,10 @@ import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmData;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -21,6 +23,29 @@ public interface SchmRepository extends JpaRepository<Schm, UUID>, JpaSpecificat
         WHERE s.schmId = :schmId
     """)
     List<SchmData> getPublishedSchema(@Param("schmId") UUID schmId);
+
+
+
+    @Query("""
+        SELECT d
+        FROM Schm s
+        JOIN SchmData d
+          ON d.id.schmId = s.schmId
+         AND d.id.schmVersion = :schmVersion
+        WHERE s.schmId = :schmId
+    """)
+    List<SchmData> getSchemaByVersion(@Param("schmId") UUID schmId, @Param("schmVersion") int schmVersion);
+
+
+    @Transactional
+    @Modifying
+    @Query("""
+    DELETE FROM SchmData d
+    WHERE d.id.schmId = :schmId
+      AND d.id.schmVersion = :schmVersion
+""")
+    void deleteBySchmIdAndSchmVersion(@Param("schmId") UUID schmId,
+                                      @Param("schmVersion") int schmVersion);
 
     Schm getByschmId(UUID uuid);
 }

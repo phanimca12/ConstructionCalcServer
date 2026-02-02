@@ -26,13 +26,17 @@ public class SchemaService {
     NamespaceFilterManager namespaceFilterManager;
 
     public Schm createOrUpdateSchema(Schm request) {
-       return schmRepository.save(request);
+        return schmRepository.save(request);
     }
 
+    public void deleteBySchmIdAndSchmVersion(String namespace, String id,int version)
+    {
+        schmRepository.deleteBySchmIdAndSchmVersion(UUID.fromString(id),version);
+    }
     public SchmData createOrUpdateSchemaData(SchmData request) {
         if(request.getId().getSchmVersion() == null) {
             Integer latestVersion = schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc
-                    (request.getId().getSchmId()).map(sd -> sd.getId().getSchmVersion())
+                            (request.getId().getSchmId()).map(sd -> sd.getId().getSchmVersion())
                     .orElse(0);
             request.getId().setSchmVersion(latestVersion + 1);
         }
@@ -48,6 +52,12 @@ public class SchemaService {
         namespaceFilterManager.enableIfPresent(namespace);
         return schmRepository.getPublishedSchema(UUID.fromString(id));
     }
+
+    public List<SchmData> getSchemaByVersion(String namespace, String id,int version) {
+        namespaceFilterManager.enableIfPresent(namespace);
+        return schmRepository.getSchemaByVersion(UUID.fromString(id),version);
+    }
+
 
     public Schm getSchemaById(String namespace, String id) {
         return schmRepository.getByschmId(UUID.fromString(id));

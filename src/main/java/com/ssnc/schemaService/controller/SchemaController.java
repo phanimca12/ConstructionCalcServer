@@ -24,9 +24,9 @@ public class SchemaController {
                                  @RequestParam(required = false) String id,
                                  @RequestParam(required = false) String name,
                                  @RequestParam(required = false) String lockBy,
-                                 @RequestParam(required = false) Integer publishVersion){
+                                 @RequestParam(required = false) Integer publishVersion) {
         SchmFilterCriteria criteria = new SchmFilterCriteria();
-        if(id != null)
+        if (id != null)
             criteria.setSchmId(UUID.fromString(id));
         criteria.setSchemaName(name);
         criteria.setLockBy(lockBy);
@@ -44,7 +44,7 @@ public class SchemaController {
 
     @GetMapping("/{id}")
     public Schm getSchemaById(@PathVariable("namespace") String namespace,
-                                    @PathVariable("id") String id){
+                              @PathVariable("id") String id) {
         return schemaService.getSchemaById(namespace, id);
     }
 
@@ -69,9 +69,35 @@ public class SchemaController {
         return schemaService.createOrUpdateSchemaData(request);
     }
 
+    @PutMapping("/{id}/version/{versionnumber}/publish")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SchmData createOrUpdateSchemaDataByVer(@PathVariable("namespace") String namespace,
+                                                  @PathVariable("id") String id, @PathVariable("versionnumber") int versionnumber,
+                                                  @RequestBody SchmData request) {
+        SchmDataId schmDataId = new SchmDataId();
+        schmDataId.setSchmId(UUID.fromString(id));
+        schmDataId.setSchmVersion(versionnumber);
+        request.setId(schmDataId);
+        return schemaService.createOrUpdateSchemaData(request);
+    }
+
+    @DeleteMapping("/{id}/version/{versionnumber}/publish")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void deleteBySchmIdAndSchmVersion(@PathVariable("namespace") String namespace,
+                                             @PathVariable("id") String id, @PathVariable("versionnumber") int versionnumber) {
+
+        schemaService.deleteBySchmIdAndSchmVersion(namespace, id, versionnumber);
+    }
+
     @GetMapping("/{id}/version/publish")
     public List<SchmData> getPublishedSchemaData(@PathVariable("namespace") String namespace,
-                                             @PathVariable("id") String id){
+                                                 @PathVariable("id") String id) {
         return schemaService.getPublishedSchema(namespace, id);
+    }
+
+    @GetMapping("/{id}/version/{version}")
+    public List<SchmData> getSchemaByVersion(@PathVariable("namespace") String namespace,
+                                             @PathVariable("id") String id, @PathVariable("version") int version) {
+        return schemaService.getSchemaByVersion(namespace, id, version);
     }
 }
