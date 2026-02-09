@@ -57,7 +57,10 @@ public class SchemaService {
         namespaceFilterManager.enableIfPresent(namespace);
         return schmRepository.getSchemaByVersion(UUID.fromString(id),version);
     }
-
+    public List<SchmData> getSchemaByLatestVersion(String namespace, String id) {
+        namespaceFilterManager.enableIfPresent(namespace);
+        return schmRepository.getSchemaByLatestVersion(UUID.fromString(id));
+    }
 
     public Schm getSchemaById(String namespace, String id) {
         return schmRepository.getByschmId(UUID.fromString(id));

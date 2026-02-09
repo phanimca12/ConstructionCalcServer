@@ -29,12 +29,27 @@ public interface SchmRepository extends JpaRepository<Schm, UUID>, JpaSpecificat
     @Query("""
         SELECT d
         FROM Schm s
-        JOIN SchmData d
+        JOIN SchmData d 
           ON d.id.schmId = s.schmId
          AND d.id.schmVersion = :schmVersion
         WHERE s.schmId = :schmId
     """)
     List<SchmData> getSchemaByVersion(@Param("schmId") UUID schmId, @Param("schmVersion") int schmVersion);
+
+
+    @Query("""
+        SELECT d
+        FROM Schm s
+        JOIN SchmData d 
+          ON d.id.schmId = s.schmId
+              WHERE s.schmId = :schmId
+               AND d.id.schmVersion = (
+                      SELECT MAX(d2.id.schmVersion)
+                      FROM SchmData d2
+                      WHERE d2.id.schmId = :schmId
+                  )
+    """)
+    List<SchmData> getSchemaByLatestVersion(@Param("schmId") UUID schmId);
 
 
     @Transactional

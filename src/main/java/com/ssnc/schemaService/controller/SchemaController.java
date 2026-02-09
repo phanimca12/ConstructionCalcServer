@@ -100,4 +100,10 @@ public class SchemaController {
                                              @PathVariable("id") String id, @PathVariable("version") int version) {
         return schemaService.getSchemaByVersion(namespace, id, version);
     }
+
+    @GetMapping("/{id}/version/latest")
+    public List<SchmData> getSchemaByLatestVersion(@PathVariable("namespace") String namespace,
+                                             @PathVariable("id") String id) {
+        return schemaService.getSchemaByLatestVersion(namespace, id);
+    }
 }
