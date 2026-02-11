@@ -1,0 +1,9 @@
+<service>
+    <id>schemaService</id>
+    <name>schemaService</name>
+    <description>SchemaService Application</description>
+    <env name="SchemaService_HOME" value="C:\opt\DST\schema-services"/>
+    <executable>java</executable>
+    <arguments>-jar %SchemaService_HOME%\schema-service-1.0.jar --server.port=8009</arguments >
+    <logmode>rotate</logmode>
+</service>

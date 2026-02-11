@@ -18,6 +18,14 @@
             <outputDirectory>/</outputDirectory>
         </file>
         <file>
+            <source> ${basedir}/cmd/schemaService.exe</source>
+            <outputDirectory>/</outputDirectory>
+        </file>
+        <file>
+            <source> ${basedir}/cmd/schemaService.xml</source>
+            <outputDirectory>/</outputDirectory>
+        </file>
+        <file>
             <source> ${basedir}/src/main/resources/application.yml</source>
             <outputDirectory>/</outputDirectory>
             <destName>application.yml</destName>

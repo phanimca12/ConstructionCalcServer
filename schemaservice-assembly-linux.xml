@@ -18,6 +18,14 @@
             <outputDirectory>/</outputDirectory>
         </file>
         <file>
+            <source> ${basedir}/cmd/run.sh</source>
+            <outputDirectory>/</outputDirectory>
+        </file>
+        <file>
+            <source> ${basedir}/cmd/schemaService.service</source>
+            <outputDirectory>/</outputDirectory>
+        </file>
+        <file>
             <source> ${basedir}/src/main/resources/application.yml</source>
             <outputDirectory>/</outputDirectory>
             <destName>application.yml</destName>

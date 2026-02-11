@@ -1,0 +1,21 @@
+[Unit]
+Description=Schema Service Application
+[Service]
+User=root
+# The configuration file application.properties should be here:
+
+#change this to your workspace
+WorkingDirectory=/opt/dst/schema-services/schemaservice
+
+EnvironmentFile=/etc/environment
+
+#executable is a bash script which calls jar file
+ExecStart=/bin/bash /opt/dst/schema-services/schemaservice/run.sh
+
+SuccessExitStatus=0
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
