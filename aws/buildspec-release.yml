@@ -18,8 +18,8 @@ phases:
       - echo Entered the build phase...
       - echo Build started on `date`
       - mvn -T 1 $AWD_SKIPTESTS install -U
-      - chmod +x ./aws/scripts/build/copy-appspec.sh
-      - ./aws/scripts/build/copy-appspec.sh
+      - chmod +x ./aws/scripts/copy-appspec.sh
+      - ./aws/scripts/copy-appspec.sh
 
 artifacts:
   files:
