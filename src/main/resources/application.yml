@@ -1,3 +1,9 @@
+logging:
+  file:
+    name: "/opt/dst/schema-services/schemaservice/logs/schemaservice.log"
+    max-size: "10MB"
+  level:
+    root: "INFO"
 server:
   port: 8082
 spring:
@@ -42,7 +48,7 @@ timestamp:
   sqlserver_ts: "DATETIME2"
   postgresql_ts: "DATE"
 
-  guid:
-    oracle_guid: "RAW(16)"
-    sqlserver_guid: "UNIQUEIDENTIFIER"
-    postgresql_guid: "UUID
+guid:
+  oracle_guid: "RAW(16)"
+  sqlserver_guid: "UNIQUEIDENTIFIER"
+  postgresql_guid: "UUID"
