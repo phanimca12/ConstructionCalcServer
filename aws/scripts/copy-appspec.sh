@@ -2,10 +2,10 @@ echo "TargetOS='$TargetOS'"
 
 cp ./aws/linux_appspec.yml appspec.yml
 
-if [ "$TargetOS" = "linux" ||  "$TargetOS" = "Linux"  ]
+if [ "$AWD_TARGET" = "LinJboss" ||  "$AWD_TARGET" = "LinuxLiberty"  ]
 then
    cp ./aws/linux_appspec.yml appspec.yml
-elif [ "$TargetOS" = "windows" ]
+elif [ "$AWD_TARGET" = "WindowsLiberty" ||  "$AWD_TARGET" = "WindowsJboss" ]
 then
    cp ./aws/windows_appspec.yml appspec.yml
 else 
