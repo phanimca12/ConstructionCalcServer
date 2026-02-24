@@ -1,4 +1,4 @@
-echo "TargetOS='$TargetOS'"  
+echo "TargetOS='$AWD_TARGET'"
 
 cp ./aws/linux_appspec.yml appspec.yml
 
