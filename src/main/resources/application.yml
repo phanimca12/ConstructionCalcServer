@@ -19,8 +19,7 @@ spring:
     url: "jdbc:oracle:thin:@localhost:1521/AWD1"
     username: "SCHMDB"
     password: "password"
-    driver-class-name: "oracle.jdbc.driver.OracleDriver"
-
+    name: "oracle"
     hikari:
       maximumPoolSize: 100
       minimumIdle: 10
@@ -32,6 +31,7 @@ spring:
     placeholders:
       clob: "${clob.${spring.datasource.name}_clob}"
       timestamp: "${timestamp.${spring.datasource.name}_ts}"
+      guid: "${guid.${spring.datasource.name}_guid}"
   jpa:
     properties:
       hibernate:
