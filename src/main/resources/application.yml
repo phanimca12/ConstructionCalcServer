@@ -10,11 +10,11 @@ spring:
     console:
       enabled: true
   datasource:
-    url: jdbc:h2:mem:testdb
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: password
-    name: "oracle"
+    url: "jdbc:oracle:thin:@localhost:1521/AWD1"
+    username: "SCHMDB"
+    password: "password"
+    driver-class-name: "oracle.jdbc.driver.OracleDriver"
+
     hikari:
       maximumPoolSize: 100
       minimumIdle: 10
@@ -41,3 +41,8 @@ timestamp:
   oracle_ts: "TIMESTAMP"
   sqlserver_ts: "DATETIME2"
   postgresql_ts: "DATE"
+
+  guid:
+    oracle_guid: "RAW(16)"
+    sqlserver_guid: "UNIQUEIDENTIFIER"
+    postgresql_guid: "UUID
