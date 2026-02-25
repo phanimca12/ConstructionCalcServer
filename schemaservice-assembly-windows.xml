@@ -26,7 +26,7 @@
             <outputDirectory>/</outputDirectory>
         </file>
         <file>
-            <source> ${basedir}/src/main/resources/application.yml</source>
+            <source> ${basedir}/src/main/resources/application-windows.yml</source>
             <outputDirectory>/</outputDirectory>
             <destName>application.yml</destName>
         </file>

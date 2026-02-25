@@ -22,7 +22,7 @@
         updated_datetime ${timestamp},
         schm_id ${guid} not null,
         tenant_name varchar(256) not null,
-        nmspc_name varchar(256) not null,
+        nmspc_name varchar(32) not null,
         created_by varchar(256),
         "group" varchar(256),
         lock_by varchar(256),
