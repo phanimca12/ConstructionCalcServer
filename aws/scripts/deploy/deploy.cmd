@@ -3,8 +3,8 @@ set /p FINDOUTPUT= < SchemaService.txt
 IF "%FINDOUTPUT%"=="" (
     net stop IBMHTTPServerV9.0
     echo. >> "C:\Program Files\IBM\HTTPServer\conf\httpd.conf"
-    echo ProxyPassMatch "^/schema-services/(.*)$"  "http://localhost:8899/$1" >> "C:\Program Files\IBM\HTTPServer\conf\httpd.conf"
-    echo ProxyPassReverse "^/schema-services/(.*)$"  "http://localhost:8899/$1" >> "C:\Program Files\IBM\HTTPServer\conf\httpd.conf"
+    echo ProxyPassMatch "^/schema-services/(.*)$"  "http://localhost:8082/$1" >> "C:\Program Files\IBM\HTTPServer\conf\httpd.conf"
+    echo ProxyPassReverse "^/schema-services/(.*)$"  "http://localhost:8082/$1" >> "C:\Program Files\IBM\HTTPServer\conf\httpd.conf"
     net start IBMHTTPServerV9.0
 )
 del UXBuilder.txt
