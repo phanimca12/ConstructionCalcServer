@@ -16,17 +16,17 @@ public class NameSpaceController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Nmspc createTenant(@RequestBody Nmspc request) {
+    public Nmspc createNamespace(@RequestBody Nmspc request) {
         return nameSpaceService.createNameSpace(request);
     }
 
-    @GetMapping("/{tenantName}")
-    public Nmspc getTenantByName(@PathVariable String tenantName) {
-        return nameSpaceService.getNameSpaceByName(tenantName);
+    @GetMapping("/{namespace}")
+    public Nmspc getNameSpaceByName(@PathVariable String nameSpace) {
+        return nameSpaceService.getNameSpaceByName(nameSpace);
     }
 
     @GetMapping
-    public List<Nmspc> getAllTenants() {
+    public List<Nmspc> getAllNameSpaces() {
         return nameSpaceService.getAllNameSpaces();
     }
 }
