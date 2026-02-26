@@ -63,9 +63,13 @@ public class SchemaController {
     public SchmData createOrUpdateSchemaData(@PathVariable("namespace") String namespace,
                                              @PathVariable("id") String id,
                                              @RequestBody SchmData request) {
-        SchmDataId schmDataId = new SchmDataId();
-        schmDataId.setSchmId(UUID.fromString(id));
-        request.setId(schmDataId);
+        if(request.getId() != null) {
+            request.getId().setSchmId(UUID.fromString(id));
+        }else{
+            SchmDataId schmDataId = new SchmDataId();
+            schmDataId.setSchmId(UUID.fromString(id));
+            request.setId(schmDataId);
+        }
         return schemaService.createOrUpdateSchemaData(request);
     }
 
@@ -106,4 +110,5 @@ public class SchemaController {
                                              @PathVariable("id") String id) {
         return schemaService.getSchemaByLatestVersion(namespace, id);
     }
+
 }
