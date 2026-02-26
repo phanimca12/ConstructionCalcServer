@@ -20,9 +20,9 @@ public class NameSpaceController {
         return nameSpaceService.createNameSpace(request);
     }
 
-    @GetMapping("/{namespace}")
-    public Nmspc getNameSpaceByName(@PathVariable String nameSpace) {
-        return nameSpaceService.getNameSpaceByName(nameSpace);
+    @GetMapping("/{namepace}")
+    public Nmspc getNameSpaceByName(@PathVariable String namepace) {
+        return nameSpaceService.getNameSpaceByName(namepace);
     }
 
     @GetMapping
