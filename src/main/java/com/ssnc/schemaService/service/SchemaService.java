@@ -65,4 +65,9 @@ public class SchemaService {
     public Schm getSchemaById(String namespace, String id) {
         return schmRepository.getByschmId(UUID.fromString(id));
     }
+
+    public List<Schm> getPublishedSchemas(String namespace) {
+        namespaceFilterManager.enableIfPresent(namespace);
+        return schmRepository.findByPublishVersionGreaterThanOrderBySchmNameAsc(0);
+    }
 }

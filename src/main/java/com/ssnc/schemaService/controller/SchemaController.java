@@ -111,4 +111,8 @@ public class SchemaController {
         return schemaService.getSchemaByLatestVersion(namespace, id);
     }
 
+    @GetMapping("/published")
+    public List<Schm> getPublishedSchemas(@PathVariable("namespace") String namespace) {
+        return schemaService.getPublishedSchemas(namespace);
+    }
 }

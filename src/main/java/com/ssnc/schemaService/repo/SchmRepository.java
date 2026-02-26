@@ -63,4 +63,6 @@ public interface SchmRepository extends JpaRepository<Schm, UUID>, JpaSpecificat
                                       @Param("schmVersion") int schmVersion);
 
     Schm getByschmId(UUID uuid);
+
+    List<Schm> findByPublishVersionGreaterThanOrderBySchmNameAsc(Integer publishVersion);
 }
