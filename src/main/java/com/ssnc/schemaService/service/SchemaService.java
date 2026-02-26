@@ -9,7 +9,9 @@ import com.ssnc.schemaService.repo.SchmSpecifications;
 import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -68,6 +70,10 @@ public class SchemaService {
 
     public List<Schm> getPublishedSchemas(String namespace) {
         namespaceFilterManager.enableIfPresent(namespace);
-        return schmRepository.findByPublishVersionGreaterThanOrderBySchmNameAsc(0);
+        List<Schm> schmList = schmRepository.findByPublishVersionGreaterThanOrderBySchmNameAsc(0);
+        if(!CollectionUtils.isEmpty(schmList)) {
+            schmList.forEach(schm -> schm.setVersions(null));
+        }
+        return schmList == null ? new ArrayList<Schm>() : schmList;
     }
 }
