@@ -1,0 +1,43 @@
+version: 0.2
+
+env:
+  parameter-store:
+    AWS_ACCESS_KEY: /CodeBuild/awd-access-key
+    AWS_SECRET_ACCESS_KEY: /CodeBuild/awd-secret-access-key
+   
+phases:
+  install:
+    commands:
+      - echo $JAVA_HOME
+      - echo $PATH
+      - cp aws/m2/settings.xml /root/.m2/settings.xml
+      - export JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto
+      - export PATH=$JAVA_HOME/bin:$PATH
+      - echo $JAVA_HOME
+      - echo $PATH
+
+  pre_build:
+    commands:
+      - echo Entering the pre_build phase...
+      - mkdir ./aws/winsw
+      - wget -O ./aws/winsw/winsw.exe https://repo.jenkins-ci.org/releases/com/sun/winsw/winsw/2.9.0/winsw-2.9.0-net461.exe
+
+  build:
+    commands:
+      - echo Entered the build phase...
+      - echo Build started on `date`
+      - export JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto
+      - export PATH=$JAVA_HOME/bin:$PATH
+      - mvn -T 1 $AWD_SKIPTESTS install -U
+      - chmod +x ./aws/scripts/copy-appspec.sh
+      - ./aws/scripts/copy-appspec.sh
+
+artifacts:
+  files:
+    - '**/aws/scripts/deploy/*.sh'   
+    - '**/aws/scripts/deploy/*.cmd'   
+    - '**/appspec.yml'
+    - '**/target/**.zip'
+cache:
+  paths:
+    - "/root/.m2/**/*"
