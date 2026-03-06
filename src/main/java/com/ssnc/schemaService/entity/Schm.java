@@ -64,6 +64,12 @@ public class Schm {
     @Column(name = "\"GROUP\"", length = 256)
     private String group;
 
+    @Column(name = "SCHM_TYPE", length = 64)
+    private String schemaType;
+
+    @Column(name = "CONTENT_TYPE", length = 128)
+    private String contentType;
+
     @Column(name = "PUBLISH_VERSION")
     private Integer publishVersion;
 

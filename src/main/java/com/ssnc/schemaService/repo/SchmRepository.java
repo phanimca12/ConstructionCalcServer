@@ -1,6 +1,5 @@
 package com.ssnc.schemaService.repo;
 
-import com.ssnc.schemaService.entity.Nmspc;
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmData;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,61 +7,85 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
+@Repository
 public interface SchmRepository extends JpaRepository<Schm, UUID>, JpaSpecificationExecutor<Schm> {
+
+    /**
+     * Get published schema version
+     */
     @Query("""
         SELECT d
         FROM Schm s
-        JOIN SchmData d
-          ON d.id.schmId = s.schmId
+        JOIN SchmData d ON d.id.schmId = s.schmId
          AND d.id.schmVersion = s.publishVersion
         WHERE s.schmId = :schmId
+          AND s.publishVersion IS NOT NULL
     """)
-    List<SchmData> getPublishedSchema(@Param("schmId") UUID schmId);
+    Optional<SchmData> getPublishedVersion(@Param("schmId") UUID schmId);
 
-
-
+    /**
+     * Get specific schema version
+     */
     @Query("""
         SELECT d
-        FROM Schm s
-        JOIN SchmData d 
-          ON d.id.schmId = s.schmId
-         AND d.id.schmVersion = :schmVersion
-        WHERE s.schmId = :schmId
+        FROM SchmData d
+        WHERE d.id.schmId = :schmId
+          AND d.id.schmVersion = :versionNumber
     """)
-    List<SchmData> getSchemaByVersion(@Param("schmId") UUID schmId, @Param("schmVersion") int schmVersion);
+    Optional<SchmData> getSchemaVersion(@Param("schmId") UUID schmId, @Param("versionNumber") Integer versionNumber);
 
-
+    /**
+     * Get latest version
+     */
     @Query("""
         SELECT d
-        FROM Schm s
-        JOIN SchmData d 
-          ON d.id.schmId = s.schmId
-              WHERE s.schmId = :schmId
-               AND d.id.schmVersion = (
-                      SELECT MAX(d2.id.schmVersion)
-                      FROM SchmData d2
-                      WHERE d2.id.schmId = :schmId
-                  )
+        FROM SchmData d
+        WHERE d.id.schmId = :schmId
+          AND d.id.schmVersion = (
+              SELECT MAX(d2.id.schmVersion)
+              FROM SchmData d2
+              WHERE d2.id.schmId = :schmId
+          )
     """)
-    List<SchmData> getSchemaByLatestVersion(@Param("schmId") UUID schmId);
+    Optional<SchmData> getLatestVersion(@Param("schmId") UUID schmId);
 
-
-    @Transactional
-    @Modifying
+    /**
+     * Get all versions for a schema
+     */
     @Query("""
-    DELETE FROM SchmData d
-    WHERE d.id.schmId = :schmId
-      AND d.id.schmVersion = :schmVersion
-""")
-    void deleteBySchmIdAndSchmVersion(@Param("schmId") UUID schmId,
-                                      @Param("schmVersion") int schmVersion);
+        SELECT d
+        FROM SchmData d
+        WHERE d.id.schmId = :schmId
+        ORDER BY d.id.schmVersion DESC
+    """)
+    List<SchmData> getAllVersions(@Param("schmId") UUID schmId);
 
-    Schm getByschmId(UUID uuid);
+    /**
+     * Find schemas by type and group
+     */
+    List<Schm> findBySchemaTypeAndGroup(String schemaType, String group);
 
-    List<Schm> findByPublishVersionGreaterThanOrderBySchmNameAsc(Integer publishVersion);
+    /**
+     * Find schemas by type
+     */
+    List<Schm> findBySchemaType(String schemaType);
+
+    /**
+     * Find schemas by group
+     */
+    List<Schm> findByGroup(String group);
+
+    /**
+     * Get schema by ID
+     */
+    Optional<Schm> findBySchmId(UUID schmId);
+
+    Optional<Schm> findBySchmName(String name);
 }

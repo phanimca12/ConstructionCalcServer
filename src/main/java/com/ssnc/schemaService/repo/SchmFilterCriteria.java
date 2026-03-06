@@ -1,46 +1,19 @@
 package com.ssnc.schemaService.repo;
 
-import java.time.LocalDateTime;
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.UUID;
 
+@Setter
+@Getter
 public class SchmFilterCriteria {
-
     private UUID schmId;
     private String schemaName;
+    private String schemaType;
+    private String group;
     private String lockBy;
     private Integer publishVersion;
-    // getters & setters
+    private Boolean publishedOnly;
 
-
-    public String getSchemaName() {
-        return schemaName;
-    }
-
-    public void setSchemaName(String schemaName) {
-        this.schemaName = schemaName;
-    }
-
-    public Integer getPublishVersion() {
-        return publishVersion;
-    }
-
-    public void setPublishVersion(Integer publishVersion) {
-        this.publishVersion = publishVersion;
-    }
-
-    public UUID getSchmId() {
-        return schmId;
-    }
-
-    public void setSchmId(UUID schmId) {
-        this.schmId = schmId;
-    }
-
-    public String getLockBy() {
-        return lockBy;
-    }
-
-    public void setLockBy(String lockBy) {
-        this.lockBy = lockBy;
-    }
 }

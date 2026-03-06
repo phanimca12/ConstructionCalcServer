@@ -29,6 +29,8 @@
         schm_name varchar(256),
         updated_by varchar(256),
         schm_desc varchar(4000),
+        schm_type VARCHAR(64),
+        content_type VARCHAR(128),
         primary key (schm_id),
         foreign key (nmspc_name) references nmspc,
         foreign key (tenant_name) references tenant
@@ -41,6 +43,7 @@
         schm_version_name varchar(64),
         created_by varchar(256),
         updated_by varchar(256),
+        IS_DRAFT char(1),
         schm_data ${clob},
         primary key (schm_version, SCHM_ID),
         foreign key (schm_id) references schm

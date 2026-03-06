@@ -1,118 +1,215 @@
 package com.ssnc.schemaService.controller;
 
-import com.ssnc.schemaService.entity.Schm;
-import com.ssnc.schemaService.entity.SchmData;
-import com.ssnc.schemaService.entity.SchmDataId;
-import com.ssnc.schemaService.repo.SchmFilterCriteria;
+import com.ssnc.schemaService.dto.SchemaDto;
+import com.ssnc.schemaService.dto.SchemaVersionDto;
+import com.ssnc.schemaService.dto.SchemaWithVersionDto;
 import com.ssnc.schemaService.service.SchemaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/schemas/{namespace}")
+@RequestMapping("/schemas/{nameSpace}")
 public class SchemaController {
 
     @Autowired
-    SchemaService schemaService;
+    private SchemaService schemaService;
 
-    @GetMapping()
-    public List<Schm> getSchemas(@PathVariable("namespace") String namespace,
-                                 @RequestParam(required = false) String id,
-                                 @RequestParam(required = false) String name,
-                                 @RequestParam(required = false) String lockBy,
-                                 @RequestParam(required = false) Integer publishVersion) {
-        SchmFilterCriteria criteria = new SchmFilterCriteria();
-        if (id != null)
-            criteria.setSchmId(UUID.fromString(id));
-        criteria.setSchemaName(name);
-        criteria.setLockBy(lockBy);
-        criteria.setPublishVersion(publishVersion);
-        return schemaService.getSchemas(namespace, criteria);
+    /**
+     * GET /schemas/{nameSpace}
+     * Get schemas with optional filtering by type and group
+     */
+    @GetMapping
+    public ResponseEntity<List<SchemaDto>> getSchemas(
+            @PathVariable("nameSpace") String nameSpace,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String group,
+            @RequestParam(required = false) boolean publishedOnly) {
+        List<SchemaDto> schemas = schemaService.getSchemas(nameSpace, type, group, publishedOnly);
+        return ResponseEntity.ok(schemas);
     }
 
-    @PostMapping()
-    @ResponseStatus(HttpStatus.CREATED)
-    public Schm createSchema(@PathVariable("namespace") String namespace,
-                             @RequestBody Schm request) {
-        request.setNamespace(namespace);
-        return schemaService.createOrUpdateSchema(request);
-    }
-
-    @GetMapping("/{id}")
-    public Schm getSchemaById(@PathVariable("namespace") String namespace,
-                              @PathVariable("id") String id) {
-        return schemaService.getSchemaById(namespace, id);
-    }
-
-    @PostMapping("/{id}")
-    @ResponseStatus(HttpStatus.CREATED)
-    public Schm updateSchema(@PathVariable("namespace") String namespace,
-                             @PathVariable("id") String id,
-                             @RequestBody Schm request) {
-        request.setNamespace(namespace);
-        request.setSchmId(UUID.fromString(id));
-        return schemaService.createOrUpdateSchema(request);
-    }
-
-    @PostMapping("/{id}/version")
-    @ResponseStatus(HttpStatus.CREATED)
-    public SchmData createOrUpdateSchemaData(@PathVariable("namespace") String namespace,
-                                             @PathVariable("id") String id,
-                                             @RequestBody SchmData request) {
-        if(request.getId() != null) {
-            request.getId().setSchmId(UUID.fromString(id));
-        }else{
-            SchmDataId schmDataId = new SchmDataId();
-            schmDataId.setSchmId(UUID.fromString(id));
-            request.setId(schmDataId);
+    /**
+     * POST /schemas/{nameSpace}
+     * Create a new schema with optional multipart content
+     */
+    @PostMapping(consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
+    public ResponseEntity<SchemaDto> createSchema(
+            @PathVariable("nameSpace") String nameSpace,
+            @RequestPart(value = "schema") SchemaDto schema,
+            @RequestPart(value = "content", required = false) String content) {
+        try {
+            SchemaDto created = schemaService.createSchema(nameSpace, schema, content);
+            return ResponseEntity.status(HttpStatus.OK).body(created);
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
-        return schemaService.createOrUpdateSchemaData(request);
     }
 
-    @PutMapping("/{id}/version/{versionnumber}/publish")
-    @ResponseStatus(HttpStatus.CREATED)
-    public SchmData createOrUpdateSchemaDataByVer(@PathVariable("namespace") String namespace,
-                                                  @PathVariable("id") String id, @PathVariable("versionnumber") int versionnumber,
-                                                  @RequestBody SchmData request) {
-        SchmDataId schmDataId = new SchmDataId();
-        schmDataId.setSchmId(UUID.fromString(id));
-        schmDataId.setSchmVersion(versionnumber);
-        request.setId(schmDataId);
-        return schemaService.createOrUpdateSchemaData(request);
+    /**
+     * GET /schemas/{nameSpace}/{id}
+     * Get schema by ID with optional version filtering
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<List<SchemaWithVersionDto>> getSchemaById(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id,
+            @RequestParam(required = false) String versionNumber,
+            @RequestParam(required = false) String versionName) {
+
+        List<SchemaWithVersionDto> result = schemaService.getSchemasById(
+                nameSpace,
+                UUID.fromString(id),
+                versionNumber,
+                versionName
+        );
+
+        if (result.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(result);
     }
 
-    @DeleteMapping("/{id}/version/{versionnumber}/publish")
-    @ResponseStatus(HttpStatus.CREATED)
-    public void deleteBySchmIdAndSchmVersion(@PathVariable("namespace") String namespace,
-                                             @PathVariable("id") String id, @PathVariable("versionnumber") int versionnumber) {
-
-        schemaService.deleteBySchmIdAndSchmVersion(namespace, id, versionnumber);
+    /**
+     * PUT /schemas/{nameSpace}/{id}
+     * Update an existing schema
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<SchemaDto> updateSchema(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id,
+            @RequestBody SchemaDto schemaDto) {
+        SchemaDto updated = schemaService.updateSchema(nameSpace, UUID.fromString(id), schemaDto);
+        return ResponseEntity.ok(updated);
     }
 
-    @GetMapping("/{id}/version/publish")
-    public List<SchmData> getPublishedSchemaData(@PathVariable("namespace") String namespace,
-                                                 @PathVariable("id") String id) {
-        return schemaService.getPublishedSchema(namespace, id);
+    /**
+     * GET /schemas/{nameSpace}/{id}/version/{versionNumber}
+     * Get specific schema version
+     */
+    @GetMapping("/{id}/version/{versionNumber}")
+    public ResponseEntity<SchemaVersionDto> getSchemaVersion(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id,
+            @PathVariable("versionNumber") String versionNumber) {
+        return schemaService.getSchemaVersion(nameSpace, UUID.fromString(id), Integer.parseInt(versionNumber))
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/{id}/version/{version}")
-    public List<SchmData> getSchemaByVersion(@PathVariable("namespace") String namespace,
-                                             @PathVariable("id") String id, @PathVariable("version") int version) {
-        return schemaService.getSchemaByVersion(namespace, id, version);
+    /**
+     * PUT /schemas/{nameSpace}/{id}/version/{versionNumber}/publish
+     * Publish a specific schema version
+     */
+    @PutMapping("/{id}/version/{versionNumber}/publish")
+    public ResponseEntity<Void> publishSchemaVersion(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id,
+            @PathVariable("versionNumber") String versionNumber) {
+        try {
+            schemaService.publishSchemaVersion(nameSpace, UUID.fromString(id), Integer.parseInt(versionNumber));
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
-    @GetMapping("/{id}/version/latest")
-    public List<SchmData> getSchemaByLatestVersion(@PathVariable("namespace") String namespace,
-                                             @PathVariable("id") String id) {
-        return schemaService.getSchemaByLatestVersion(namespace, id);
+    /**
+     * DELETE /schemas/{nameSpace}/{id}/version/{versionNumber}/publish
+     * Unpublish a specific schema version
+     */
+    @PutMapping("/{id}/version/{versionNumber}/unPublish")
+    public ResponseEntity<Void> unPublishSchemaVersion(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id,
+            @PathVariable("versionNumber") String versionNumber) {
+        schemaService.unPublishSchemaVersion(nameSpace, UUID.fromString(id), Integer.parseInt(versionNumber));
+        return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/published")
-    public List<Schm> getPublishedSchemas(@PathVariable("namespace") String namespace) {
-        return schemaService.getPublishedSchemas(namespace);
+    /**
+     * GET /schemas/{nameSpace}/{id}/version/published
+     * Get published version of a schema
+     */
+    @GetMapping("/{id}/version/published")
+    public ResponseEntity<SchemaVersionDto> getPublishedVersion(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id) {
+        return schemaService.getPublishedVersion(nameSpace, UUID.fromString(id))
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * GET /schemas/{nameSpace}/{id}/version/draft
+     * Get draft version of a schema
+     */
+    @GetMapping("/{id}/version/draft")
+    public ResponseEntity<SchemaVersionDto> getDraftVersion(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id) {
+        return schemaService.getDraftVersion(nameSpace, UUID.fromString(id))
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * GET /schemas/{nameSpace}/{id}/version/published/content
+     * Get content of published schema version
+     */
+    @GetMapping(value = "/{id}/version/published/content", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<String> getPublishedContent(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id) {
+        return schemaService.getPublishedContent(nameSpace, UUID.fromString(id))
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * GET /schemas/{nameSpace}/{id}/version/{versionNumber}/content
+     * Get content of a specific schema version
+     */
+    @GetMapping(value = "/{id}/version/{versionNumber}/content", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<String> getVersionContent(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id,
+            @PathVariable("versionNumber") Integer versionNumber) {
+        return schemaService.getVersionContent(nameSpace, UUID.fromString(id), versionNumber)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * GET /schemas/{nameSpace}/{id}/version/draft/content
+     * Get content of draft schema version
+     */
+    @GetMapping(value = "/{id}/version/draft/content", produces = MediaType.ALL_VALUE)
+    public ResponseEntity<String> getDraftContent(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id) {
+        return schemaService.getDraftContent(nameSpace, UUID.fromString(id))
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * PUT /schemas/{nameSpace}/{id}/version/draft/content
+     * Update content of existing draft or create new version if draft doesn't exist
+     */
+    @PutMapping(value = "/{id}/version/draft/content", consumes = MediaType.ALL_VALUE)
+    public ResponseEntity<SchemaVersionDto> updateDraftContent(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id,
+            @RequestBody String content) {
+        SchemaVersionDto response = schemaService.updateDraftContent(nameSpace, UUID.fromString(id), content);
+        return ResponseEntity.ok(response);
     }
 }

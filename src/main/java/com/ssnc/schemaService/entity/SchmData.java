@@ -22,6 +22,9 @@ public class SchmData {
     @Column(name = "SCHM_VERSION_NAME", length = 64)
     private String schmVersionName;
 
+    @Column(name = "IS_DRAFT", length = 1)
+    private Boolean isDraft;
+
     @CreationTimestamp
     @Column(name = "CREATED_DATETIME", updatable = false)
     private LocalDateTime createdDatetime;

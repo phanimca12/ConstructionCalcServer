@@ -12,4 +12,6 @@ import java.util.UUID;
 @Repository
 public interface SchmDataRepository extends JpaRepository<SchmData, SchmDataId> {
     Optional<SchmData> findTopByIdSchmIdOrderByIdSchmVersionDesc(UUID schemaId);
+
+    Optional<SchmData> findByIdSchmIdAndIsDraft(UUID schemaId, Boolean isDraft);
 }
