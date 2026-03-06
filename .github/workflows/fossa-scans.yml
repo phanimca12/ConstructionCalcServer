@@ -1,0 +1,17 @@
+name: Fossa Scans
+on:
+  push:
+    branches: [ "main", "develop", "release/*" ]
+  workflow_dispatch:
+jobs:
+  fossa-with-build:
+    uses: intelligentautomation/Reusable-Workflows/.github/workflows/fossa-scan-with-build.yml@main
+    with:
+      fossa-config-file: '.fossa-config.yml'
+      keyvault-name: 'github-ia-kv'
+      secrets-to-pull: 'AWS-Access-Key-ID,AWS-Secret-Access-Key,Fossa-Api-Key'
+      java-version: '17'
+      maven-version: '3.9.9'
+      maven-settings-path: 'aws/m2/settings.xml'
+    secrets:
+      AZURE_CREDS: ${{ secrets.AZURE_CREDS }}
