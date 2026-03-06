@@ -10,6 +10,7 @@ jobs:
     uses: intelligentautomation/Reusable-Workflows/.github/workflows/sonarqube-scan-with-build.yml@main
     with:
       maven-settings-path: 'aws/m2/settings.xml'
+      java-version: '21'
       sonarqube-project-key: 'BPM-SchemaService'
       sonar-host-url: 'https://sonar.ssnc-corp.cloud/'
       keyvault-name: github-ia-kv
