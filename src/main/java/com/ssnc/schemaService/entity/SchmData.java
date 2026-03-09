@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.entity;
 
+import com.ssnc.schemaService.config.BooleanToYNConverter;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
@@ -22,6 +23,7 @@ public class SchmData {
     @Column(name = "SCHM_VERSION_NAME", length = 64)
     private String schmVersionName;
 
+    @Convert(converter = BooleanToYNConverter.class)
     @Column(name = "IS_DRAFT", length = 1)
     private Boolean isDraft;
 

@@ -212,22 +212,4 @@ public class SchemaController {
         SchemaVersionDto response = schemaService.updateDraftContent(nameSpace, UUID.fromString(id), content);
         return ResponseEntity.ok(response);
     }
-
-    /**
-     * PUT /schemas/{nameSpace}/{id}/{version}
-     * Update schema version with draft logic
-     */
-    @PutMapping("/{id}/{version}")
-    public ResponseEntity<SchemaVersionDto> updateSchemaVersion(
-            @PathVariable("nameSpace") String nameSpace,
-            @PathVariable("id") String id,
-            @PathVariable("version") Integer version,
-            @RequestBody SchemaVersionDto schemaVersionDto) {
-        SchemaVersionDto response = schemaService.updateSchemaVersion(
-                nameSpace,
-                UUID.fromString(id),
-                version,
-                schemaVersionDto);
-        return ResponseEntity.ok(response);
-    }
 }
