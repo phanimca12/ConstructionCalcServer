@@ -261,6 +261,66 @@ public class SchemaService {
     }
 
     /**
+     * Update schema version with draft logic
+     * If the provided version is not a draft, update the existing draft or create a new one
+     */
+    @Transactional
+    public SchemaVersionDto updateSchemaVersion(String namespace, UUID schmId, Integer version, SchemaVersionDto schemaVersionDto) {
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        // Check if the provided version exists
+        Optional<SchmData> providedVersionOpt = schmRepository.getSchemaVersion(schmId, version);
+
+        if (providedVersionOpt.isEmpty()) {
+            throw new IllegalArgumentException("Version " + version + " does not exist for schema " + schmId);
+        }
+
+        SchmData providedVersion = providedVersionOpt.get();
+
+        // If the provided version is NOT a draft, we need to update or create a draft version
+        if (providedVersion.getIsDraft() == null || !providedVersion.getIsDraft()) {
+            // Look for an existing draft version
+            Optional<SchmData> draftOpt = schmDataRepository.findByIdSchmIdAndIsDraft(schmId, true);
+
+            if (draftOpt.isPresent()) {
+                // Update the existing draft
+                SchmData draft = draftOpt.get();
+                draft.setSchmData(schemaVersionDto.getContent());
+                draft.setUpdatedBy(schemaVersionDto.getModifedByUser());
+                draft.setUpdatedDatetime(LocalDateTime.now());
+                SchmData updated = schmDataRepository.save(draft);
+                return mapToVersionResponse(updated);
+            } else {
+                // No draft exists, create a new version as draft
+                Integer highestVersion = schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(schmId)
+                        .map(sd -> sd.getId().getSchmVersion())
+                        .orElse(0);
+
+                SchmDataId newId = new SchmDataId();
+                newId.setSchmId(schmId);
+                newId.setSchmVersion(highestVersion + 1);
+
+                SchmData newDraft = new SchmData();
+                newDraft.setId(newId);
+                newDraft.setSchmData(schemaVersionDto.getContent());
+                newDraft.setIsDraft(true);
+                newDraft.setCreatedBy(schemaVersionDto.getModifedByUser());
+                newDraft.setUpdatedBy(schemaVersionDto.getModifedByUser());
+
+                SchmData saved = schmDataRepository.save(newDraft);
+                return mapToVersionResponse(saved);
+            }
+        } else {
+            // The provided version IS a draft, update it directly
+            providedVersion.setSchmData(schemaVersionDto.getContent());
+            providedVersion.setUpdatedBy(schemaVersionDto.getModifedByUser());
+            providedVersion.setUpdatedDatetime(LocalDateTime.now());
+            SchmData updated = schmDataRepository.save(providedVersion);
+            return mapToVersionResponse(updated);
+        }
+    }
+
+    /**
      * Create schema data from multipart file
      */
     private void createSchemaDataFromFile(UUID schmId, String content) throws IOException {
