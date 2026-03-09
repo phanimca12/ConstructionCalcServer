@@ -11,6 +11,6 @@ public class NameSpaceDto {
     private String description;
     private String createdByUser;
     private LocalDateTime createDateTime;
-    private String modifedByUser;
+    private String modifiedByUser;
     private LocalDateTime modifiedDateTime;
 }

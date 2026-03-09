@@ -20,7 +20,7 @@ public class NameSpaceService {
         nmspc.setNmspcName(nameSpaceDto.getName());
         nmspc.setDescription(nameSpaceDto.getDescription());
         nmspc.setCreatedBy(nameSpaceDto.getCreatedByUser());
-        nmspc.setUpdatedBy(nameSpaceDto.getModifedByUser());
+        nmspc.setUpdatedBy(nameSpaceDto.getModifiedByUser());
 
         Nmspc savedNmspc = nameSpaceRepository.save(nmspc);
 
@@ -34,7 +34,7 @@ public class NameSpaceService {
         dto.setDescription(nmspc.getDescription());
         dto.setCreatedByUser(nmspc.getCreatedBy());
         dto.setCreateDateTime(nmspc.getCreatedDatetime());
-        dto.setModifedByUser(nmspc.getUpdatedBy());
+        dto.setModifiedByUser(nmspc.getUpdatedBy());
         dto.setModifiedDateTime(nmspc.getUpdatedDatetime());
         return dto;
     }

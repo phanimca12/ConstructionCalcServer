@@ -286,7 +286,7 @@ public class SchemaService {
                 // Update the existing draft
                 SchmData draft = draftOpt.get();
                 draft.setSchmData(schemaVersionDto.getContent());
-                draft.setUpdatedBy(schemaVersionDto.getModifedByUser());
+                draft.setUpdatedBy(schemaVersionDto.getModifiedByUser());
                 draft.setUpdatedDatetime(LocalDateTime.now());
                 SchmData updated = schmDataRepository.save(draft);
                 return mapToVersionResponse(updated);
@@ -304,8 +304,8 @@ public class SchemaService {
                 newDraft.setId(newId);
                 newDraft.setSchmData(schemaVersionDto.getContent());
                 newDraft.setIsDraft(true);
-                newDraft.setCreatedBy(schemaVersionDto.getModifedByUser());
-                newDraft.setUpdatedBy(schemaVersionDto.getModifedByUser());
+                newDraft.setCreatedBy(schemaVersionDto.getModifiedByUser());
+                newDraft.setUpdatedBy(schemaVersionDto.getModifiedByUser());
 
                 SchmData saved = schmDataRepository.save(newDraft);
                 return mapToVersionResponse(saved);
@@ -313,7 +313,7 @@ public class SchemaService {
         } else {
             // The provided version IS a draft, update it directly
             providedVersion.setSchmData(schemaVersionDto.getContent());
-            providedVersion.setUpdatedBy(schemaVersionDto.getModifedByUser());
+            providedVersion.setUpdatedBy(schemaVersionDto.getModifiedByUser());
             providedVersion.setUpdatedDatetime(LocalDateTime.now());
             SchmData updated = schmDataRepository.save(providedVersion);
             return mapToVersionResponse(updated);
@@ -335,6 +335,7 @@ public class SchemaService {
         SchmData newVersion = new SchmData();
         newVersion.setId(newId);
         newVersion.setSchmData(content);
+        newVersion.setIsDraft(true);
 
         schmDataRepository.save(newVersion);
     }
@@ -353,7 +354,7 @@ public class SchemaService {
         response.setGroup(schm.getGroup());
         response.setCreatedByUser(schm.getCreatedBy());
         response.setCreateDateTime(schm.getCreatedDatetime());
-        response.setModifedByUser(schm.getUpdatedBy());
+        response.setModifiedByUser(schm.getUpdatedBy());
         response.setModifiedDateTime(schm.getUpdatedDatetime());
 
         // Set published and draft URLs
@@ -375,7 +376,7 @@ public class SchemaService {
         response.setIsDraft(data.getIsDraft());
         response.setCreatedByUser(data.getCreatedBy());
         response.setCreateDateTime(data.getCreatedDatetime());
-        response.setModifedByUser(data.getUpdatedBy());
+        response.setModifiedByUser(data.getUpdatedBy());
         response.setModifiedDateTime(data.getUpdatedDatetime());
         return response;
     }
@@ -394,7 +395,7 @@ public class SchemaService {
         schm.setGroup(response.getGroup());
         schm.setCreatedBy(response.getCreatedByUser());
         schm.setCreatedDatetime(response.getCreateDateTime());
-        schm.setUpdatedBy(response.getModifedByUser());
+        schm.setUpdatedBy(response.getModifiedByUser());
         schm.setUpdatedDatetime(response.getModifiedDateTime());
         return schm;
     }
@@ -413,7 +414,7 @@ public class SchemaService {
         schmData.setIsDraft(response.getIsDraft());
         schmData.setCreatedBy(response.getCreatedByUser());
         schmData.setCreatedDatetime(response.getCreateDateTime());
-        schmData.setUpdatedBy(response.getModifedByUser());
+        schmData.setUpdatedBy(response.getModifiedByUser());
         schmData.setUpdatedDatetime(response.getModifiedDateTime());
 
         return schmData;
