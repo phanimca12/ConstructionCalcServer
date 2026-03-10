@@ -164,20 +164,18 @@ public class SchemaService {
     }
 
     /**
-     * Delete/unpublish a schema version
+     * Unpublish a schema by setting publish version to null
      */
     @Transactional
-    public void unPublishSchemaVersion(String namespace, UUID schmId, Integer versionNumber) {
+    public void unPublishSchemaVersion(String namespace, UUID schmId) {
         namespaceFilterManager.enableIfPresent(namespace);
-        // If this is the published version, unpublish first
         Optional<Schm> schemaOpt = schmRepository.findBySchmId(schmId);
-        if (schemaOpt.isPresent() && schemaOpt.get().getPublishVersion() != null
-                && schemaOpt.get().getPublishVersion().equals(versionNumber)) {
+        if (schemaOpt.isPresent()) {
             Schm schema = schemaOpt.get();
             schema.setPublishVersion(null);
             schmRepository.save(schema);
-        }else{
-            throw new IllegalArgumentException("Invalid schema " + schmId );
+        } else {
+            throw new IllegalArgumentException("Schema not found: " + schmId);
         }
     }
 

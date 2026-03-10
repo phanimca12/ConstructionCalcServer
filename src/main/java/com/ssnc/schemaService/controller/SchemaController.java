@@ -122,15 +122,14 @@ public class SchemaController {
     }
 
     /**
-     * DELETE /schemas/{nameSpace}/{id}/version/{versionNumber}/publish
-     * Unpublish a specific schema version
+     * PUT /schemas/{nameSpace}/{id}/unPublish
+     * Unpublish a schema by setting publish version to null
      */
-    @PutMapping("/{id}/version/{versionNumber}/unPublish")
+    @PutMapping("/{id}/unPublish")
     public ResponseEntity<Void> unPublishSchemaVersion(
             @PathVariable("nameSpace") String nameSpace,
-            @PathVariable("id") String id,
-            @PathVariable("versionNumber") String versionNumber) {
-        schemaService.unPublishSchemaVersion(nameSpace, UUID.fromString(id), Integer.parseInt(versionNumber));
+            @PathVariable("id") String id) {
+        schemaService.unPublishSchemaVersion(nameSpace, UUID.fromString(id));
         return ResponseEntity.ok().build();
     }
 
