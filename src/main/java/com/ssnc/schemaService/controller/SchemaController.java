@@ -23,15 +23,16 @@ public class SchemaController {
 
     /**
      * GET /schemas/{nameSpace}
-     * Get schemas with optional filtering by type and group
+     * Get schemas with optional filtering by type, group, and content type
      */
     @GetMapping
     public ResponseEntity<List<SchemaDto>> getSchemas(
             @PathVariable("nameSpace") String nameSpace,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String group,
+            @RequestParam(required = false) String contentType,
             @RequestParam(required = false) boolean publishedOnly) {
-        List<SchemaDto> schemas = schemaService.getSchemas(nameSpace, type, group, publishedOnly);
+        List<SchemaDto> schemas = schemaService.getSchemas(nameSpace, type, group, contentType, publishedOnly);
         return ResponseEntity.ok(schemas);
     }
 

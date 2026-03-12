@@ -39,14 +39,15 @@ public class SchemaService {
     private NamespaceFilterManager namespaceFilterManager;
 
     /**
-     * Get schemas with optional filtering by type and group
+     * Get schemas with optional filtering by type, group, and content type
      */
-    public List<SchemaDto> getSchemas(String namespace, String type, String group, boolean publishedOnly) {
+    public List<SchemaDto> getSchemas(String namespace, String type, String group, String contentType, boolean publishedOnly) {
         namespaceFilterManager.enableIfPresent(namespace);
 
         SchmFilterCriteria criteria = new SchmFilterCriteria();
         criteria.setSchemaType(type);
         criteria.setGroup(group);
+        criteria.setContentType(contentType);
         criteria.setPublishedOnly(publishedOnly);
 
         List<Schm> schemas = schmRepository.findAll(SchmSpecifications.withFilters(criteria));

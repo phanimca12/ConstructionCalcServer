@@ -50,15 +50,43 @@ class SchemaControllerTest {
     @Test
     void testGetSchemas() {
         List<SchemaDto> expectedSchemas = Arrays.asList(testSchemaDto);
-        when(schemaService.getSchemas(testNamespace, null, null, false))
+        when(schemaService.getSchemas(testNamespace, null, null, null, false))
                 .thenReturn(expectedSchemas);
 
         ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
-                testNamespace, null, null, false);
+                testNamespace, null, null, null, false);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(expectedSchemas, response.getBody());
-        verify(schemaService).getSchemas(testNamespace, null, null, false);
+        verify(schemaService).getSchemas(testNamespace, null, null, null, false);
+    }
+
+    @Test
+    void testGetSchemasWithFilters() {
+        List<SchemaDto> expectedSchemas = Arrays.asList(testSchemaDto);
+        when(schemaService.getSchemas(testNamespace, "FormData", "group1", "application/json", true))
+                .thenReturn(expectedSchemas);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, "FormData", "group1", "application/json", true);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedSchemas, response.getBody());
+        verify(schemaService).getSchemas(testNamespace, "FormData", "group1", "application/json", true);
+    }
+
+    @Test
+    void testGetSchemasWithContentType() {
+        List<SchemaDto> expectedSchemas = Arrays.asList(testSchemaDto);
+        when(schemaService.getSchemas(testNamespace, null, null, "application/xml", false))
+                .thenReturn(expectedSchemas);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, null, null, "application/xml", false);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedSchemas, response.getBody());
+        verify(schemaService).getSchemas(testNamespace, null, null, "application/xml", false);
     }
 
     @Test
