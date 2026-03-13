@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.dto.NameSpaceDto;
 import com.ssnc.schemaService.entity.Nmspc;
 import com.ssnc.schemaService.service.NameSpaceService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,17 +17,17 @@ public class NameSpaceController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Nmspc createNamespace(@RequestBody Nmspc request) {
+    public NameSpaceDto createNamespace(@RequestBody NameSpaceDto request) {
         return nameSpaceService.createNameSpace(request);
     }
 
     @GetMapping("/{namespace}")
-    public Nmspc getNameSpaceByName(@PathVariable String namespace) {
+    public NameSpaceDto getNameSpaceByName(@PathVariable String namespace) {
         return nameSpaceService.getNameSpaceByName(namespace);
     }
 
     @GetMapping
-    public List<Nmspc> getAllNameSpaces() {
+    public List<NameSpaceDto> getAllNameSpaces() {
         return nameSpaceService.getAllNameSpaces();
     }
 }

@@ -42,6 +42,15 @@ public final class SchmSpecifications {
                 );
             }
 
+            if (criteria.getContentType() != null) {
+                predicates.add(
+                        cb.equal(
+                                cb.lower(root.get("contentType")),
+                                criteria.getContentType().toLowerCase()
+                        )
+                );
+            }
+
             if (criteria.getGroup() != null) {
                 predicates.add(
                         cb.equal(

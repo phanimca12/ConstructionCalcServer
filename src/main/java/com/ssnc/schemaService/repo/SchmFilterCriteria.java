@@ -11,6 +11,7 @@ public class SchmFilterCriteria {
     private UUID schmId;
     private String schemaName;
     private String schemaType;
+    private String contentType;
     private String group;
     private String lockBy;
     private Integer publishVersion;

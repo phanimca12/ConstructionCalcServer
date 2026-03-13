@@ -23,15 +23,16 @@ public class SchemaController {
 
     /**
      * GET /schemas/{nameSpace}
-     * Get schemas with optional filtering by type and group
+     * Get schemas with optional filtering by type, group, and content type
      */
     @GetMapping
     public ResponseEntity<List<SchemaDto>> getSchemas(
             @PathVariable("nameSpace") String nameSpace,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String group,
+            @RequestParam(required = false) String contentType,
             @RequestParam(required = false) boolean publishedOnly) {
-        List<SchemaDto> schemas = schemaService.getSchemas(nameSpace, type, group, publishedOnly);
+        List<SchemaDto> schemas = schemaService.getSchemas(nameSpace, type, group, contentType, publishedOnly);
         return ResponseEntity.ok(schemas);
     }
 
@@ -122,15 +123,14 @@ public class SchemaController {
     }
 
     /**
-     * DELETE /schemas/{nameSpace}/{id}/version/{versionNumber}/publish
-     * Unpublish a specific schema version
+     * PUT /schemas/{nameSpace}/{id}/unPublish
+     * Unpublish a schema by setting publish version to null
      */
-    @PutMapping("/{id}/version/{versionNumber}/unPublish")
+    @PutMapping("/{id}/unPublish")
     public ResponseEntity<Void> unPublishSchemaVersion(
             @PathVariable("nameSpace") String nameSpace,
-            @PathVariable("id") String id,
-            @PathVariable("versionNumber") String versionNumber) {
-        schemaService.unPublishSchemaVersion(nameSpace, UUID.fromString(id), Integer.parseInt(versionNumber));
+            @PathVariable("id") String id) {
+        schemaService.unPublishSchemaVersion(nameSpace, UUID.fromString(id));
         return ResponseEntity.ok().build();
     }
 

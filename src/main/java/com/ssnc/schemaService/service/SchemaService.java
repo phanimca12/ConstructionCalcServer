@@ -39,14 +39,15 @@ public class SchemaService {
     private NamespaceFilterManager namespaceFilterManager;
 
     /**
-     * Get schemas with optional filtering by type and group
+     * Get schemas with optional filtering by type, group, and content type
      */
-    public List<SchemaDto> getSchemas(String namespace, String type, String group, boolean publishedOnly) {
+    public List<SchemaDto> getSchemas(String namespace, String type, String group, String contentType, boolean publishedOnly) {
         namespaceFilterManager.enableIfPresent(namespace);
 
         SchmFilterCriteria criteria = new SchmFilterCriteria();
         criteria.setSchemaType(type);
         criteria.setGroup(group);
+        criteria.setContentType(contentType);
         criteria.setPublishedOnly(publishedOnly);
 
         List<Schm> schemas = schmRepository.findAll(SchmSpecifications.withFilters(criteria));
@@ -113,14 +114,25 @@ public class SchemaService {
     }
 
     /**
-     * Update an existing schema
+     * Update an existing schema (schmName is non-editable, always fetched from DB)
      */
     @Transactional
     public SchemaDto updateSchema(String namespace, UUID schmId, SchemaDto schemaDto) {
-        Schm schema = mapToSchmEntity(schemaDto);
-        schema.setNamespace(namespace);
-        schema.setSchmId(schmId);
-        Schm updated = schmRepository.save(schema);
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        // Fetch existing entity - schmName is non-editable and always from DB
+        Schm existing = schmRepository.findBySchmId(schmId)
+                .orElseThrow(() -> new IllegalArgumentException("Schema not found: " + schmId));
+
+        // Update only editable fields (schmName is preserved from DB)
+        existing.setSchmDesc(schemaDto.getDescription());
+        existing.setSchemaType(schemaDto.getSchemaType());
+        existing.setContentType(schemaDto.getContentType());
+        existing.setGroup(schemaDto.getGroup());
+        existing.setLockBy(schemaDto.getLockBy());
+        existing.setUpdatedBy(schemaDto.getModifiedByUser());
+
+        Schm updated = schmRepository.save(existing);
         return mapToSchemaResponse(updated);
     }
 
@@ -143,17 +155,18 @@ public class SchemaService {
         Optional<Schm> schemaOpt = schmRepository.findBySchmId(schmId);
         if(schemaOpt.isPresent()){
             Schm schema = schemaOpt.get();
-            if (schema.getPublishVersion() != null ) {
-                if (!schema.getPublishVersion().equals(versionNumber)) {
+            if (schema.getPublishVersion() != null && schema.getPublishVersion().equals(versionNumber)) {
                     throw new IllegalStateException("Schema " + schmId + " already has published version " + schema.getPublishVersion());
-                }else {
-                    throw new IllegalStateException("Schema " + schmId + " with version " + versionNumber  + " already published ");
                 }
-            }
 
             // Verify the version exists
             Optional<SchmData> versionOpt = schmRepository.getSchemaVersion(schmId, versionNumber);
             if (versionOpt.isPresent()) {
+                SchmData schemaData = versionOpt.get();
+                // Set isDraft to false when publishing
+                schemaData.setIsDraft(false);
+                schmDataRepository.save(schemaData);
+
                 schema.setPublishVersion(versionNumber);
                 schmRepository.save(schema);
             } else {
@@ -163,20 +176,18 @@ public class SchemaService {
     }
 
     /**
-     * Delete/unpublish a schema version
+     * Unpublish a schema by setting publish version to null
      */
     @Transactional
-    public void unPublishSchemaVersion(String namespace, UUID schmId, Integer versionNumber) {
+    public void unPublishSchemaVersion(String namespace, UUID schmId) {
         namespaceFilterManager.enableIfPresent(namespace);
-        // If this is the published version, unpublish first
         Optional<Schm> schemaOpt = schmRepository.findBySchmId(schmId);
-        if (schemaOpt.isPresent() && schemaOpt.get().getPublishVersion() != null
-                && schemaOpt.get().getPublishVersion().equals(versionNumber)) {
+        if (schemaOpt.isPresent()) {
             Schm schema = schemaOpt.get();
             schema.setPublishVersion(null);
             schmRepository.save(schema);
-        }else{
-            throw new IllegalArgumentException("Invalid schema " + schmId );
+        } else {
+            throw new IllegalArgumentException("Schema not found: " + schmId);
         }
     }
 
@@ -253,7 +264,11 @@ public class SchemaService {
             SchmData newVersion = new SchmData();
             newVersion.setId(newId);
             newVersion.setSchmData(content);
-            //newVersion.setSchmVersionName("draft");
+            newVersion.setIsDraft(true);
+            newVersion.setUpdatedBy("Draft Creator");
+            newVersion.setCreatedBy("Draft Creator");
+            newVersion.setCreatedDatetime(LocalDateTime.now());
+            newVersion.setUpdatedDatetime(LocalDateTime.now());
 
             SchmData saved = schmDataRepository.save(newVersion);
             return mapToVersionResponse(saved);
@@ -275,6 +290,9 @@ public class SchemaService {
         SchmData newVersion = new SchmData();
         newVersion.setId(newId);
         newVersion.setSchmData(content);
+        newVersion.setIsDraft(true);
+        newVersion.setUpdatedBy("Test");
+        newVersion.setCreatedBy("Test");
 
         schmDataRepository.save(newVersion);
     }
@@ -293,14 +311,17 @@ public class SchemaService {
         response.setGroup(schm.getGroup());
         response.setCreatedByUser(schm.getCreatedBy());
         response.setCreateDateTime(schm.getCreatedDatetime());
-        response.setModifedByUser(schm.getUpdatedBy());
+        response.setModifiedByUser(schm.getUpdatedBy());
         response.setModifiedDateTime(schm.getUpdatedDatetime());
 
-        // Set published and draft URLs
+        // Set published version number from SCHM table
         if (schm.getPublishVersion() != null) {
-            response.setPublished("/schemas/" + schm.getNamespace() + "/" + schm.getSchmId() + "/version/published/content");
+            response.setPublished(String.valueOf(schm.getPublishVersion()));
         }
-        response.setDraft("/schemas/" + schm.getNamespace() + "/" + schm.getSchmId() + "/version/draft/content");
+
+        // Set draft version number from SCHM_DATA table where isDraft = Y
+        schmDataRepository.findByIdSchmIdAndIsDraft(schm.getSchmId(), true)
+                .ifPresent(draft -> response.setDraft(String.valueOf(draft.getId().getSchmVersion())));
 
         return response;
     }
@@ -315,7 +336,7 @@ public class SchemaService {
         response.setIsDraft(data.getIsDraft());
         response.setCreatedByUser(data.getCreatedBy());
         response.setCreateDateTime(data.getCreatedDatetime());
-        response.setModifedByUser(data.getUpdatedBy());
+        response.setModifiedByUser(data.getUpdatedBy());
         response.setModifiedDateTime(data.getUpdatedDatetime());
         return response;
     }
@@ -334,7 +355,7 @@ public class SchemaService {
         schm.setGroup(response.getGroup());
         schm.setCreatedBy(response.getCreatedByUser());
         schm.setCreatedDatetime(response.getCreateDateTime());
-        schm.setUpdatedBy(response.getModifedByUser());
+        schm.setUpdatedBy(response.getModifiedByUser());
         schm.setUpdatedDatetime(response.getModifiedDateTime());
         return schm;
     }
@@ -353,7 +374,7 @@ public class SchemaService {
         schmData.setIsDraft(response.getIsDraft());
         schmData.setCreatedBy(response.getCreatedByUser());
         schmData.setCreatedDatetime(response.getCreateDateTime());
-        schmData.setUpdatedBy(response.getModifedByUser());
+        schmData.setUpdatedBy(response.getModifiedByUser());
         schmData.setUpdatedDatetime(response.getModifiedDateTime());
 
         return schmData;

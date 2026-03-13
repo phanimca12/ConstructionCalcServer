@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.dto.TenantDto;
 import com.ssnc.schemaService.entity.Tenant;
 import com.ssnc.schemaService.service.TenantService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,17 +18,17 @@ public class TenantController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Tenant createTenant(@RequestBody Tenant request) {
+    public TenantDto createTenant(@RequestBody TenantDto request) {
         return tenantService.createTenant(request);
     }
 
     @GetMapping("/{tenantName}")
-    public Tenant getTenantByName(@PathVariable String tenantName) {
+    public TenantDto getTenantByName(@PathVariable String tenantName) {
         return tenantService.getTenantByName(tenantName);
     }
 
     @GetMapping
-    public List<Tenant> getAllTenants() {
+    public List<TenantDto> getAllTenants() {
         return tenantService.getAllTenants();
     }
 }
