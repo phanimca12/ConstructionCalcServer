@@ -114,14 +114,25 @@ public class SchemaService {
     }
 
     /**
-     * Update an existing schema
+     * Update an existing schema (only updates SCHM table)
      */
     @Transactional
     public SchemaDto updateSchema(String namespace, UUID schmId, SchemaDto schemaDto) {
-        Schm schema = mapToSchmEntity(schemaDto);
-        schema.setNamespace(namespace);
-        schema.setSchmId(schmId);
-        Schm updated = schmRepository.save(schema);
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        // Fetch existing entity to avoid cascading to SCHM_DATA
+        Schm existing = schmRepository.findBySchmId(schmId)
+                .orElseThrow(() -> new IllegalArgumentException("Schema not found: " + schmId));
+
+        existing.setSchmDesc(schemaDto.getDescription());
+        existing.setSchemaType(schemaDto.getSchemaType());
+        existing.setContentType(schemaDto.getContentType());
+        existing.setGroup(schemaDto.getGroup());
+        existing.setLockBy(schemaDto.getLockBy());
+        existing.setUpdatedBy(schemaDto.getModifiedByUser());
+
+        // Save updates only to SCHM table (versions relationship is not modified)
+        Schm updated = schmRepository.save(existing);
         return mapToSchemaResponse(updated);
     }
 
