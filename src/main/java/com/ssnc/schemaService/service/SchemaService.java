@@ -114,16 +114,17 @@ public class SchemaService {
     }
 
     /**
-     * Update an existing schema (only updates SCHM table)
+     * Update an existing schema (schmName is non-editable, always fetched from DB)
      */
     @Transactional
     public SchemaDto updateSchema(String namespace, UUID schmId, SchemaDto schemaDto) {
         namespaceFilterManager.enableIfPresent(namespace);
 
-        // Fetch existing entity to avoid cascading to SCHM_DATA
+        // Fetch existing entity - schmName is non-editable and always from DB
         Schm existing = schmRepository.findBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException("Schema not found: " + schmId));
 
+        // Update only editable fields (schmName is preserved from DB)
         existing.setSchmDesc(schemaDto.getDescription());
         existing.setSchemaType(schemaDto.getSchemaType());
         existing.setContentType(schemaDto.getContentType());
@@ -131,7 +132,6 @@ public class SchemaService {
         existing.setLockBy(schemaDto.getLockBy());
         existing.setUpdatedBy(schemaDto.getModifiedByUser());
 
-        // Save updates only to SCHM table (versions relationship is not modified)
         Schm updated = schmRepository.save(existing);
         return mapToSchemaResponse(updated);
     }
@@ -314,11 +314,14 @@ public class SchemaService {
         response.setModifiedByUser(schm.getUpdatedBy());
         response.setModifiedDateTime(schm.getUpdatedDatetime());
 
-        // Set published and draft URLs
+        // Set published version number from SCHM table
         if (schm.getPublishVersion() != null) {
-            response.setPublished("/schemas/" + schm.getNamespace() + "/" + schm.getSchmId() + "/version/published/content");
+            response.setPublished(String.valueOf(schm.getPublishVersion()));
         }
-        response.setDraft("/schemas/" + schm.getNamespace() + "/" + schm.getSchmId() + "/version/draft/content");
+
+        // Set draft version number from SCHM_DATA table where isDraft = Y
+        schmDataRepository.findByIdSchmIdAndIsDraft(schm.getSchmId(), true)
+                .ifPresent(draft -> response.setDraft(String.valueOf(draft.getId().getSchmVersion())));
 
         return response;
     }

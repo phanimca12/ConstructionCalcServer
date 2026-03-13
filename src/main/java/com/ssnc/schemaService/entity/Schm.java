@@ -1,6 +1,7 @@
 package com.ssnc.schemaService.entity;
 
 import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Table;
 import lombok.Data;
 import org.hibernate.annotations.*;
@@ -73,11 +74,8 @@ public class Schm {
     @Column(name = "PUBLISH_VERSION")
     private Integer publishVersion;
 
-    @OneToMany(
-        fetch = FetchType.LAZY
-    )
-    @JoinColumn(name = "SCHM_ID")
+    @OneToMany( fetch = FetchType.LAZY , cascade = CascadeType.PERSIST)
+     @JoinColumn(name = "SCHM_ID")
     private List<SchmData> versions = new ArrayList<>();
-
 
 }
