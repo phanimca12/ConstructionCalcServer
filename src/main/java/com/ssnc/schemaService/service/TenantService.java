@@ -23,12 +23,7 @@ public class TenantService {
 
     @Autowired
     TenantRepository tenantRepository;
-    private final JwtClaimsContext jwtClaimsContext;
-
-    public TenantService(TenantRepository tenantRepository, JwtClaimsContext jwtClaimsContext) {
-        this.tenantRepository = tenantRepository;
-        this.jwtClaimsContext = jwtClaimsContext;
-    }
+    JwtClaimsContext jwtClaimsContext;
 
     @Transactional
     public List<Tenant> createTenantsFromContext() throws Exception {
@@ -38,46 +33,34 @@ public class TenantService {
             throw new IllegalStateException(error);
         }
 
-        List<String> clients = jwtClaimsContext.getClients();
+        String tenantName = jwtClaimsContext.getTenant();
 
-        List<String> newClients = new ArrayList<>();
-        clients.forEach(client -> {
-            Optional<Tenant> existingTenant = tenantRepository.findByTenantName(client);
-            if (existingTenant.isEmpty()) {
-                newClients.add(client);
-            }
-        });
-
-        if (newClients.isEmpty()) {
-            logger.debug("All clients already onboarded: {}", clients);
+        if (tenantName == null || tenantName.isEmpty()) {
+            logger.debug("No tenant found in JWT context");
             return new ArrayList<>();
         }
 
-        List<Tenant> tenantsToCreate = new ArrayList<>();
-        buildTenantEntityFromContext(tenantsToCreate, newClients);
-
-        // Batch insert all new tenants at once
-        if (!tenantsToCreate.isEmpty()) {
-            tenantRepository.saveAll(tenantsToCreate);
-            logger.info("Successfully created {} tenants", tenantsToCreate.size());
+        // Check if tenant already exists
+        Optional<Tenant> existingTenant = tenantRepository.findByTenantName(tenantName);
+        if (existingTenant.isPresent()) {
+            logger.debug("Tenant already onboarded: {}", tenantName);
+            return new ArrayList<>();
         }
 
-        return tenantsToCreate;
-    }
-
-    private void buildTenantEntityFromContext(List<Tenant> tenantsToCreate, List<String> clients) {
+        // Create new tenant
         String userName = jwtClaimsContext.getUserId() != null ? jwtClaimsContext.getUserId() : "system";
 
-        for (String clientName : clients) {
-            logger.debug("Preparing to create new tenant for client: {}", clientName);
+        logger.debug("Preparing to create new tenant: {}", tenantName);
 
-            Tenant newTenant = new Tenant();
-            newTenant.setTenantName(clientName);
-            newTenant.setCreatedBy(userName);
-            newTenant.setUpdatedBy(userName);
+        Tenant newTenant = new Tenant();
+        newTenant.setTenantName(tenantName);
+        newTenant.setCreatedBy(userName);
+        newTenant.setUpdatedBy(userName);
 
-            tenantsToCreate.add(newTenant);
-        }
+        Tenant savedTenant = tenantRepository.save(newTenant);
+        logger.info("Successfully created tenant: {}", tenantName);
+
+        return List.of(savedTenant);
     }
 
     public TenantDto createTenant(TenantDto tenantDto) {

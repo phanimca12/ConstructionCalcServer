@@ -50,8 +50,7 @@ class TenantControllerTest {
 
     @Test
     void testCreateTenant_Success() throws Exception {
-        List<String> clients = Arrays.asList("client1", "client2");
-        when(jwtClaimsContext.getClients()).thenReturn(clients);
+        when(jwtClaimsContext.getTenant()).thenReturn("client1");
         when(tenantService.createTenantsFromContext()).thenReturn(new ArrayList<>());
 
         ResponseEntity<?> result = tenantController.createTenant();
@@ -63,7 +62,7 @@ class TenantControllerTest {
 
     @Test
     void testCreateTenant_WithException() throws Exception {
-        when(jwtClaimsContext.getClients()).thenReturn(Arrays.asList("client1"));
+        when(jwtClaimsContext.getTenant()).thenReturn("client1");
         when(tenantService.createTenantsFromContext())
                 .thenThrow(new RuntimeException("Database error"));
 
