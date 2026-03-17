@@ -1,15 +1,20 @@
 package com.ssnc.schemaService.controller;
 
 import com.ssnc.schemaService.dto.TenantDto;
+import com.ssnc.schemaService.entity.Tenant;
 import com.ssnc.schemaService.service.TenantService;
+import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -23,7 +28,9 @@ class TenantControllerTest {
     @Mock
     private TenantService tenantService;
 
-    @InjectMocks
+    @Mock
+    private JwtClaimsContext jwtClaimsContext;
+
     private TenantController tenantController;
 
     private TenantDto testTenantDto;
@@ -31,6 +38,7 @@ class TenantControllerTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        tenantController = new TenantController(tenantService, jwtClaimsContext);
 
         testTenantDto = new TenantDto();
         testTenantDto.setName("testTenant");
@@ -41,31 +49,30 @@ class TenantControllerTest {
     }
 
     @Test
-    void testCreateTenant_Success() {
-        when(tenantService.createTenant(any(TenantDto.class)))
-                .thenReturn(testTenantDto);
+    void testCreateTenant_Success() throws Exception {
+        List<String> clients = Arrays.asList("client1", "client2");
+        when(jwtClaimsContext.getClients()).thenReturn(clients);
+        when(tenantService.createTenantsFromContext()).thenReturn(new ArrayList<>());
 
-        TenantDto result = tenantController.createTenant(testTenantDto);
+        ResponseEntity<?> result = tenantController.createTenant();
 
         assertNotNull(result);
-        assertEquals("testTenant", result.getName());
-        assertEquals("testUser", result.getCreatedByUser());
-        verify(tenantService, times(1)).createTenant(testTenantDto);
+        assertEquals(HttpStatus.CREATED, result.getStatusCode());
+        verify(tenantService, times(1)).createTenantsFromContext();
     }
 
     @Test
-    void testCreateTenant_WithMinimalData() {
-        TenantDto minimalDto = new TenantDto();
-        minimalDto.setName("tenant2");
+    void testCreateTenant_WithException() throws Exception {
+        when(jwtClaimsContext.getClients()).thenReturn(Arrays.asList("client1"));
+        when(tenantService.createTenantsFromContext())
+                .thenThrow(new RuntimeException("Database error"));
 
-        when(tenantService.createTenant(any(TenantDto.class)))
-                .thenReturn(minimalDto);
-
-        TenantDto result = tenantController.createTenant(minimalDto);
+        ResponseEntity<?> result = tenantController.createTenant();
 
         assertNotNull(result);
-        assertEquals("tenant2", result.getName());
-        verify(tenantService).createTenant(minimalDto);
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getStatusCode());
+        assertEquals("Database error", result.getBody());
+        verify(tenantService, times(1)).createTenantsFromContext();
     }
 
     @Test

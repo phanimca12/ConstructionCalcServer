@@ -12,6 +12,7 @@ import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.repo.SchmSpecifications;
 import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import com.ssnc.schemaService.tenant.TenantContext;
+import com.ssnc.shared.security.JwtClaimsContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,9 @@ public class SchemaService {
 
     @Autowired
     private NamespaceFilterManager namespaceFilterManager;
+
+    @Autowired
+    private JwtClaimsContext jwtClaimsContext;
 
     /**
      * Get schemas with optional filtering by type, group, and content type
@@ -257,6 +261,9 @@ public class SchemaService {
                     .map(sd -> sd.getId().getSchmVersion())
                     .orElse(0);
 
+            String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                    ? jwtClaimsContext.getUserId() : "system";
+
             SchmDataId newId = new SchmDataId();
             newId.setSchmId(schmId);
             newId.setSchmVersion(latestVersion + 1);
@@ -265,8 +272,8 @@ public class SchemaService {
             newVersion.setId(newId);
             newVersion.setSchmData(content);
             newVersion.setIsDraft(true);
-            newVersion.setUpdatedBy("Draft Creator");
-            newVersion.setCreatedBy("Draft Creator");
+            newVersion.setUpdatedBy(userName);
+            newVersion.setCreatedBy(userName);
             newVersion.setCreatedDatetime(LocalDateTime.now());
             newVersion.setUpdatedDatetime(LocalDateTime.now());
 
@@ -283,6 +290,9 @@ public class SchemaService {
                 .map(sd -> sd.getId().getSchmVersion())
                 .orElse(0);
 
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : "system";
+
         SchmDataId newId = new SchmDataId();
         newId.setSchmId(schmId);
         newId.setSchmVersion(latestVersion + 1);
@@ -291,8 +301,8 @@ public class SchemaService {
         newVersion.setId(newId);
         newVersion.setSchmData(content);
         newVersion.setIsDraft(true);
-        newVersion.setUpdatedBy("Test");
-        newVersion.setCreatedBy("Test");
+        newVersion.setUpdatedBy(userName);
+        newVersion.setCreatedBy(userName);
 
         schmDataRepository.save(newVersion);
     }

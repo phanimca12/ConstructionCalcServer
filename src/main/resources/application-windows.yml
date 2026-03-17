@@ -52,3 +52,15 @@ guid:
   oracle_guid: "RAW(16)"
   sqlserver_guid: "UNIQUEIDENTIFIER"
   postgresql_guid: "UUID"
+
+bpm:
+  security:
+    jwt:
+      enabled: true
+      use-default-security-config: true
+      public-key-endpoint: "/awdServer/api/services/v1/publickey"
+      token-header: "Authorization"
+      token-prefix: "Bearer"
+      whitelist-paths:
+        - "/actuator/**"
+        - "/swagger-ui/**"
