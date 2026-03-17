@@ -30,8 +30,9 @@ public class SchmXref {
     @Column(name = "NMSPC_NAME", length = 32)
     private String nmspName;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "REF_TYPE", length = 64)
-    private String refType;
+    private XRefType refType;
 
     @Column(name = "REF_VERSION", length = 64)
     private String refVersion;

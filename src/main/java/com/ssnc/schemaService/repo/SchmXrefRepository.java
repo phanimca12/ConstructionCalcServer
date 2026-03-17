@@ -1,6 +1,7 @@
 package com.ssnc.schemaService.repo;
 
 import com.ssnc.schemaService.entity.SchmXref;
+import com.ssnc.schemaService.entity.XRefType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -18,7 +19,7 @@ public interface SchmXrefRepository extends JpaRepository<SchmXref, UUID> {
     /**
      * Find cross-references by schema ID and reference type
      */
-    List<SchmXref> findBySchmIdAndRefType(UUID schmId, String refType);
+    List<SchmXref> findBySchmIdAndRefType(UUID schmId, XRefType refType);
 
     /**
      * Find cross-references by reference GUID

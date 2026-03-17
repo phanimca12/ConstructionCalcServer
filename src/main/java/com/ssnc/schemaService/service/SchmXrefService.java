@@ -2,7 +2,9 @@ package com.ssnc.schemaService.service;
 
 import com.ssnc.schemaService.dto.SchmXrefDto;
 import com.ssnc.schemaService.entity.SchmXref;
+import com.ssnc.schemaService.entity.XRefType;
 import com.ssnc.schemaService.repo.SchmXrefRepository;
+import com.ssnc.schemaService.util.XRefTypeMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +48,8 @@ public class SchmXrefService {
      * Get cross-references by schema ID and reference type
      */
     public List<SchmXrefDto> getXrefsBySchmIdAndRefType(UUID schmId, String refType) {
-        List<SchmXref> xrefs = schmXrefRepository.findBySchmIdAndRefType(schmId, refType);
+        XRefType enumType = XRefTypeMapper.toEnum(refType);
+        List<SchmXref> xrefs = schmXrefRepository.findBySchmIdAndRefType(schmId, enumType);
         return xrefs.stream().map(this::mapToDto).collect(Collectors.toList());
     }
 
@@ -81,7 +84,7 @@ public class SchmXrefService {
         existing.setSchmName(xrefDto.getSchmName());
         existing.setSchmType(xrefDto.getSchmType());
         existing.setNmspName(xrefDto.getNmspName());
-        existing.setRefType(xrefDto.getRefType());
+        existing.setRefType(XRefTypeMapper.toEnum(xrefDto.getRefType()));
         existing.setRefVersion(xrefDto.getRefVersion());
         existing.setRefName(xrefDto.getRefName());
         existing.setRefGuid(xrefDto.getRefGuid());
@@ -113,7 +116,7 @@ public class SchmXrefService {
         dto.setSchmName(xref.getSchmName());
         dto.setSchmType(xref.getSchmType());
         dto.setNmspName(xref.getNmspName());
-        dto.setRefType(xref.getRefType());
+        dto.setRefType(XRefTypeMapper.toString(xref.getRefType()));
         dto.setRefVersion(xref.getRefVersion());
         dto.setRefName(xref.getRefName());
         dto.setRefGuid(xref.getRefGuid());
@@ -135,7 +138,7 @@ public class SchmXrefService {
         xref.setSchmName(dto.getSchmName());
         xref.setSchmType(dto.getSchmType());
         xref.setNmspName(dto.getNmspName());
-        xref.setRefType(dto.getRefType());
+        xref.setRefType(XRefTypeMapper.toEnum(dto.getRefType()));
         xref.setRefVersion(dto.getRefVersion());
         xref.setRefName(dto.getRefName());
         xref.setRefGuid(dto.getRefGuid());
