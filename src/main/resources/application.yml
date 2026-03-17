@@ -59,8 +59,6 @@ bpm:
       enabled: true
       use-default-security-config: true
       public-key-endpoint: "/awdServer/api/services/v1/publickey"
-      token-header: "Authorization"
-      token-prefix: "Bearer"
       whitelist-paths:
         - "/actuator/**"
         - "/swagger-ui/**"
