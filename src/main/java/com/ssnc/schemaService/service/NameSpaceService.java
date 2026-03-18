@@ -1,5 +1,7 @@
 package com.ssnc.schemaService.service;
 
+import com.ssnc.schemaService.constants.AppConstants;
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.NameSpaceDto;
 import com.ssnc.schemaService.entity.Nmspc;
 import com.ssnc.schemaService.repo.NameSpaceRepository;
@@ -21,7 +23,7 @@ public class NameSpaceService {
 
     public NameSpaceDto createNameSpace(NameSpaceDto nameSpaceDto) {
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
-                ? jwtClaimsContext.getUserId() : "system";
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
         Nmspc nmspc = new Nmspc();
         nmspc.setNmspcName(nameSpaceDto.getName());
@@ -48,7 +50,7 @@ public class NameSpaceService {
 
     public NameSpaceDto getNameSpaceByName(String name) {
         Nmspc nmspc = nameSpaceRepository.findBynmspcName(name)
-                .orElseThrow(() -> new EntityNotFoundException("Namespace not found"));
+                .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.NAMESPACE_NOT_FOUND));
         return mapToNameSpaceDto(nmspc);
     }
 

@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.config;
 
+import com.ssnc.schemaService.constants.AppConstants;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 
@@ -9,9 +10,9 @@ public class BooleanToYNConverter implements AttributeConverter<Boolean, String>
     @Override
     public String convertToDatabaseColumn(Boolean attribute) {
         if (attribute == null) {
-            return null; // or "N" if you want default
+            return null; // or AppConstants.BOOLEAN_NO if you want default
         }
-        return attribute ? "Y" : "N";
+        return attribute ? AppConstants.BOOLEAN_YES : AppConstants.BOOLEAN_NO;
     }
 
     @Override
@@ -19,6 +20,6 @@ public class BooleanToYNConverter implements AttributeConverter<Boolean, String>
         if (dbData == null) {
             return null; // or false if you want default
         }
-        return dbData.equalsIgnoreCase("Y");
+        return dbData.equalsIgnoreCase(AppConstants.BOOLEAN_YES);
     }
 }

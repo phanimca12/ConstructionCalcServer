@@ -1,5 +1,7 @@
 package com.ssnc.schemaService.service;
 
+import com.ssnc.schemaService.constants.AppConstants;
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.TenantDto;
 import com.ssnc.schemaService.entity.Tenant;
 import com.ssnc.schemaService.repo.TenantRepository;
@@ -29,29 +31,28 @@ public class TenantService {
     @Transactional
     public List<Tenant> createTenantsFromContext() throws Exception {
         if (jwtClaimsContext != null && !jwtClaimsContext.isPopulated()) {
-            String error = "JWT claims context is not populated. Cannot create tenants.";
-            logger.error(error);
-            throw new IllegalStateException(error);
+            logger.error(ErrorMessages.JWT_CONTEXT_NOT_POPULATED);
+            throw new IllegalStateException(ErrorMessages.JWT_CONTEXT_NOT_POPULATED);
         }
 
         String tenantName = jwtClaimsContext.getTenant();
 
         if (tenantName == null || tenantName.isEmpty()) {
-            logger.debug("No tenant found in JWT context");
+            logger.debug(ErrorMessages.NO_TENANT_IN_JWT);
             return new ArrayList<>();
         }
 
         // Check if tenant already exists
         Optional<Tenant> existingTenant = tenantRepository.findByTenantName(tenantName);
         if (existingTenant.isPresent()) {
-            logger.debug("Tenant already onboarded: {}", tenantName);
+            logger.debug(ErrorMessages.TENANT_ALREADY_ONBOARDED, tenantName);
             return new ArrayList<>();
         }
 
         // Create new tenant
-        String userName = jwtClaimsContext.getUserId() != null ? jwtClaimsContext.getUserId() : "system";
+        String userName = jwtClaimsContext.getUserId() != null ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
-        logger.debug("Preparing to create new tenant: {}", tenantName);
+        logger.debug(ErrorMessages.TENANT_ONBOARDING_PREPARING, tenantName);
 
         Tenant newTenant = new Tenant();
         newTenant.setTenantName(tenantName);
@@ -59,14 +60,14 @@ public class TenantService {
         newTenant.setUpdatedBy(userName);
 
         Tenant savedTenant = tenantRepository.save(newTenant);
-        logger.info("Successfully created tenant: {}", tenantName);
+        logger.info(ErrorMessages.TENANT_ONBOARDING_SUCCESS, tenantName);
 
         return List.of(savedTenant);
     }
 
     public TenantDto createTenant(TenantDto tenantDto) {
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
-                ? jwtClaimsContext.getUserId() : "system";
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
         Tenant tenant = new Tenant();
         tenant.setTenantName(tenantDto.getName());
@@ -80,7 +81,7 @@ public class TenantService {
 
     public TenantDto getTenantByName(String name) {
         Tenant tenant = tenantRepository.findByTenantName(name)
-                .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
+                .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.TENANT_NOT_FOUND));
         return mapToTenantDto(tenant);
     }
 

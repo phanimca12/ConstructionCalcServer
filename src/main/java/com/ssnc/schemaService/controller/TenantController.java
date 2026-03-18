@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.TenantDto;
 import com.ssnc.schemaService.entity.Tenant;
 import com.ssnc.schemaService.service.TenantService;
@@ -27,14 +28,14 @@ public class TenantController {
     @PostMapping
     public ResponseEntity<?> createTenant() throws Exception {
         try {
-            logger.debug("Received request for tenant onboarding: [{}]", jwtClaimsContext != null ? jwtClaimsContext.getClients() : "Context not Found");
+            logger.debug("Received request for tenant onboarding: [{}]", jwtClaimsContext != null ? jwtClaimsContext.getClients() : ErrorMessages.JWT_CONTEXT_NOT_FOUND);
 
             tenantService.createTenantsFromContext();
 
             return ResponseEntity.status(HttpStatus.CREATED).build();
         } catch (Exception e) {
-            logger.error("Error syncing tenants from JWT claims context: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+            logger.error(ErrorMessages.ERROR_SYNCING_TENANTS, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessages.TENANT_CREATION_FAILED);
         }
     }
 

@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
@@ -102,7 +103,7 @@ class SchemaControllerTest {
         when(schemaService.createSchema(eq(testNamespace), any(SchemaDto.class), eq("content")))
                 .thenReturn(testSchemaDto);
 
-        ResponseEntity<SchemaDto> response = schemaController.createSchema(
+        ResponseEntity<?> response = schemaController.createSchema(
                 testNamespace, testSchemaDto, "content");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -115,11 +116,11 @@ class SchemaControllerTest {
         when(schemaService.createSchema(eq(testNamespace), any(SchemaDto.class), anyString()))
                 .thenThrow(new IOException("Test exception"));
 
-        ResponseEntity<SchemaDto> response = schemaController.createSchema(
+        ResponseEntity<?> response = schemaController.createSchema(
                 testNamespace, testSchemaDto, "content");
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-        assertNull(response.getBody());
+        assertEquals(ErrorMessages.SCHEMA_CREATION_FAILED, response.getBody());
     }
 
     @Test

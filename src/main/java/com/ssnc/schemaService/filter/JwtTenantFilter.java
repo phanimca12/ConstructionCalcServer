@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.filter;
 
+import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.servlet.FilterChain;
@@ -25,7 +26,9 @@ public class JwtTenantFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         try {
-            String tenantName = (jwtClaimsContext!=null && jwtClaimsContext.getTenant() != null) ? jwtClaimsContext.getTenant() :"client1Id";
+            String tenantName = (jwtClaimsContext!=null && jwtClaimsContext.getTenant() != null)
+                    ? jwtClaimsContext.getTenant()
+                    : AppConstants.DEFAULT_TENANT_ID;
             TenantContext.setTenantName(tenantName);
             filterChain.doFilter(request, response);
 

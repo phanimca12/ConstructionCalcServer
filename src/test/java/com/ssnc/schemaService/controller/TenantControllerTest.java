@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.TenantDto;
 import com.ssnc.schemaService.entity.Tenant;
 import com.ssnc.schemaService.service.TenantService;
@@ -31,6 +32,7 @@ class TenantControllerTest {
     @Mock
     private JwtClaimsContext jwtClaimsContext;
 
+    @InjectMocks
     private TenantController tenantController;
 
     private TenantDto testTenantDto;
@@ -38,7 +40,6 @@ class TenantControllerTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        tenantController = new TenantController(tenantService, jwtClaimsContext);
 
         // Mock JwtClaimsContext
         when(jwtClaimsContext.getUserId()).thenReturn("testUser");
@@ -76,7 +77,7 @@ class TenantControllerTest {
 
         assertNotNull(result);
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getStatusCode());
-        assertEquals("Database error", result.getBody());
+        assertEquals(ErrorMessages.TENANT_CREATION_FAILED, result.getBody());
         verify(tenantService, times(1)).createTenantsFromContext();
     }
 
