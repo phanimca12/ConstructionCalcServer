@@ -49,4 +49,23 @@
         foreign key (schm_id) references schm
     );
 
+    create table schm_xref (
+        xref_id ${guid} not null,
+        schm_id ${guid} not null,
+        schm_name varchar(256),
+        schm_type varchar(64),
+        nmspc_name varchar(32),
+        ref_type varchar(64),
+        ref_version varchar(64),
+        ref_name varchar(256),
+        ref_guid ${guid},
+        ref_guid_char varchar(256),
+        created_datetime ${timestamp},
+        updated_datetime ${timestamp},
+        created_by varchar(256),
+        updated_by varchar(256),
+        primary key (xref_id),
+        foreign key (schm_id) references schm
+    );
+
 

@@ -1,8 +1,11 @@
 package com.ssnc.schemaService.service;
 
+import com.ssnc.schemaService.constants.AppConstants;
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.NameSpaceDto;
 import com.ssnc.schemaService.entity.Nmspc;
 import com.ssnc.schemaService.repo.NameSpaceRepository;
+import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,12 +18,18 @@ public class NameSpaceService {
     @Autowired
     NameSpaceRepository nameSpaceRepository;
 
+    @Autowired
+    private JwtClaimsContext jwtClaimsContext;
+
     public NameSpaceDto createNameSpace(NameSpaceDto nameSpaceDto) {
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+
         Nmspc nmspc = new Nmspc();
         nmspc.setNmspcName(nameSpaceDto.getName());
         nmspc.setDescription(nameSpaceDto.getDescription());
-        nmspc.setCreatedBy(nameSpaceDto.getCreatedByUser());
-        nmspc.setUpdatedBy(nameSpaceDto.getModifiedByUser());
+        nmspc.setCreatedBy(userName);
+        nmspc.setUpdatedBy(userName);
 
         Nmspc savedNmspc = nameSpaceRepository.save(nmspc);
 
@@ -41,7 +50,7 @@ public class NameSpaceService {
 
     public NameSpaceDto getNameSpaceByName(String name) {
         Nmspc nmspc = nameSpaceRepository.findBynmspcName(name)
-                .orElseThrow(() -> new EntityNotFoundException("Namespace not found"));
+                .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.NAMESPACE_NOT_FOUND));
         return mapToNameSpaceDto(nmspc);
     }
 
