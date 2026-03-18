@@ -23,6 +23,7 @@ public class TenantService {
 
     @Autowired
     TenantRepository tenantRepository;
+    @Autowired
     JwtClaimsContext jwtClaimsContext;
 
     @Transactional
@@ -64,10 +65,13 @@ public class TenantService {
     }
 
     public TenantDto createTenant(TenantDto tenantDto) {
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : "system";
+
         Tenant tenant = new Tenant();
         tenant.setTenantName(tenantDto.getName());
-        tenant.setCreatedBy(tenantDto.getCreatedByUser());
-        tenant.setUpdatedBy(tenantDto.getModifiedByUser());
+        tenant.setCreatedBy(userName);
+        tenant.setUpdatedBy(userName);
 
         Tenant savedTenant = tenantRepository.save(tenant);
 

@@ -40,6 +40,12 @@ class TenantControllerTest {
         MockitoAnnotations.openMocks(this);
         tenantController = new TenantController(tenantService, jwtClaimsContext);
 
+        // Mock JwtClaimsContext
+        when(jwtClaimsContext.getUserId()).thenReturn("testUser");
+        when(jwtClaimsContext.getTenant()).thenReturn("testTenant");
+        when(jwtClaimsContext.getClients()).thenReturn(java.util.Collections.singletonList("client1"));
+        when(jwtClaimsContext.isPopulated()).thenReturn(true);
+
         testTenantDto = new TenantDto();
         testTenantDto.setName("testTenant");
         testTenantDto.setCreatedByUser("testUser");

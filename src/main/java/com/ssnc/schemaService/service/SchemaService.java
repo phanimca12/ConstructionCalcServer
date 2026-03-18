@@ -69,8 +69,13 @@ public class SchemaService {
             throw new IllegalArgumentException("Schema with name " + schemaDto.getName() + " already exists");
         }
 
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : "system";
+
         Schm schema = mapToSchmEntity(schemaDto);
         schema.setNamespace(namespace);
+        schema.setCreatedBy(userName);
+        schema.setUpdatedBy(userName);
         Schm saved = schmRepository.save(schema);
 
         // If content is provided, create initial version
@@ -128,13 +133,16 @@ public class SchemaService {
         Schm existing = schmRepository.findBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException("Schema not found: " + schmId));
 
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : "system";
+
         // Update only editable fields (schmName is preserved from DB)
         existing.setSchmDesc(schemaDto.getDescription());
         existing.setSchemaType(schemaDto.getSchemaType());
         existing.setContentType(schemaDto.getContentType());
         existing.setGroup(schemaDto.getGroup());
         existing.setLockBy(schemaDto.getLockBy());
-        existing.setUpdatedBy(schemaDto.getModifiedByUser());
+        existing.setUpdatedBy(userName);
 
         Schm updated = schmRepository.save(existing);
         return mapToSchemaResponse(updated);
@@ -363,9 +371,7 @@ public class SchemaService {
         schm.setContentType(response.getContentType());
         schm.setLockBy(response.getLockBy());
         schm.setGroup(response.getGroup());
-        schm.setCreatedBy(response.getCreatedByUser());
         schm.setCreatedDatetime(response.getCreateDateTime());
-        schm.setUpdatedBy(response.getModifiedByUser());
         schm.setUpdatedDatetime(response.getModifiedDateTime());
         return schm;
     }
@@ -382,9 +388,7 @@ public class SchemaService {
         schmData.setId(id);
        // schmData.setSchmVersionName(response.getIsDraft() ? "draft" : null);
         schmData.setIsDraft(response.getIsDraft());
-        schmData.setCreatedBy(response.getCreatedByUser());
         schmData.setCreatedDatetime(response.getCreateDateTime());
-        schmData.setUpdatedBy(response.getModifiedByUser());
         schmData.setUpdatedDatetime(response.getModifiedDateTime());
 
         return schmData;

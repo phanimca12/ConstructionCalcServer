@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,10 +42,17 @@ class SchemaControllerTest {
         testSchemaDto = new SchemaDto();
         testSchemaDto.setId(testSchemaId);
         testSchemaDto.setName("Test Schema");
+        testSchemaDto.setDescription("Test Description");
+        testSchemaDto.setCreatedByUser("testUser");
+        testSchemaDto.setModifiedByUser("testUser");
+        testSchemaDto.setCreateDateTime(LocalDateTime.now());
+        testSchemaDto.setModifiedDateTime(LocalDateTime.now());
 
         testVersionDto = new SchemaVersionDto();
         testVersionDto.setVersionNumber(1);
         testVersionDto.setIsDraft(false);
+        testVersionDto.setCreatedByUser("testUser");
+        testVersionDto.setModifiedByUser("testUser");
     }
 
     @Test
