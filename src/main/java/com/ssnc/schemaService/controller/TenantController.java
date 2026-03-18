@@ -21,13 +21,8 @@ public class TenantController {
 
     @Autowired
     TenantService tenantService;
-    private final JwtClaimsContext jwtClaimsContext;
-
-    public TenantController( TenantService tenantService, JwtClaimsContext jwtClaimsContext )
-    {
-        this.tenantService = tenantService;
-        this.jwtClaimsContext = jwtClaimsContext;
-    }
+    @Autowired
+    JwtClaimsContext jwtClaimsContext;
 
     @PostMapping
     public ResponseEntity<?> createTenant() throws Exception {
