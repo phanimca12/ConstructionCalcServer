@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.tenant;
 
+import com.ssnc.schemaService.constants.AppConstants;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
 import org.springframework.stereotype.Component;
 
@@ -11,7 +12,7 @@ public class TenantIdentifierResolver
 
     @Override
     public String resolveCurrentTenantIdentifier() {
-        return TenantContext.getTenantName() != null ? TenantContext.getTenantName() :"CLIENT1ID";
+        return TenantContext.getTenantName() != null ? TenantContext.getTenantName() : AppConstants.DEFAULT_TENANT_ID;
     }
 
     @Override
