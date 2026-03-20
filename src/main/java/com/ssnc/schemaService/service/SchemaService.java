@@ -46,22 +46,77 @@ public class SchemaService {
     private JwtClaimsContext jwtClaimsContext;
 
     /**
-     * Get schemas with optional filtering by type, group, and content type
+     * Get schemas with optional filtering and sorting
      */
-    public List<SchemaDto> getSchemas(String namespace, String type, String group, String contentType, boolean publishedOnly) {
+    public List<SchemaDto> getSchemas(String namespace, String name, String type, String group,
+                                       String modifiedByUser, String versionModifiedByUser,
+                                       String sort, String withVersion) {
         namespaceFilterManager.enableIfPresent(namespace);
 
         SchmFilterCriteria criteria = new SchmFilterCriteria();
+        criteria.setName(name);
         criteria.setSchemaType(type);
         criteria.setGroup(group);
-        criteria.setContentType(contentType);
-        criteria.setPublishedOnly(publishedOnly);
+        criteria.setModifiedByUser(modifiedByUser);
+        criteria.setVersionModifiedByUser(versionModifiedByUser);
+        criteria.setSort(sort);
+        criteria.setWithVersion(withVersion);
 
         List<Schm> schemas = schmRepository.findAll(SchmSpecifications.withFilters(criteria));
+
+        // Map to DTOs and apply version filtering
         return schemas.stream()
                 .map(this::mapToSchemaResponse)
-                .sorted(Comparator.comparing(SchemaDto::getName))
+                .filter(schemaDto -> filterByVersion(schemaDto, withVersion))
+                .sorted(getSortComparator(sort))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Filter schemas based on withVersion parameter
+     */
+    private boolean filterByVersion(SchemaDto schemaDto, String withVersion) {
+        if (withVersion == null || "none".equalsIgnoreCase(withVersion)) {
+            return true;
+        }
+
+        switch (withVersion.toLowerCase()) {
+            case "draft":
+                // Only include schemas that have a draft version
+                return schemaDto.getDraft() != null;
+            case "published":
+                // Only include schemas that have a published version
+                return schemaDto.getPublished() != null;
+            case "latest":
+                // Include schemas that have at least one version (draft or published)
+                return schemaDto.getDraft() != null || schemaDto.getPublished() != null;
+            default:
+                return true;
+        }
+    }
+
+    /**
+     * Get comparator based on sort parameter
+     */
+    private Comparator<SchemaDto> getSortComparator(String sort) {
+        if (sort == null) {
+            return Comparator.comparing(SchemaDto::getName);
+        }
+
+        switch (sort) {
+            case "versionUpdateAsc":
+                return Comparator.comparing(SchemaDto::getModifiedDateTime,
+                        Comparator.nullsLast(Comparator.naturalOrder()));
+            case "versionUpdateDesc":
+                return Comparator.comparing(SchemaDto::getModifiedDateTime,
+                        Comparator.nullsLast(Comparator.reverseOrder()));
+            case "nameAsc":
+                return Comparator.comparing(SchemaDto::getName);
+            case "nameDesc":
+                return Comparator.comparing(SchemaDto::getName).reversed();
+            default:
+                return Comparator.comparing(SchemaDto::getName);
+        }
     }
 
     /**

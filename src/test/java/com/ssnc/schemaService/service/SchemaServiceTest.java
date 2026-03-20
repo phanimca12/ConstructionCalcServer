@@ -169,7 +169,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
                 .thenReturn(Optional.empty());
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, false);
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "none");
 
         assertNotNull(result);
         assertEquals(3, result.size());
@@ -402,5 +402,259 @@ class SchemaServiceTest {
         assertThrows(IllegalArgumentException.class, () ->
                 schemaService.unlockSchema(testNamespace, testSchmId)
         );
+    }
+
+    @Test
+    void testGetSchemas_SortByNameAsc() {
+        Schm schm1 = createTestSchm("Zebra Schema");
+        Schm schm2 = createTestSchm("Apple Schema");
+        Schm schm3 = createTestSchm("Mango Schema");
+
+        List<Schm> unsortedSchemas = Arrays.asList(schm1, schm2, schm3);
+        when(schmRepository.findAll(any(Specification.class))).thenReturn(unsortedSchemas);
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
+                .thenReturn(Optional.empty());
+
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "nameAsc", "none");
+
+        assertEquals(3, result.size());
+        assertEquals("Apple Schema", result.get(0).getName());
+        assertEquals("Mango Schema", result.get(1).getName());
+        assertEquals("Zebra Schema", result.get(2).getName());
+    }
+
+    @Test
+    void testGetSchemas_SortByNameDesc() {
+        Schm schm1 = createTestSchm("Apple Schema");
+        Schm schm2 = createTestSchm("Zebra Schema");
+        Schm schm3 = createTestSchm("Mango Schema");
+
+        List<Schm> unsortedSchemas = Arrays.asList(schm1, schm2, schm3);
+        when(schmRepository.findAll(any(Specification.class))).thenReturn(unsortedSchemas);
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
+                .thenReturn(Optional.empty());
+
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "nameDesc", "none");
+
+        assertEquals(3, result.size());
+        assertEquals("Zebra Schema", result.get(0).getName());
+        assertEquals("Mango Schema", result.get(1).getName());
+        assertEquals("Apple Schema", result.get(2).getName());
+    }
+
+    @Test
+    void testGetSchemas_SortByVersionUpdateDesc() {
+        Schm schm1 = createTestSchmWithDate("Schema 1", LocalDateTime.of(2024, 1, 1, 10, 0));
+        Schm schm2 = createTestSchmWithDate("Schema 2", LocalDateTime.of(2024, 1, 3, 10, 0));
+        Schm schm3 = createTestSchmWithDate("Schema 3", LocalDateTime.of(2024, 1, 2, 10, 0));
+
+        List<Schm> unsortedSchemas = Arrays.asList(schm1, schm2, schm3);
+        when(schmRepository.findAll(any(Specification.class))).thenReturn(unsortedSchemas);
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
+                .thenReturn(Optional.empty());
+
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "versionUpdateDesc", "none");
+
+        assertEquals(3, result.size());
+        assertEquals("Schema 2", result.get(0).getName());
+        assertEquals("Schema 3", result.get(1).getName());
+        assertEquals("Schema 1", result.get(2).getName());
+    }
+
+    @Test
+    void testGetSchemas_SortByVersionUpdateAsc() {
+        Schm schm1 = createTestSchmWithDate("Schema 1", LocalDateTime.of(2024, 1, 3, 10, 0));
+        Schm schm2 = createTestSchmWithDate("Schema 2", LocalDateTime.of(2024, 1, 1, 10, 0));
+        Schm schm3 = createTestSchmWithDate("Schema 3", LocalDateTime.of(2024, 1, 2, 10, 0));
+
+        List<Schm> unsortedSchemas = Arrays.asList(schm1, schm2, schm3);
+        when(schmRepository.findAll(any(Specification.class))).thenReturn(unsortedSchemas);
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
+                .thenReturn(Optional.empty());
+
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "versionUpdateAsc", "none");
+
+        assertEquals(3, result.size());
+        assertEquals("Schema 2", result.get(0).getName());
+        assertEquals("Schema 3", result.get(1).getName());
+        assertEquals("Schema 1", result.get(2).getName());
+    }
+
+    private Schm createTestSchm(String name) {
+        Schm schm = new Schm();
+        schm.setSchmId(UUID.randomUUID());
+        schm.setSchmName(name);
+        schm.setSchmDesc("Test description");
+        schm.setCreatedBy(testUserId);
+        schm.setUpdatedBy(testUserId);
+        schm.setUpdatedDatetime(LocalDateTime.now());
+        return schm;
+    }
+
+    private Schm createTestSchmWithDate(String name, LocalDateTime updatedDate) {
+        Schm schm = createTestSchm(name);
+        schm.setUpdatedDatetime(updatedDate);
+        return schm;
+    }
+
+    @Test
+    void testGetSchemas_WithVersionDraft_OnlyReturnsSchemasWithDraft() {
+        // Schema 1: Has draft
+        Schm schm1 = createTestSchm("Schema 1");
+        UUID schm1Id = schm1.getSchmId();
+
+        // Schema 2: No draft
+        Schm schm2 = createTestSchm("Schema 2");
+        UUID schm2Id = schm2.getSchmId();
+
+        // Schema 3: Has draft
+        Schm schm3 = createTestSchm("Schema 3");
+        UUID schm3Id = schm3.getSchmId();
+
+        List<Schm> schemas = Arrays.asList(schm1, schm2, schm3);
+        when(schmRepository.findAll(any(Specification.class))).thenReturn(schemas);
+
+        // Mock draft versions - only schm1 and schm3 have drafts
+        SchmData draft1 = createDraftVersion(schm1Id, 1);
+        SchmData draft3 = createDraftVersion(schm3Id, 1);
+
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(schm1Id, true))
+                .thenReturn(Optional.of(draft1));
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(schm2Id, true))
+                .thenReturn(Optional.empty());
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(schm3Id, true))
+                .thenReturn(Optional.of(draft3));
+
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "draft");
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().anyMatch(s -> s.getName().equals("Schema 1")));
+        assertTrue(result.stream().anyMatch(s -> s.getName().equals("Schema 3")));
+        assertFalse(result.stream().anyMatch(s -> s.getName().equals("Schema 2")));
+    }
+
+    @Test
+    void testGetSchemas_WithVersionPublished_OnlyReturnsSchemasWithPublishedVersion() {
+        // Schema 1: Has published version
+        Schm schm1 = createTestSchm("Schema 1");
+        schm1.setPublishVersion(2);
+        UUID schm1Id = schm1.getSchmId();
+
+        // Schema 2: No published version
+        Schm schm2 = createTestSchm("Schema 2");
+        schm2.setPublishVersion(null);
+        UUID schm2Id = schm2.getSchmId();
+
+        // Schema 3: Has published version
+        Schm schm3 = createTestSchm("Schema 3");
+        schm3.setPublishVersion(1);
+        UUID schm3Id = schm3.getSchmId();
+
+        List<Schm> schemas = Arrays.asList(schm1, schm2, schm3);
+        when(schmRepository.findAll(any(Specification.class))).thenReturn(schemas);
+
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
+                .thenReturn(Optional.empty());
+
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "published");
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().anyMatch(s -> s.getName().equals("Schema 1")));
+        assertTrue(result.stream().anyMatch(s -> s.getName().equals("Schema 3")));
+        assertFalse(result.stream().anyMatch(s -> s.getName().equals("Schema 2")));
+    }
+
+    @Test
+    void testGetSchemas_WithVersionLatest_ReturnsSchemasWithAnyVersion() {
+        // Schema 1: Has both draft and published
+        Schm schm1 = createTestSchm("Schema 1");
+        schm1.setPublishVersion(1);
+        UUID schm1Id = schm1.getSchmId();
+
+        // Schema 2: No versions
+        Schm schm2 = createTestSchm("Schema 2");
+        UUID schm2Id = schm2.getSchmId();
+
+        // Schema 3: Has only draft
+        Schm schm3 = createTestSchm("Schema 3");
+        UUID schm3Id = schm3.getSchmId();
+
+        List<Schm> schemas = Arrays.asList(schm1, schm2, schm3);
+        when(schmRepository.findAll(any(Specification.class))).thenReturn(schemas);
+
+        SchmData draft1 = createDraftVersion(schm1Id, 2);
+        SchmData draft3 = createDraftVersion(schm3Id, 1);
+
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(schm1Id, true))
+                .thenReturn(Optional.of(draft1));
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(schm2Id, true))
+                .thenReturn(Optional.empty());
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(schm3Id, true))
+                .thenReturn(Optional.of(draft3));
+
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "latest");
+
+        assertEquals(2, result.size());
+        assertTrue(result.stream().anyMatch(s -> s.getName().equals("Schema 1")));
+        assertTrue(result.stream().anyMatch(s -> s.getName().equals("Schema 3")));
+        assertFalse(result.stream().anyMatch(s -> s.getName().equals("Schema 2")));
+    }
+
+    @Test
+    void testGetSchemas_WithVersionNone_ReturnsAllSchemas() {
+        Schm schm1 = createTestSchm("Schema 1");
+        schm1.setPublishVersion(1);
+        UUID schm1Id = schm1.getSchmId();
+
+        Schm schm2 = createTestSchm("Schema 2");
+        UUID schm2Id = schm2.getSchmId();
+
+        Schm schm3 = createTestSchm("Schema 3");
+        UUID schm3Id = schm3.getSchmId();
+
+        List<Schm> schemas = Arrays.asList(schm1, schm2, schm3);
+        when(schmRepository.findAll(any(Specification.class))).thenReturn(schemas);
+
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
+                .thenReturn(Optional.empty());
+
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "none");
+
+        assertEquals(3, result.size());
+    }
+
+    @Test
+    void testGetSchemas_WithVersionNull_ReturnsAllSchemas() {
+        Schm schm1 = createTestSchm("Schema 1");
+        UUID schm1Id = schm1.getSchmId();
+
+        Schm schm2 = createTestSchm("Schema 2");
+        UUID schm2Id = schm2.getSchmId();
+
+        List<Schm> schemas = Arrays.asList(schm1, schm2);
+        when(schmRepository.findAll(any(Specification.class))).thenReturn(schemas);
+
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
+                .thenReturn(Optional.empty());
+
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, null);
+
+        assertEquals(2, result.size());
+    }
+
+    private SchmData createDraftVersion(UUID schmId, int versionNumber) {
+        SchmDataId id = new SchmDataId();
+        id.setSchmId(schmId);
+        id.setSchmVersion(versionNumber);
+
+        SchmData draft = new SchmData();
+        draft.setId(id);
+        draft.setIsDraft(true);
+        draft.setCreatedBy(testUserId);
+        draft.setUpdatedBy(testUserId);
+        draft.setCreatedDatetime(LocalDateTime.now());
+        draft.setUpdatedDatetime(LocalDateTime.now());
+
+        return draft;
     }
 }

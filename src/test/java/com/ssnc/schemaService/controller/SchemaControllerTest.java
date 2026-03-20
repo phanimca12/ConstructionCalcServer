@@ -64,43 +64,43 @@ class SchemaControllerTest {
     @Test
     void testGetSchemas() {
         List<SchemaDto> expectedSchemas = Arrays.asList(testSchemaDto);
-        when(schemaService.getSchemas(testNamespace, null, null, null, false))
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "none"))
                 .thenReturn(expectedSchemas);
 
         ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
-                testNamespace, null, null, null, false);
+                testNamespace, null, null, null, null, null, null, "none");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(expectedSchemas, response.getBody());
-        verify(schemaService).getSchemas(testNamespace, null, null, null, false);
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "none");
     }
 
     @Test
     void testGetSchemasWithFilters() {
         List<SchemaDto> expectedSchemas = Arrays.asList(testSchemaDto);
-        when(schemaService.getSchemas(testNamespace, "FormData", "group1", "application/json", true))
+        when(schemaService.getSchemas(testNamespace, "testSchema", "FormData", "group1", "user1", null, "nameAsc", "none"))
                 .thenReturn(expectedSchemas);
 
         ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
-                testNamespace, "FormData", "group1", "application/json", true);
+                testNamespace, "testSchema", "FormData", "group1", "user1", null, "nameAsc", "none");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(expectedSchemas, response.getBody());
-        verify(schemaService).getSchemas(testNamespace, "FormData", "group1", "application/json", true);
+        verify(schemaService).getSchemas(testNamespace, "testSchema", "FormData", "group1", "user1", null, "nameAsc", "none");
     }
 
     @Test
-    void testGetSchemasWithContentType() {
+    void testGetSchemasWithSort() {
         List<SchemaDto> expectedSchemas = Arrays.asList(testSchemaDto);
-        when(schemaService.getSchemas(testNamespace, null, null, "application/xml", false))
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, null, "versionUpdateDesc", "latest"))
                 .thenReturn(expectedSchemas);
 
         ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
-                testNamespace, null, null, "application/xml", false);
+                testNamespace, null, null, null, null, null, "versionUpdateDesc", "latest");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(expectedSchemas, response.getBody());
-        verify(schemaService).getSchemas(testNamespace, null, null, "application/xml", false);
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, "versionUpdateDesc", "latest");
     }
 
     @Test
@@ -340,5 +340,94 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(schemaService).unlockSchema(testNamespace, testSchemaId);
+    }
+
+    @Test
+    void testGetSchemas_WithVersionDraft() {
+        SchemaDto schema1 = new SchemaDto();
+        schema1.setId(UUID.randomUUID());
+        schema1.setName("Schema 1");
+        schema1.setDraft("1");
+
+        List<SchemaDto> expectedSchemas = Arrays.asList(schema1);
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "draft"))
+                .thenReturn(expectedSchemas);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, null, null, null, null, null, null, "draft");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedSchemas, response.getBody());
+        assertEquals(1, response.getBody().size());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "draft");
+    }
+
+    @Test
+    void testGetSchemas_WithVersionPublished() {
+        SchemaDto schema1 = new SchemaDto();
+        schema1.setId(UUID.randomUUID());
+        schema1.setName("Schema 1");
+        schema1.setPublished("2");
+
+        List<SchemaDto> expectedSchemas = Arrays.asList(schema1);
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "published"))
+                .thenReturn(expectedSchemas);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, null, null, null, null, null, null, "published");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedSchemas, response.getBody());
+        assertEquals(1, response.getBody().size());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "published");
+    }
+
+    @Test
+    void testGetSchemas_WithVersionLatest() {
+        SchemaDto schema1 = new SchemaDto();
+        schema1.setId(UUID.randomUUID());
+        schema1.setName("Schema 1");
+        schema1.setDraft("2");
+        schema1.setPublished("1");
+
+        List<SchemaDto> expectedSchemas = Arrays.asList(schema1);
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "latest"))
+                .thenReturn(expectedSchemas);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, null, null, null, null, null, null, "latest");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedSchemas, response.getBody());
+        assertEquals(1, response.getBody().size());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "latest");
+    }
+
+    @Test
+    void testGetSchemas_WithModifiedByUserFilter() {
+        List<SchemaDto> expectedSchemas = Arrays.asList(testSchemaDto);
+        when(schemaService.getSchemas(testNamespace, null, null, null, "john.doe", null, null, "none"))
+                .thenReturn(expectedSchemas);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, null, null, null, "john.doe", null, null, "none");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedSchemas, response.getBody());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, "john.doe", null, null, "none");
+    }
+
+    @Test
+    void testGetSchemas_WithVersionModifiedByUserFilter() {
+        List<SchemaDto> expectedSchemas = Arrays.asList(testSchemaDto);
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, "jane.smith", null, "none"))
+                .thenReturn(expectedSchemas);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, null, null, null, null, "jane.smith", null, "none");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedSchemas, response.getBody());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, "jane.smith", null, "none");
     }
 }

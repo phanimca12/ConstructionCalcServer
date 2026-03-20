@@ -29,16 +29,20 @@ public class SchemaController {
 
     /**
      * GET /schemas/{nameSpace}
-     * Get schemas with optional filtering by type, group, and content type
+     * Get schemas with optional filtering and sorting
      */
     @GetMapping
     public ResponseEntity<List<SchemaDto>> getSchemas(
             @PathVariable("nameSpace") String nameSpace,
+            @RequestParam(required = false) String name,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String group,
-            @RequestParam(required = false) String contentType,
-            @RequestParam(required = false) boolean publishedOnly) {
-        List<SchemaDto> schemas = schemaService.getSchemas(nameSpace, type, group, contentType, publishedOnly);
+            @RequestParam(required = false) String modifiedByUser,
+            @RequestParam(required = false) String versionModifiedByUser,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false, defaultValue = "none") String withVersion) {
+        List<SchemaDto> schemas = schemaService.getSchemas(
+                nameSpace, name, type, group, modifiedByUser, versionModifiedByUser, sort, withVersion);
         return ResponseEntity.ok(schemas);
     }
 
