@@ -1,5 +1,7 @@
 package com.ssnc.schemaService.service;
 
+import com.ssnc.schemaService.constants.AppConstants;
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
@@ -12,6 +14,7 @@ import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.repo.SchmSpecifications;
 import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import com.ssnc.schemaService.tenant.TenantContext;
+import com.ssnc.shared.security.JwtClaimsContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +41,9 @@ public class SchemaService {
     @Autowired
     private NamespaceFilterManager namespaceFilterManager;
 
+    @Autowired
+    private JwtClaimsContext jwtClaimsContext;
+
     /**
      * Get schemas with optional filtering by type, group, and content type
      */
@@ -62,11 +68,16 @@ public class SchemaService {
         namespaceFilterManager.enableIfPresent(namespace);
         Optional<Schm> exists = schmRepository.findBySchmName(schemaDto.getName());
         if(exists.isPresent()) {
-            throw new IllegalArgumentException("Schema with name " + schemaDto.getName() + " already exists");
+            throw new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_ALREADY_EXISTS, schemaDto.getName()));
         }
+
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
         Schm schema = mapToSchmEntity(schemaDto);
         schema.setNamespace(namespace);
+        schema.setCreatedBy(userName);
+        schema.setUpdatedBy(userName);
         Schm saved = schmRepository.save(schema);
 
         // If content is provided, create initial version
@@ -93,9 +104,9 @@ public class SchemaService {
 
         // Handle special version names
         if (versionName != null) {
-            if ("published".equalsIgnoreCase(versionName)) {
+            if (AppConstants.VERSION_NAME_PUBLISHED.equalsIgnoreCase(versionName)) {
                 schmRepository.getPublishedVersion(schmId).ifPresent(versions::add);
-            } else if ("latest".equalsIgnoreCase(versionName)) {
+            } else if (AppConstants.VERSION_NAME_LATEST.equalsIgnoreCase(versionName)) {
                 schmRepository.getLatestVersion(schmId).ifPresent(versions::add);
             }
         } else if (versionNumber != null) {
@@ -122,7 +133,10 @@ public class SchemaService {
 
         // Fetch existing entity - schmName is non-editable and always from DB
         Schm existing = schmRepository.findBySchmId(schmId)
-                .orElseThrow(() -> new IllegalArgumentException("Schema not found: " + schmId));
+                .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
+
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
         // Update only editable fields (schmName is preserved from DB)
         existing.setSchmDesc(schemaDto.getDescription());
@@ -130,7 +144,7 @@ public class SchemaService {
         existing.setContentType(schemaDto.getContentType());
         existing.setGroup(schemaDto.getGroup());
         existing.setLockBy(schemaDto.getLockBy());
-        existing.setUpdatedBy(schemaDto.getModifiedByUser());
+        existing.setUpdatedBy(userName);
 
         Schm updated = schmRepository.save(existing);
         return mapToSchemaResponse(updated);
@@ -156,7 +170,7 @@ public class SchemaService {
         if(schemaOpt.isPresent()){
             Schm schema = schemaOpt.get();
             if (schema.getPublishVersion() != null && schema.getPublishVersion().equals(versionNumber)) {
-                    throw new IllegalStateException("Schema " + schmId + " already has published version " + schema.getPublishVersion());
+                    throw new IllegalStateException(String.format(ErrorMessages.SCHEMA_ALREADY_PUBLISHED, schmId, schema.getPublishVersion()));
                 }
 
             // Verify the version exists
@@ -170,7 +184,7 @@ public class SchemaService {
                 schema.setPublishVersion(versionNumber);
                 schmRepository.save(schema);
             } else {
-                throw new IllegalArgumentException("Version " + versionNumber + " does not exist for schema " + schmId);
+                throw new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_VERSION_NOT_FOUND, versionNumber, schmId));
             }
         }
     }
@@ -187,7 +201,7 @@ public class SchemaService {
             schema.setPublishVersion(null);
             schmRepository.save(schema);
         } else {
-            throw new IllegalArgumentException("Schema not found: " + schmId);
+            throw new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId));
         }
     }
 
@@ -257,6 +271,9 @@ public class SchemaService {
                     .map(sd -> sd.getId().getSchmVersion())
                     .orElse(0);
 
+            String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                    ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+
             SchmDataId newId = new SchmDataId();
             newId.setSchmId(schmId);
             newId.setSchmVersion(latestVersion + 1);
@@ -265,8 +282,8 @@ public class SchemaService {
             newVersion.setId(newId);
             newVersion.setSchmData(content);
             newVersion.setIsDraft(true);
-            newVersion.setUpdatedBy("Draft Creator");
-            newVersion.setCreatedBy("Draft Creator");
+            newVersion.setUpdatedBy(userName);
+            newVersion.setCreatedBy(userName);
             newVersion.setCreatedDatetime(LocalDateTime.now());
             newVersion.setUpdatedDatetime(LocalDateTime.now());
 
@@ -283,6 +300,9 @@ public class SchemaService {
                 .map(sd -> sd.getId().getSchmVersion())
                 .orElse(0);
 
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+
         SchmDataId newId = new SchmDataId();
         newId.setSchmId(schmId);
         newId.setSchmVersion(latestVersion + 1);
@@ -291,8 +311,8 @@ public class SchemaService {
         newVersion.setId(newId);
         newVersion.setSchmData(content);
         newVersion.setIsDraft(true);
-        newVersion.setUpdatedBy("Test");
-        newVersion.setCreatedBy("Test");
+        newVersion.setUpdatedBy(userName);
+        newVersion.setCreatedBy(userName);
 
         schmDataRepository.save(newVersion);
     }
@@ -353,9 +373,7 @@ public class SchemaService {
         schm.setContentType(response.getContentType());
         schm.setLockBy(response.getLockBy());
         schm.setGroup(response.getGroup());
-        schm.setCreatedBy(response.getCreatedByUser());
         schm.setCreatedDatetime(response.getCreateDateTime());
-        schm.setUpdatedBy(response.getModifiedByUser());
         schm.setUpdatedDatetime(response.getModifiedDateTime());
         return schm;
     }
@@ -372,9 +390,7 @@ public class SchemaService {
         schmData.setId(id);
        // schmData.setSchmVersionName(response.getIsDraft() ? "draft" : null);
         schmData.setIsDraft(response.getIsDraft());
-        schmData.setCreatedBy(response.getCreatedByUser());
         schmData.setCreatedDatetime(response.getCreateDateTime());
-        schmData.setUpdatedBy(response.getModifiedByUser());
         schmData.setUpdatedDatetime(response.getModifiedDateTime());
 
         return schmData;

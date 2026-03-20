@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
@@ -41,7 +42,7 @@ public class SchemaController {
      * Create a new schema with optional multipart content
      */
     @PostMapping(consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
-    public ResponseEntity<SchemaDto> createSchema(
+    public ResponseEntity<?> createSchema(
             @PathVariable("nameSpace") String nameSpace,
             @RequestPart(value = "schema") SchemaDto schema,
             @RequestPart(value = "content", required = false) String content) {
@@ -49,7 +50,7 @@ public class SchemaController {
             SchemaDto created = schemaService.createSchema(nameSpace, schema, content);
             return ResponseEntity.status(HttpStatus.OK).body(created);
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessages.SCHEMA_CREATION_FAILED);
         }
     }
 

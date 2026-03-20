@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
@@ -13,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,10 +43,17 @@ class SchemaControllerTest {
         testSchemaDto = new SchemaDto();
         testSchemaDto.setId(testSchemaId);
         testSchemaDto.setName("Test Schema");
+        testSchemaDto.setDescription("Test Description");
+        testSchemaDto.setCreatedByUser("testUser");
+        testSchemaDto.setModifiedByUser("testUser");
+        testSchemaDto.setCreateDateTime(LocalDateTime.now());
+        testSchemaDto.setModifiedDateTime(LocalDateTime.now());
 
         testVersionDto = new SchemaVersionDto();
         testVersionDto.setVersionNumber(1);
         testVersionDto.setIsDraft(false);
+        testVersionDto.setCreatedByUser("testUser");
+        testVersionDto.setModifiedByUser("testUser");
     }
 
     @Test
@@ -94,7 +103,7 @@ class SchemaControllerTest {
         when(schemaService.createSchema(eq(testNamespace), any(SchemaDto.class), eq("content")))
                 .thenReturn(testSchemaDto);
 
-        ResponseEntity<SchemaDto> response = schemaController.createSchema(
+        ResponseEntity<?> response = schemaController.createSchema(
                 testNamespace, testSchemaDto, "content");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -107,11 +116,11 @@ class SchemaControllerTest {
         when(schemaService.createSchema(eq(testNamespace), any(SchemaDto.class), anyString()))
                 .thenThrow(new IOException("Test exception"));
 
-        ResponseEntity<SchemaDto> response = schemaController.createSchema(
+        ResponseEntity<?> response = schemaController.createSchema(
                 testNamespace, testSchemaDto, "content");
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-        assertNull(response.getBody());
+        assertEquals(ErrorMessages.SCHEMA_CREATION_FAILED, response.getBody());
     }
 
     @Test

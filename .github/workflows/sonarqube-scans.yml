@@ -1,17 +1,18 @@
 name: SonarQube Scan
 on:
   push:
-    branches: [ "develop" ]
+    branches: [ "main", "develop" ]
   pull_request:
-    branches: [ "develop", "release/*" ]
+    branches: [ "main", "develop", "release/*" ]
   workflow_dispatch:
 jobs:   
   sonarqube-scans:
     uses: intelligentautomation/Reusable-Workflows/.github/workflows/sonarqube-scan-with-build.yml@main
     with:
-      maven-settings-path: aws/m2/settings.xml
-      sonarqube-project-key: BPM-SchemaService
-      sonar-host-url: https://sonar.ssnc-corp.cloud
+      maven-settings-path: 'aws/m2/settings.xml'
+      java-version: '21'
+      sonarqube-project-key: 'BPM-SchemaService'
+      sonar-host-url: 'https://sonar.ssnc-corp.cloud/'
       keyvault-name: github-ia-kv
       secrets-to-pull: GitHub-Token,SonarQube-Token,AWS-Access-Key-ID,AWS-Secret-Access-Key
     secrets:
