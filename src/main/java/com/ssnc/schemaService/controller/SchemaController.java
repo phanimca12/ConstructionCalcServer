@@ -1,10 +1,12 @@
 package com.ssnc.schemaService.controller;
 
 import com.ssnc.schemaService.constants.ErrorMessages;
+import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
 import com.ssnc.schemaService.service.SchemaService;
+import com.ssnc.schemaService.service.SchmXrefService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,6 +23,9 @@ public class SchemaController {
 
     @Autowired
     private SchemaService schemaService;
+
+    @Autowired
+    private SchmXrefService schmXrefService;
 
     /**
      * GET /schemas/{nameSpace}
@@ -124,10 +129,10 @@ public class SchemaController {
     }
 
     /**
-     * PUT /schemas/{nameSpace}/{id}/unPublish
+     * PUT /schemas/{nameSpace}/{id}/version/unpublish
      * Unpublish a schema by setting publish version to null
      */
-    @PutMapping("/{id}/unPublish")
+    @PutMapping("/{id}/version/unpublish")
     public ResponseEntity<Void> unPublishSchemaVersion(
             @PathVariable("nameSpace") String nameSpace,
             @PathVariable("id") String id) {
@@ -212,5 +217,41 @@ public class SchemaController {
             @RequestBody String content) {
         SchemaVersionDto response = schemaService.updateDraftContent(nameSpace, UUID.fromString(id), content);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /schemas/{nameSpace}/{id}/extRefs
+     * Get external references for a schema
+     */
+    @GetMapping("/{id}/extRefs")
+    public ResponseEntity<List<ExtRefDto>> getExtRefsForSchema(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id) {
+        List<ExtRefDto> extRefs = schmXrefService.getExtRefsForSchema(nameSpace, UUID.fromString(id));
+        return ResponseEntity.ok(extRefs);
+    }
+
+    /**
+     * PUT /schemas/{nameSpace}/{id}/lock
+     * Lock a schema
+     */
+    @PutMapping("/{id}/lock")
+    public ResponseEntity<Void> lockSchema(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id) {
+        schemaService.lockSchema(nameSpace, UUID.fromString(id));
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * PUT /schemas/{nameSpace}/{id}/unLock
+     * Unlock a schema
+     */
+    @PutMapping("/{id}/unLock")
+    public ResponseEntity<Void> unlockSchema(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id) {
+        schemaService.unlockSchema(nameSpace, UUID.fromString(id));
+        return ResponseEntity.ok().build();
     }
 }

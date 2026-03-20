@@ -1,10 +1,16 @@
 package com.ssnc.schemaService.service;
 
+import com.ssnc.schemaService.dto.ExtRefDto;
+import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchmXrefDto;
+import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmXref;
 import com.ssnc.schemaService.entity.XRefType;
+import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.repo.SchmXrefRepository;
+import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import com.ssnc.schemaService.util.XRefTypeMapper;
+import com.ssnc.shared.security.JwtClaimsContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +25,15 @@ public class SchmXrefService {
 
     @Autowired
     private SchmXrefRepository schmXrefRepository;
+
+    @Autowired
+    private SchmRepository schmRepository;
+
+    @Autowired
+    private NamespaceFilterManager namespaceFilterManager;
+
+    @Autowired(required = false)
+    private JwtClaimsContext jwtClaimsContext;
 
     /**
      * Get all cross-references
@@ -107,6 +122,100 @@ public class SchmXrefService {
     }
 
     /**
+     * Get external references for a namespace with optional type filter
+     */
+    public List<ExtRefDto> getExtRefs(String nameSpace, String type) {
+        namespaceFilterManager.enableIfPresent(nameSpace);
+
+        List<SchmXref> xrefs;
+        if (type != null && !type.isEmpty()) {
+            XRefType enumType = XRefTypeMapper.toEnum(type);
+            xrefs = schmXrefRepository.findByNmspNameAndRefType(nameSpace, enumType);
+        } else {
+            xrefs = schmXrefRepository.findByNmspName(nameSpace);
+        }
+
+        return xrefs.stream()
+                .map(this::mapToExtRefDto)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get schemas associated with a specific external reference
+     */
+    public List<SchemaDto> getSchemasForExtRef(String nameSpace, String extRefType, String extRefName, String extRefVersion) {
+        namespaceFilterManager.enableIfPresent(nameSpace);
+
+        XRefType enumType = XRefTypeMapper.toEnum(extRefType);
+        List<SchmXref> xrefs;
+
+        if (extRefVersion != null && !extRefVersion.isEmpty()) {
+            xrefs = schmXrefRepository.findByNmspNameAndRefTypeAndRefNameAndRefVersion(nameSpace, enumType, extRefName, extRefVersion);
+        } else {
+            xrefs = schmXrefRepository.findByNmspNameAndRefTypeAndRefName(nameSpace, enumType, extRefName);
+        }
+
+        return xrefs.stream()
+                .map(xref -> schmRepository.findById(xref.getSchmId()))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .map(this::mapToSchemaDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Associate schemas with an external reference
+     */
+    @Transactional
+    public List<SchemaDto> associateSchemasWithExtRef(String nameSpace, String extRefType, String extRefName, String extRefVersion, List<SchemaDto> schemas) {
+        namespaceFilterManager.enableIfPresent(nameSpace);
+
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : "system";
+
+        XRefType enumType = XRefTypeMapper.toEnum(extRefType);
+
+        // Delete existing associations for this version
+        List<SchmXref> existingXrefs;
+        if (extRefVersion != null && !extRefVersion.isEmpty()) {
+            existingXrefs = schmXrefRepository.findByNmspNameAndRefTypeAndRefNameAndRefVersion(nameSpace, enumType, extRefName, extRefVersion);
+        } else {
+            existingXrefs = schmXrefRepository.findByNmspNameAndRefTypeAndRefName(nameSpace, enumType, extRefName);
+        }
+        existingXrefs.forEach(xref -> schmXrefRepository.delete(xref));
+
+        // Create new associations
+        for (SchemaDto schemaDto : schemas) {
+            SchmXref xref = new SchmXref();
+            xref.setSchmId(schemaDto.getId());
+            xref.setSchmName(schemaDto.getName());
+            xref.setSchmType(schemaDto.getSchemaType());
+            xref.setNmspName(nameSpace);
+            xref.setRefType(enumType);
+            xref.setRefName(extRefName);
+            xref.setRefVersion(extRefVersion);
+            xref.setCreatedBy(userName);
+            xref.setUpdatedBy(userName);
+            schmXrefRepository.save(xref);
+        }
+
+        return schemas;
+    }
+
+    /**
+     * Get external references for a schema
+     */
+    public List<ExtRefDto> getExtRefsForSchema(String nameSpace, UUID schmId) {
+        namespaceFilterManager.enableIfPresent(nameSpace);
+
+        List<SchmXref> xrefs = schmXrefRepository.findBySchmId(schmId);
+        return xrefs.stream()
+                .map(this::mapToExtRefDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Map entity to DTO
      */
     private SchmXrefDto mapToDto(SchmXref xref) {
@@ -146,5 +255,45 @@ public class SchmXrefService {
         xref.setCreatedBy(dto.getCreatedBy());
         xref.setUpdatedBy(dto.getUpdatedBy());
         return xref;
+    }
+
+    /**
+     * Map SchmXref entity to ExtRefDto
+     */
+    private ExtRefDto mapToExtRefDto(SchmXref xref) {
+        ExtRefDto dto = new ExtRefDto();
+        dto.setExtRefId(xref.getXrefId());
+        dto.setExtRefName(xref.getRefName());
+        dto.setExtRefType(XRefTypeMapper.toString(xref.getRefType()));
+        dto.setExtRefVersion(xref.getRefVersion());
+        dto.setCreatedByUser(xref.getCreatedBy());
+        dto.setCreateDateTime(xref.getCreatedDatetime());
+        dto.setModifiedByUser(xref.getUpdatedBy());
+        dto.setModifiedDateTime(xref.getUpdatedDatetime());
+        return dto;
+    }
+
+    /**
+     * Map Schm entity to SchemaDto
+     */
+    private SchemaDto mapToSchemaDto(Schm schm) {
+        SchemaDto dto = new SchemaDto();
+        dto.setId(schm.getSchmId());
+        dto.setName(schm.getSchmName());
+        dto.setDescription(schm.getSchmDesc());
+        dto.setSchemaType(schm.getSchemaType());
+        dto.setContentType(schm.getContentType());
+        dto.setLockBy(schm.getLockBy());
+        dto.setGroup(schm.getGroup());
+        dto.setCreatedByUser(schm.getCreatedBy());
+        dto.setCreateDateTime(schm.getCreatedDatetime());
+        dto.setModifiedByUser(schm.getUpdatedBy());
+        dto.setModifiedDateTime(schm.getUpdatedDatetime());
+
+        if (schm.getPublishVersion() != null) {
+            dto.setPublished(String.valueOf(schm.getPublishVersion()));
+        }
+
+        return dto;
     }
 }

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -57,7 +58,10 @@ public class SchemaService {
         criteria.setPublishedOnly(publishedOnly);
 
         List<Schm> schemas = schmRepository.findAll(SchmSpecifications.withFilters(criteria));
-        return schemas.stream().map(this::mapToSchemaResponse).collect(Collectors.toList());
+        return schemas.stream()
+                .map(this::mapToSchemaResponse)
+                .sorted(Comparator.comparing(SchemaDto::getName))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -290,6 +294,37 @@ public class SchemaService {
             SchmData saved = schmDataRepository.save(newVersion);
             return mapToVersionResponse(saved);
         }
+    }
+
+    /**
+     * Lock a schema
+     */
+    @Transactional
+    public void lockSchema(String namespace, UUID schmId) {
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+
+        Schm schema = schmRepository.findBySchmId(schmId)
+                .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
+
+        schema.setLockBy(userName);
+        schmRepository.save(schema);
+    }
+
+    /**
+     * Unlock a schema
+     */
+    @Transactional
+    public void unlockSchema(String namespace, UUID schmId) {
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        Schm schema = schmRepository.findBySchmId(schmId)
+                .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
+
+        schema.setLockBy(null);
+        schmRepository.save(schema);
     }
 
     /**

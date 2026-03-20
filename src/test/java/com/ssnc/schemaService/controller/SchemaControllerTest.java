@@ -1,10 +1,12 @@
 package com.ssnc.schemaService.controller;
 
 import com.ssnc.schemaService.constants.ErrorMessages;
+import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
 import com.ssnc.schemaService.service.SchemaService;
+import com.ssnc.schemaService.service.SchmXrefService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -25,6 +27,9 @@ class SchemaControllerTest {
 
     @Mock
     private SchemaService schemaService;
+
+    @Mock
+    private SchmXrefService schmXrefService;
 
     @InjectMocks
     private SchemaController schemaController;
@@ -294,5 +299,46 @@ class SchemaControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(testVersionDto, response.getBody());
         verify(schemaService).updateDraftContent(testNamespace, testSchemaId, content);
+    }
+
+    @Test
+    void testGetExtRefsForSchema() {
+        ExtRefDto extRefDto = new ExtRefDto();
+        extRefDto.setExtRefId(UUID.randomUUID());
+        extRefDto.setExtRefName("Test ExtRef");
+        extRefDto.setExtRefType("Automation");
+        List<ExtRefDto> expectedExtRefs = Arrays.asList(extRefDto);
+
+        when(schmXrefService.getExtRefsForSchema(testNamespace, testSchemaId))
+                .thenReturn(expectedExtRefs);
+
+        ResponseEntity<List<ExtRefDto>> response = schemaController.getExtRefsForSchema(
+                testNamespace, testSchemaId.toString());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedExtRefs, response.getBody());
+        verify(schmXrefService).getExtRefsForSchema(testNamespace, testSchemaId);
+    }
+
+    @Test
+    void testLockSchema() {
+        doNothing().when(schemaService).lockSchema(testNamespace, testSchemaId);
+
+        ResponseEntity<Void> response = schemaController.lockSchema(
+                testNamespace, testSchemaId.toString());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(schemaService).lockSchema(testNamespace, testSchemaId);
+    }
+
+    @Test
+    void testUnlockSchema() {
+        doNothing().when(schemaService).unlockSchema(testNamespace, testSchemaId);
+
+        ResponseEntity<Void> response = schemaController.unlockSchema(
+                testNamespace, testSchemaId.toString());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(schemaService).unlockSchema(testNamespace, testSchemaId);
     }
 }
