@@ -11,6 +11,7 @@ import com.ssnc.schemaService.repo.ExtRefRepository;
 import com.ssnc.schemaService.repo.SchmExtRefXrefRepository;
 import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.tenant.NamespaceFilterManager;
+import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -109,9 +110,10 @@ public class ExternalReferenceService {
         ExtRefType.fromString(extRefType);
 
         String currentUser = jwtClaimsContext.getUserId();
+        String tenantName = TenantContext.getTenantName();
 
         // Check if external reference already exists
-        Optional<ExtRef> existingExtRef = extRefRepository.findByExtRefId(extRefId);
+        Optional<ExtRef> existingExtRef = extRefRepository.findById(extRefId);
 
         ExtRef extRef;
         if (existingExtRef.isPresent()) {
@@ -125,6 +127,7 @@ public class ExternalReferenceService {
             // Create new
             extRef = new ExtRef();
             extRef.setExtRefId(extRefId);
+            extRef.setTenantName(tenantName);
             extRef.setExtRefName(extRefName);
             extRef.setExtRefType(extRefType);
             extRef.setExtRefVersion(extRefVersion);
@@ -145,6 +148,7 @@ public class ExternalReferenceService {
         if (request.getSchemas() != null && !request.getSchemas().isEmpty()) {
             for (ExtRefWithSchemasRequest.SchemaReference schemaRef : request.getSchemas()) {
                 SchmExtRefXref xref = new SchmExtRefXref();
+                xref.setTenantName(tenantName);
                 xref.setSchmId(schemaRef.getSchmId());
                 xref.setExtRefId(extRefId);
                 xref.setCreatedBy(currentUser);

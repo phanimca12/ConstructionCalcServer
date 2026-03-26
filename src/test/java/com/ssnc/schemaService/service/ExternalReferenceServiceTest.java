@@ -10,11 +10,13 @@ import com.ssnc.schemaService.repo.ExtRefRepository;
 import com.ssnc.schemaService.repo.SchmExtRefXrefRepository;
 import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.tenant.NamespaceFilterManager;
+import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDateTime;
@@ -221,20 +223,24 @@ class ExternalReferenceServiceTest {
         ExtRefWithSchemasRequest emptyRequest = new ExtRefWithSchemasRequest();
         emptyRequest.setSchemas(Arrays.asList());
 
-        when(extRefRepository.findByExtRefId(testExtRefId)).thenReturn(Optional.empty());
-        when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-        when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
-        doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-        ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
-                testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, emptyRequest);
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-        assertNotNull(result);
-        assertEquals(testExtRefId, result.getExtRefId());
-        assertEquals("Test Process", result.getExtRefName());
-        verify(namespaceFilterManager).enableIfPresent(testNamespace);
-        verify(extRefRepository).findByExtRefId(testExtRefId);
-        verify(extRefRepository).save(any(ExtRef.class));
+            ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, emptyRequest);
+
+            assertNotNull(result);
+            assertEquals(testExtRefId, result.getExtRefId());
+            assertEquals("Test Process", result.getExtRefName());
+            verify(namespaceFilterManager).enableIfPresent(testNamespace);
+            verify(extRefRepository).findById(testExtRefId);
+            verify(extRefRepository).save(any(ExtRef.class));
+        }
     }
 
     @Test
@@ -242,20 +248,24 @@ class ExternalReferenceServiceTest {
         ExtRefWithSchemasRequest emptyRequest = new ExtRefWithSchemasRequest();
         emptyRequest.setSchemas(Arrays.asList());
 
-        when(extRefRepository.findByExtRefId(testExtRefId)).thenReturn(Optional.of(testExtRef));
-        testExtRef.setExtRefName("Updated Process");
-        when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-        when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
-        doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-        ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
-                testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, emptyRequest);
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
+            testExtRef.setExtRefName("Updated Process");
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-        assertNotNull(result);
-        assertEquals(testExtRefId, result.getExtRefId());
-        verify(namespaceFilterManager).enableIfPresent(testNamespace);
-        verify(extRefRepository).findByExtRefId(testExtRefId);
-        verify(extRefRepository).save(any(ExtRef.class));
+            ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, emptyRequest);
+
+            assertNotNull(result);
+            assertEquals(testExtRefId, result.getExtRefId());
+            verify(namespaceFilterManager).enableIfPresent(testNamespace);
+            verify(extRefRepository).findById(testExtRefId);
+            verify(extRefRepository).save(any(ExtRef.class));
+        }
     }
 
     @Test
@@ -263,14 +273,17 @@ class ExternalReferenceServiceTest {
         ExtRefWithSchemasRequest emptyRequest = new ExtRefWithSchemasRequest();
         emptyRequest.setSchemas(Arrays.asList());
 
-        doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-        assertThrows(IllegalArgumentException.class, () -> {
-            externalReferenceService.createOrUpdateExternalReference(
-                    testNamespace, "InvalidType", "Test", testExtRefId, testExtRefVersion, emptyRequest);
-        });
+            assertThrows(IllegalArgumentException.class, () -> {
+                externalReferenceService.createOrUpdateExternalReference(
+                        testNamespace, "InvalidType", "Test", testExtRefId, testExtRefVersion, emptyRequest);
+            });
 
-        verify(namespaceFilterManager).enableIfPresent(testNamespace);
+            verify(namespaceFilterManager).enableIfPresent(testNamespace);
+        }
     }
 
     @Test
@@ -287,18 +300,22 @@ class ExternalReferenceServiceTest {
 
         request.setSchemas(Arrays.asList(schemaRef1, schemaRef2));
 
-        when(extRefRepository.findByExtRefId(testExtRefId)).thenReturn(Optional.empty());
-        when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-        when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
-        when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
-        doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-        ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
-                testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request);
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-        assertNotNull(result);
-        assertEquals(testExtRefId, result.getExtRefId());
-        verify(schmExtRefXrefRepository, times(2)).save(any(SchmExtRefXref.class));
+            ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request);
+
+            assertNotNull(result);
+            assertEquals(testExtRefId, result.getExtRefId());
+            verify(schmExtRefXrefRepository, times(2)).save(any(SchmExtRefXref.class));
+        }
     }
 
     @Test
@@ -314,44 +331,52 @@ class ExternalReferenceServiceTest {
         existingXref.setExtRefId(testExtRefId);
         existingXref.setSchmId(UUID.randomUUID());
 
-        when(extRefRepository.findByExtRefId(testExtRefId)).thenReturn(Optional.of(testExtRef));
-        when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-        when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList(existingXref));
-        doNothing().when(schmExtRefXrefRepository).deleteAll(anyList());
-        when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
-        doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-        ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
-                testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, request);
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList(existingXref));
+            doNothing().when(schmExtRefXrefRepository).deleteAll(anyList());
+            when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-        assertNotNull(result);
-        verify(schmExtRefXrefRepository).deleteAll(anyList());
-        verify(schmExtRefXrefRepository).save(any(SchmExtRefXref.class));
+            ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, request);
+
+            assertNotNull(result);
+            verify(schmExtRefXrefRepository).deleteAll(anyList());
+            verify(schmExtRefXrefRepository).save(any(SchmExtRefXref.class));
+        }
     }
 
     @Test
     void testCreateOrUpdateExternalReference_AllTypes() {
         String[] validTypes = {"Process", "Automation", "PresentationFlow", "Sampling", "UXBuilder"};
 
-        for (String type : validTypes) {
-            ExtRefWithSchemasRequest emptyRequest = new ExtRefWithSchemasRequest();
-            emptyRequest.setSchemas(Arrays.asList());
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            ExtRef extRef = new ExtRef();
-            extRef.setExtRefId(UUID.randomUUID());
-            extRef.setExtRefType(type);
-            extRef.setExtRefName("Test " + type);
+            for (String type : validTypes) {
+                ExtRefWithSchemasRequest emptyRequest = new ExtRefWithSchemasRequest();
+                emptyRequest.setSchemas(Arrays.asList());
 
-            when(extRefRepository.findByExtRefId(any(UUID.class))).thenReturn(Optional.empty());
-            when(extRefRepository.save(any(ExtRef.class))).thenReturn(extRef);
-            when(schmExtRefXrefRepository.findByExtRefId(any(UUID.class))).thenReturn(Arrays.asList());
-            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+                ExtRef extRef = new ExtRef();
+                extRef.setExtRefId(UUID.randomUUID());
+                extRef.setExtRefType(type);
+                extRef.setExtRefName("Test " + type);
 
-            ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
-                    testNamespace, type, "Test " + type, extRef.getExtRefId(), "1.0.0", emptyRequest);
+                when(extRefRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
+                when(extRefRepository.save(any(ExtRef.class))).thenReturn(extRef);
+                when(schmExtRefXrefRepository.findByExtRefId(any(UUID.class))).thenReturn(Arrays.asList());
+                doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-            assertNotNull(result);
-            assertEquals(type, result.getExtRefType());
+                ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
+                        testNamespace, type, "Test " + type, extRef.getExtRefId(), "1.0.0", emptyRequest);
+
+                assertNotNull(result);
+                assertEquals(type, result.getExtRefType());
+            }
         }
     }
 

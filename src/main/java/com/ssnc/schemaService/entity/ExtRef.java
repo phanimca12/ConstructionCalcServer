@@ -15,7 +15,6 @@ import java.util.UUID;
 public class ExtRef {
 
     @Id
-    @GeneratedValue
     @Column(name = "EXT_REF_ID", nullable = false)
     private UUID extRefId;
 
