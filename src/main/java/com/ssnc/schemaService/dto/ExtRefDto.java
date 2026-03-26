@@ -8,11 +8,12 @@ import java.util.UUID;
 @Data
 public class ExtRefDto {
     private UUID extRefId;
+    private String tenantName;
     private String extRefName;
     private String extRefType;
     private String extRefVersion;
-    private String createdByUser;
-    private LocalDateTime createDateTime;
-    private String modifiedByUser;
-    private LocalDateTime modifiedDateTime;
+    private LocalDateTime createdDatetime;
+    private LocalDateTime updatedDatetime;
+    private String createdBy;
+    private String updatedBy;
 }

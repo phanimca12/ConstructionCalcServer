@@ -3,6 +3,7 @@ package com.ssnc.schemaService.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.TenantId;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -17,20 +18,18 @@ public class SchmExtRefXref {
     @Column(name = "XREF_ID", nullable = false)
     private UUID xrefId;
 
+    /**
+     * Hibernate 6 tenant discriminator column
+     */
+    @TenantId
+    @Column(name = "TENANT_NAME", nullable = false, updatable = false)
+    private String tenantName;
+
     @Column(name = "SCHM_ID", nullable = false)
     private UUID schmId;
 
-    @Column(name = "SCHM_NAME", length = 256)
-    private String schmName;
-
     @Column(name = "EXT_REF_ID", nullable = false)
     private UUID extRefId;
-
-    @Column(name = "EXT_REF_NAME", length = 256)
-    private String extRefName;
-
-    @Column(name = "EXT_REF_TYPE", length = 64)
-    private String extRefType;
 
     @CreationTimestamp
     @Column(name = "CREATED_DATETIME", updatable = false)
@@ -38,4 +37,12 @@ public class SchmExtRefXref {
 
     @Column(name = "CREATED_BY", length = 256)
     private String createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "SCHM_ID", insertable = false, updatable = false)
+    private Schm schm;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "EXT_REF_ID", insertable = false, updatable = false)
+    private ExtRef extRef;
 }

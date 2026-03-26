@@ -3,6 +3,7 @@ package com.ssnc.schemaService.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.TenantId;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
@@ -17,6 +18,13 @@ public class ExtRef {
     @GeneratedValue
     @Column(name = "EXT_REF_ID", nullable = false)
     private UUID extRefId;
+
+    /**
+     * Hibernate 6 tenant discriminator column
+     */
+    @TenantId
+    @Column(name = "TENANT_NAME", nullable = false, updatable = false)
+    private String tenantName;
 
     @Column(name = "EXT_REF_NAME", length = 256)
     private String extRefName;

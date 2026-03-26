@@ -11,27 +11,29 @@ import java.util.UUID;
 public interface SchmExtRefXrefRepository extends JpaRepository<SchmExtRefXref, UUID> {
 
     /**
-     * Find all cross-references by schema ID
+     * Find cross-references by schema ID
      */
     List<SchmExtRefXref> findBySchmId(UUID schmId);
 
     /**
-     * Find all cross-references by external reference ID
+     * Find cross-references by external reference ID
      */
     List<SchmExtRefXref> findByExtRefId(UUID extRefId);
 
     /**
-     * Find all cross-references by external reference type
+     * Find schemas by external reference details
+     * Uses JPA method naming to navigate through the extRef relationship
      */
-    List<SchmExtRefXref> findByExtRefType(String extRefType);
+    List<SchmExtRefXref> findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
+            String extRefType, UUID extRefId, String extRefVersion);
 
     /**
-     * Find all cross-references by external reference name and type
+     * Check if cross-reference exists
      */
-    List<SchmExtRefXref> findByExtRefNameAndExtRefType(String extRefName, String extRefType);
+    boolean existsBySchmIdAndExtRefId(UUID schmId, UUID extRefId);
 
     /**
-     * Delete all cross-references by external reference ID and type
+     * Delete cross-reference by schema ID and external reference ID
      */
-    void deleteByExtRefNameAndExtRefType(String extRefName, String extRefType);
+    void deleteBySchmIdAndExtRefId(UUID schmId, UUID extRefId);
 }

@@ -12,17 +12,18 @@ import java.util.UUID;
 public interface ExtRefRepository extends JpaRepository<ExtRef, UUID> {
 
     /**
-     * Find external reference by name and type
+     * Find external reference by name, type, and version
      */
-    Optional<ExtRef> findByExtRefNameAndExtRefType(String extRefName, String extRefType);
+    Optional<ExtRef> findByExtRefNameAndExtRefTypeAndExtRefVersion(
+            String extRefName, String extRefType, String extRefVersion);
 
     /**
-     * Find all external references by type
+     * Find external reference by ID
+     */
+    Optional<ExtRef> findByExtRefId(UUID extRefId);
+
+    /**
+     * Find external references by type
      */
     List<ExtRef> findByExtRefType(String extRefType);
-
-    /**
-     * Find external reference by name
-     */
-    List<ExtRef> findByExtRefName(String extRefName);
 }

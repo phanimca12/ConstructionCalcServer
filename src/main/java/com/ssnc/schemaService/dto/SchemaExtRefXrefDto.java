@@ -7,11 +7,16 @@ import java.util.UUID;
 
 @Data
 public class SchemaExtRefXrefDto {
-    private UUID schemaId;
-    private String schemaName;
+    private UUID xrefId;
+    private String tenantName;
+    private UUID schmId;
     private UUID extRefId;
+    private LocalDateTime createdDatetime;
+    private String createdBy;
+
+    // Optional nested objects for convenience
+    private String schmName;
     private String extRefName;
     private String extRefType;
-    private String createdByUser;
-    private LocalDateTime createDateTime;
+    private String extRefVersion;
 }
