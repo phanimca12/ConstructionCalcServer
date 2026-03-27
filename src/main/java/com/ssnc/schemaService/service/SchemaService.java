@@ -64,6 +64,7 @@ public class SchemaService {
 
         List<Schm> schemas = schmRepository.findAll(SchmSpecifications.withFilters(criteria));
 
+
         // Map to DTOs and apply version filtering
         return schemas.stream()
                 .map(this::mapToSchemaResponse)
@@ -117,7 +118,7 @@ public class SchemaService {
             default:
                 return Comparator.comparing(SchemaDto::getName);
         }
-    }
+   }
 
     /**
      * Create a new schema
