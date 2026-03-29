@@ -15,6 +15,7 @@ public final class ErrorMessages {
     public static final String SCHEMA_VERSION_NOT_FOUND = "Version %s does not exist for schema %s";
     public static final String SCHEMA_ALREADY_PUBLISHED = "Schema %s already has published version %s";
     public static final String SCHEMA_CREATION_FAILED = "Failed to create Schema, Please contact support";
+    public static final String SCHEMA_IN_USE = "Schema %s cannot be unpublished as it is in use by external references";
 
     // Tenant related messages
     public static final String TENANT_NOT_FOUND = "Tenant not found";

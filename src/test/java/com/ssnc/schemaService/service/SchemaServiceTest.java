@@ -1,12 +1,17 @@
 package com.ssnc.schemaService.service;
 
 import com.ssnc.schemaService.constants.AppConstants;
+import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
+import com.ssnc.schemaService.entity.ExtRef;
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmData;
 import com.ssnc.schemaService.entity.SchmDataId;
+import com.ssnc.schemaService.entity.SchmExtRefXref;
+import com.ssnc.schemaService.repo.ExtRefRepository;
 import com.ssnc.schemaService.repo.SchmDataRepository;
+import com.ssnc.schemaService.repo.SchmExtRefXrefRepository;
 import com.ssnc.schemaService.repo.SchmFilterCriteria;
 import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.tenant.NamespaceFilterManager;
@@ -47,6 +52,12 @@ class SchemaServiceTest {
 
     @Mock
     private JwtClaimsContext jwtClaimsContext;
+
+    @Mock
+    private SchmExtRefXrefRepository schmExtRefXrefRepository;
+
+    @Mock
+    private ExtRefRepository extRefRepository;
 
     @InjectMocks
     private SchemaService schemaService;
@@ -333,10 +344,12 @@ class SchemaServiceTest {
     void testUnPublishSchemaVersion_Success() {
         testSchm.setPublishVersion(1);
         when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(Arrays.asList());
         when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
         schemaService.unPublishSchemaVersion(testNamespace, testSchmId);
 
+        verify(schmExtRefXrefRepository).findBySchmId(testSchmId);
         verify(schmRepository).save(argThat(schm -> schm.getPublishVersion() == null));
     }
 
@@ -347,6 +360,26 @@ class SchemaServiceTest {
         assertThrows(IllegalArgumentException.class, () ->
                 schemaService.unPublishSchemaVersion(testNamespace, testSchmId)
         );
+    }
+
+    @Test
+    void testUnPublishSchemaVersion_SchemaInUse_ThrowsException() {
+        testSchm.setPublishVersion(1);
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        // Mock external references exist
+        SchmExtRefXref xref = new SchmExtRefXref();
+        xref.setSchmId(testSchmId);
+        xref.setExtRefId(UUID.randomUUID());
+        when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(Arrays.asList(xref));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
+                schemaService.unPublishSchemaVersion(testNamespace, testSchmId)
+        );
+
+        assertTrue(exception.getMessage().contains("cannot be unpublished as it is in use"));
+        verify(schmExtRefXrefRepository).findBySchmId(testSchmId);
+        verify(schmRepository, never()).save(any(Schm.class));
     }
 
     @Test
@@ -656,5 +689,128 @@ class SchemaServiceTest {
         draft.setUpdatedDatetime(LocalDateTime.now());
 
         return draft;
+    }
+
+    @Test
+    void testGetExternalReferencesBySchemaId_Success() {
+        UUID extRefId1 = UUID.randomUUID();
+        UUID extRefId2 = UUID.randomUUID();
+
+        // Mock schema exists
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        // Mock cross-references
+        SchmExtRefXref xref1 = new SchmExtRefXref();
+        xref1.setSchmId(testSchmId);
+        xref1.setExtRefId(extRefId1);
+
+        SchmExtRefXref xref2 = new SchmExtRefXref();
+        xref2.setSchmId(testSchmId);
+        xref2.setExtRefId(extRefId2);
+
+        List<SchmExtRefXref> xrefs = Arrays.asList(xref1, xref2);
+        when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(xrefs);
+
+        // Mock external references
+        ExtRef extRef1 = new ExtRef();
+        extRef1.setExtRefId(extRefId1);
+        extRef1.setExtRefName("API Reference");
+        extRef1.setExtRefType("API");
+        extRef1.setExtRefVersion("1.0");
+        extRef1.setCreatedBy(testUserId);
+        extRef1.setUpdatedBy(testUserId);
+
+        ExtRef extRef2 = new ExtRef();
+        extRef2.setExtRefId(extRefId2);
+        extRef2.setExtRefName("Database Reference");
+        extRef2.setExtRefType("DATABASE");
+        extRef2.setExtRefVersion("2.0");
+        extRef2.setCreatedBy(testUserId);
+        extRef2.setUpdatedBy(testUserId);
+
+        when(extRefRepository.findById(extRefId1)).thenReturn(Optional.of(extRef1));
+        when(extRefRepository.findById(extRefId2)).thenReturn(Optional.of(extRef2));
+
+        // Execute
+        List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(2, result.size());
+        assertEquals("API Reference", result.get(0).getExtRefName());
+        assertEquals("API", result.get(0).getExtRefType());
+        assertEquals("1.0", result.get(0).getExtRefVersion());
+        assertEquals("Database Reference", result.get(1).getExtRefName());
+        assertEquals("DATABASE", result.get(1).getExtRefType());
+        assertEquals("2.0", result.get(1).getExtRefVersion());
+
+        verify(namespaceFilterManager).enableIfPresent(testNamespace);
+        verify(schmRepository).findBySchmId(testSchmId);
+        verify(schmExtRefXrefRepository).findBySchmId(testSchmId);
+        verify(extRefRepository).findById(extRefId1);
+        verify(extRefRepository).findById(extRefId2);
+    }
+
+    @Test
+    void testGetExternalReferencesBySchemaId_SchemaNotFound() {
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () ->
+                schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId)
+        );
+
+        verify(namespaceFilterManager).enableIfPresent(testNamespace);
+        verify(schmRepository).findBySchmId(testSchmId);
+        verify(schmExtRefXrefRepository, never()).findBySchmId(any());
+    }
+
+    @Test
+    void testGetExternalReferencesBySchemaId_NoExternalReferences() {
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(Arrays.asList());
+
+        List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId);
+
+        assertNotNull(result);
+        assertEquals(0, result.size());
+        verify(schmRepository).findBySchmId(testSchmId);
+        verify(schmExtRefXrefRepository).findBySchmId(testSchmId);
+        verify(extRefRepository, never()).findById(any());
+    }
+
+    @Test
+    void testGetExternalReferencesBySchemaId_WithMissingExtRef() {
+        UUID extRefId1 = UUID.randomUUID();
+        UUID extRefId2 = UUID.randomUUID();
+
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        SchmExtRefXref xref1 = new SchmExtRefXref();
+        xref1.setSchmId(testSchmId);
+        xref1.setExtRefId(extRefId1);
+
+        SchmExtRefXref xref2 = new SchmExtRefXref();
+        xref2.setSchmId(testSchmId);
+        xref2.setExtRefId(extRefId2);
+
+        List<SchmExtRefXref> xrefs = Arrays.asList(xref1, xref2);
+        when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(xrefs);
+
+        ExtRef extRef1 = new ExtRef();
+        extRef1.setExtRefId(extRefId1);
+        extRef1.setExtRefName("API Reference");
+        extRef1.setExtRefType("API");
+        extRef1.setExtRefVersion("1.0");
+
+        when(extRefRepository.findById(extRefId1)).thenReturn(Optional.of(extRef1));
+        when(extRefRepository.findById(extRefId2)).thenReturn(Optional.empty());
+
+        List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals("API Reference", result.get(0).getExtRefName());
+        verify(extRefRepository).findById(extRefId1);
+        verify(extRefRepository).findById(extRefId2);
     }
 }

@@ -2,13 +2,18 @@ package com.ssnc.schemaService.service;
 
 import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.constants.ErrorMessages;
+import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
+import com.ssnc.schemaService.entity.ExtRef;
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmData;
 import com.ssnc.schemaService.entity.SchmDataId;
+import com.ssnc.schemaService.entity.SchmExtRefXref;
+import com.ssnc.schemaService.repo.ExtRefRepository;
 import com.ssnc.schemaService.repo.SchmDataRepository;
+import com.ssnc.schemaService.repo.SchmExtRefXrefRepository;
 import com.ssnc.schemaService.repo.SchmFilterCriteria;
 import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.repo.SchmSpecifications;
@@ -44,6 +49,12 @@ public class SchemaService {
 
     @Autowired
     private JwtClaimsContext jwtClaimsContext;
+
+    @Autowired
+    private SchmExtRefXrefRepository schmExtRefXrefRepository;
+
+    @Autowired
+    private ExtRefRepository extRefRepository;
 
     /**
      * Get schemas with optional filtering and sorting
@@ -257,6 +268,12 @@ public class SchemaService {
         namespaceFilterManager.enableIfPresent(namespace);
         Optional<Schm> schemaOpt = schmRepository.findBySchmId(schmId);
         if (schemaOpt.isPresent()) {
+            // Check if schema is referenced by any external references
+            List<SchmExtRefXref> xrefs = schmExtRefXrefRepository.findBySchmId(schmId);
+            if (!xrefs.isEmpty()) {
+                throw new IllegalStateException(String.format(ErrorMessages.SCHEMA_IN_USE, schmId));
+            }
+
             Schm schema = schemaOpt.get();
             schema.setPublishVersion(null);
             schmRepository.save(schema);
@@ -381,6 +398,46 @@ public class SchemaService {
 
         schema.setLockBy(null);
         schmRepository.save(schema);
+    }
+
+    /**
+     * Get external references for a schema
+     */
+    @Transactional(readOnly = true)
+    public List<ExtRefDto> getExternalReferencesBySchemaId(String namespace, UUID schmId) {
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        // Verify schema exists
+        schmRepository.findBySchmId(schmId)
+                .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
+
+        // Get all cross-references for this schema
+        List<SchmExtRefXref> xrefs = schmExtRefXrefRepository.findBySchmId(schmId);
+
+        // Map to ExtRefDto by looking up each external reference
+        return xrefs.stream()
+                .map(xref -> extRefRepository.findById(xref.getExtRefId()))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .map(this::mapExtRefToDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Map ExtRef entity to ExtRefDto
+     */
+    private ExtRefDto mapExtRefToDto(ExtRef extRef) {
+        ExtRefDto dto = new ExtRefDto();
+        dto.setExtRefId(extRef.getExtRefId());
+        dto.setTenantName(extRef.getTenantName());
+        dto.setExtRefName(extRef.getExtRefName());
+        dto.setExtRefType(extRef.getExtRefType());
+        dto.setExtRefVersion(extRef.getExtRefVersion());
+        dto.setCreatedDatetime(extRef.getCreatedDatetime());
+        dto.setUpdatedDatetime(extRef.getUpdatedDatetime());
+        dto.setCreatedBy(extRef.getCreatedBy());
+        dto.setUpdatedBy(extRef.getUpdatedBy());
+        return dto;
     }
 
     /**

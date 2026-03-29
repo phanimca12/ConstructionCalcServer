@@ -1,6 +1,7 @@
 package com.ssnc.schemaService.controller;
 
 import com.ssnc.schemaService.constants.ErrorMessages;
+import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
@@ -240,5 +241,17 @@ public class SchemaController {
             @PathVariable("id") String id) {
         schemaService.unlockSchema(nameSpace, UUID.fromString(id));
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * GET /schemas/{nameSpace}/{id}/extRefs
+     * Get external references for a schema
+     */
+    @GetMapping("/{id}/extRefs")
+    public ResponseEntity<List<ExtRefDto>> getSchemaExternalReferences(
+            @PathVariable("nameSpace") String nameSpace,
+            @PathVariable("id") String id) {
+        List<ExtRefDto> extRefs = schemaService.getExternalReferencesBySchemaId(nameSpace, UUID.fromString(id));
+        return ResponseEntity.ok(extRefs);
     }
 }

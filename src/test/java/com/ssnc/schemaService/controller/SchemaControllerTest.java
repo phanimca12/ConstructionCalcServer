@@ -1,6 +1,7 @@
 package com.ssnc.schemaService.controller;
 
 import com.ssnc.schemaService.constants.ErrorMessages;
+import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
@@ -220,6 +221,18 @@ class SchemaControllerTest {
     }
 
     @Test
+    void testUnPublishSchemaVersion_SchemaInUse() {
+        doThrow(new IllegalStateException("Schema cannot be unpublished as it is in use by external references"))
+                .when(schemaService).unPublishSchemaVersion(testNamespace, testSchemaId);
+
+        assertThrows(IllegalStateException.class, () ->
+                schemaController.unPublishSchemaVersion(testNamespace, testSchemaId.toString())
+        );
+
+        verify(schemaService).unPublishSchemaVersion(testNamespace, testSchemaId);
+    }
+
+    @Test
     void testGetPublishedVersion_Found() {
         when(schemaService.getPublishedVersion(testNamespace, testSchemaId))
                 .thenReturn(Optional.of(testVersionDto));
@@ -405,5 +418,49 @@ class SchemaControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(expectedSchemas, response.getBody());
         verify(schemaService).getSchemas(testNamespace, null, null, null, null, "jane.smith", null, "none");
+    }
+
+    @Test
+    void testGetSchemaExternalReferences_Success() {
+        UUID extRefId1 = UUID.randomUUID();
+        UUID extRefId2 = UUID.randomUUID();
+
+        ExtRefDto extRef1 = new ExtRefDto();
+        extRef1.setExtRefId(extRefId1);
+        extRef1.setExtRefName("External Reference 1");
+        extRef1.setExtRefType("API");
+        extRef1.setExtRefVersion("1.0");
+
+        ExtRefDto extRef2 = new ExtRefDto();
+        extRef2.setExtRefId(extRefId2);
+        extRef2.setExtRefName("External Reference 2");
+        extRef2.setExtRefType("DATABASE");
+        extRef2.setExtRefVersion("2.0");
+
+        List<ExtRefDto> expectedExtRefs = Arrays.asList(extRef1, extRef2);
+        when(schemaService.getExternalReferencesBySchemaId(testNamespace, testSchemaId))
+                .thenReturn(expectedExtRefs);
+
+        ResponseEntity<List<ExtRefDto>> response = schemaController.getSchemaExternalReferences(
+                testNamespace, testSchemaId.toString());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedExtRefs, response.getBody());
+        assertEquals(2, response.getBody().size());
+        verify(schemaService).getExternalReferencesBySchemaId(testNamespace, testSchemaId);
+    }
+
+    @Test
+    void testGetSchemaExternalReferences_EmptyList() {
+        when(schemaService.getExternalReferencesBySchemaId(testNamespace, testSchemaId))
+                .thenReturn(Collections.emptyList());
+
+        ResponseEntity<List<ExtRefDto>> response = schemaController.getSchemaExternalReferences(
+                testNamespace, testSchemaId.toString());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(0, response.getBody().size());
+        verify(schemaService).getExternalReferencesBySchemaId(testNamespace, testSchemaId);
     }
 }
