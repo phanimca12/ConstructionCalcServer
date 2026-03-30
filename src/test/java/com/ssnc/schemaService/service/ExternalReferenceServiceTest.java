@@ -161,7 +161,8 @@ class ExternalReferenceServiceTest {
         List<SchmExtRefXref> xrefs = Arrays.asList(testXref);
         when(schmExtRefXrefRepository.findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
                 testExtRefType, testExtRefId, testExtRefVersion)).thenReturn(xrefs);
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        // Mock batch fetch instead of individual findBySchmId
+        when(schmRepository.findAllById(Arrays.asList(testSchmId))).thenReturn(Arrays.asList(testSchm));
         doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
         List<SchemaDto> result = externalReferenceService.getSchemasByExternalReference(
@@ -174,6 +175,8 @@ class ExternalReferenceServiceTest {
         verify(namespaceFilterManager).enableIfPresent(testNamespace);
         verify(schmExtRefXrefRepository).findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
                 testExtRefType, testExtRefId, testExtRefVersion);
+        verify(schmRepository).findAllById(anyList());
+        verify(schmRepository, never()).findBySchmId(any());
     }
 
     @Test
@@ -207,7 +210,8 @@ class ExternalReferenceServiceTest {
         List<SchmExtRefXref> xrefs = Arrays.asList(testXref);
         when(schmExtRefXrefRepository.findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
                 testExtRefType, testExtRefId, testExtRefVersion)).thenReturn(xrefs);
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.empty());
+        // Mock batch fetch returns empty list (schema not found)
+        when(schmRepository.findAllById(Arrays.asList(testSchmId))).thenReturn(Arrays.asList());
         doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
         List<SchemaDto> result = externalReferenceService.getSchemasByExternalReference(
@@ -215,7 +219,7 @@ class ExternalReferenceServiceTest {
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
-        verify(schmRepository).findBySchmId(testSchmId);
+        verify(schmRepository).findAllById(anyList());
     }
 
     @Test
@@ -300,6 +304,10 @@ class ExternalReferenceServiceTest {
 
         request.setSchemas(Arrays.asList(schemaRef1, schemaRef2));
 
+        Schm schm2 = new Schm();
+        schm2.setSchmId(schmId2);
+        schm2.setSchmName("Schema 2");
+
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
@@ -307,6 +315,9 @@ class ExternalReferenceServiceTest {
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
             when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
+            // Mock schema validation
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            when(schmRepository.findBySchmId(schmId2)).thenReturn(Optional.of(schm2));
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
@@ -314,39 +325,99 @@ class ExternalReferenceServiceTest {
 
             assertNotNull(result);
             assertEquals(testExtRefId, result.getExtRefId());
+            verify(schmRepository, times(2)).findBySchmId(any(UUID.class));
             verify(schmExtRefXrefRepository, times(2)).save(any(SchmExtRefXref.class));
         }
     }
 
     @Test
-    void testCreateOrUpdateExternalReference_UpdateWithSchemas() {
+    void testCreateOrUpdateExternalReference_WithNonExistentSchema_ThrowsException() {
         ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
         ExtRefWithSchemasRequest.SchemaReference schemaRef = new ExtRefWithSchemasRequest.SchemaReference();
-        schemaRef.setSchmId(testSchmId);
-        schemaRef.setSchmName("Updated Schema");
+        UUID nonExistentSchmId = UUID.randomUUID();
+        schemaRef.setSchmId(nonExistentSchmId);
+        schemaRef.setSchmName("Non-existent Schema");
         request.setSchemas(Arrays.asList(schemaRef));
 
-        SchmExtRefXref existingXref = new SchmExtRefXref();
-        existingXref.setXrefId(UUID.randomUUID());
-        existingXref.setExtRefId(testExtRefId);
-        existingXref.setSchmId(UUID.randomUUID());
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            // Schema doesn't exist
+            when(schmRepository.findBySchmId(nonExistentSchmId)).thenReturn(Optional.empty());
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    externalReferenceService.createOrUpdateExternalReference(
+                            testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request)
+            );
+
+            assertTrue(exception.getMessage().contains("not found"));
+            verify(schmRepository).findBySchmId(nonExistentSchmId);
+            verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_UpdateWithSchemas_DifferentialUpdate() {
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+
+        // Request has testSchmId and schmId3 (new)
+        ExtRefWithSchemasRequest.SchemaReference schemaRef1 = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef1.setSchmId(testSchmId);
+        schemaRef1.setSchmName("Schema 1");
+
+        UUID schmId3 = UUID.randomUUID();
+        ExtRefWithSchemasRequest.SchemaReference schemaRef3 = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef3.setSchmId(schmId3);
+        schemaRef3.setSchmName("Schema 3");
+
+        request.setSchemas(Arrays.asList(schemaRef1, schemaRef3));
+
+        // Existing has testSchmId (keep) and schmId2 (remove)
+        SchmExtRefXref existingXref1 = new SchmExtRefXref();
+        existingXref1.setXrefId(UUID.randomUUID());
+        existingXref1.setExtRefId(testExtRefId);
+        existingXref1.setSchmId(testSchmId); // This one stays
+
+        UUID schmId2 = UUID.randomUUID();
+        SchmExtRefXref existingXref2 = new SchmExtRefXref();
+        existingXref2.setXrefId(UUID.randomUUID());
+        existingXref2.setExtRefId(testExtRefId);
+        existingXref2.setSchmId(schmId2); // This one gets removed
+
+        Schm schm3 = new Schm();
+        schm3.setSchmId(schmId3);
+        schm3.setSchmName("Schema 3");
 
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList(existingXref));
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId))
+                    .thenReturn(Arrays.asList(existingXref1, existingXref2));
             doNothing().when(schmExtRefXrefRepository).deleteAll(anyList());
             when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
+            // Mock schema validation - testSchmId already exists, add schmId3
+            when(schmRepository.findBySchmId(schmId3)).thenReturn(Optional.of(schm3));
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
                     testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, request);
 
             assertNotNull(result);
-            verify(schmExtRefXrefRepository).deleteAll(anyList());
-            verify(schmExtRefXrefRepository).save(any(SchmExtRefXref.class));
+
+            // Should delete only existingXref2 (schmId2 not in request)
+            verify(schmExtRefXrefRepository).deleteAll(argThat(list ->
+                    list.size() == 1 && ((SchmExtRefXref) list.get(0)).getSchmId().equals(schmId2)
+            ));
+
+            // Should add only schmId3 (testSchmId already exists)
+            verify(schmRepository, times(1)).findBySchmId(schmId3);
+            verify(schmExtRefXrefRepository, times(1)).save(any(SchmExtRefXref.class));
         }
     }
 

@@ -81,12 +81,15 @@ public class ExternalReferenceService {
                 .findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
                         extRefType, extRefId, extRefVersion);
 
-        return xrefs.stream()
-                .map(xref -> {
-                    Optional<Schm> schmOpt = schmRepository.findBySchmId(xref.getSchmId());
-                    return schmOpt.map(this::mapSchmToDto).orElse(null);
-                })
-                .filter(dto -> dto != null)
+        // Batch fetch all schemas (fix N+1 query problem)
+        List<UUID> schmIds = xrefs.stream()
+                .map(SchmExtRefXref::getSchmId)
+                .collect(Collectors.toList());
+
+        List<Schm> schemas = schmRepository.findAllById(schmIds);
+
+        return schemas.stream()
+                .map(this::mapSchmToDto)
                 .collect(Collectors.toList());
     }
 
@@ -137,19 +140,47 @@ public class ExternalReferenceService {
 
         extRef = extRefRepository.save(extRef);
 
-        // Handle schema associations (required)
-        // Delete existing associations for this external reference
+        // Handle schema associations with differential update (more efficient than delete all + recreate)
         List<SchmExtRefXref> existingXrefs = schmExtRefXrefRepository.findByExtRefId(extRefId);
-        if (!existingXrefs.isEmpty()) {
-            schmExtRefXrefRepository.deleteAll(existingXrefs);
+
+        // Get the set of existing and requested schema IDs
+        List<UUID> existingSchmIds = existingXrefs.stream()
+                .map(SchmExtRefXref::getSchmId)
+                .collect(Collectors.toList());
+
+        List<UUID> requestedSchmIds = new ArrayList<>();
+        if (request.getSchemas() != null && !request.getSchemas().isEmpty()) {
+            requestedSchmIds = request.getSchemas().stream()
+                    .map(ExtRefWithSchemasRequest.SchemaReference::getSchmId)
+                    .collect(Collectors.toList());
         }
 
-        // Create new associations if schemas are provided
-        if (request.getSchemas() != null && !request.getSchemas().isEmpty()) {
-            for (ExtRefWithSchemasRequest.SchemaReference schemaRef : request.getSchemas()) {
+        // Determine what to delete (in existing but not in requested)
+        List<SchmExtRefXref> toDelete = existingXrefs.stream()
+                .filter(xref -> !requestedSchmIds.contains(xref.getSchmId()))
+                .collect(Collectors.toList());
+
+        // Determine what to add (in requested but not in existing)
+        List<UUID> toAdd = requestedSchmIds.stream()
+                .filter(schmId -> !existingSchmIds.contains(schmId))
+                .collect(Collectors.toList());
+
+        // Delete removed associations
+        if (!toDelete.isEmpty()) {
+            schmExtRefXrefRepository.deleteAll(toDelete);
+        }
+
+        // Create new associations
+        if (!toAdd.isEmpty()) {
+            for (UUID schmId : toAdd) {
+                // Validate schema exists
+                schmRepository.findBySchmId(schmId)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                String.format("Schema %s not found", schmId)));
+
                 SchmExtRefXref xref = new SchmExtRefXref();
                 xref.setTenantName(tenantName);
-                xref.setSchmId(schemaRef.getSchmId());
+                xref.setSchmId(schmId);
                 xref.setExtRefId(extRefId);
                 xref.setCreatedBy(currentUser);
                 schmExtRefXrefRepository.save(xref);
