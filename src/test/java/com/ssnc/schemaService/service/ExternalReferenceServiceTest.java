@@ -1,6 +1,7 @@
 package com.ssnc.schemaService.service;
 
 import com.ssnc.schemaService.dto.ExtRefDto;
+import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.entity.ExtRef;
@@ -20,6 +21,7 @@ import org.mockito.MockedStatic;
 import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -235,12 +237,15 @@ class ExternalReferenceServiceTest {
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-            ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
                     testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, emptyRequest);
 
-            assertNotNull(result);
-            assertEquals(testExtRefId, result.getExtRefId());
-            assertEquals("Test Process", result.getExtRefName());
+            assertNotNull(response);
+            assertTrue(response.isUpdated());
+            assertEquals("External reference created successfully.", response.getMessage());
+            assertNotNull(response.getExtRef());
+            assertEquals(testExtRefId, response.getExtRef().getExtRefId());
+            assertEquals("Test Process", response.getExtRef().getExtRefName());
             verify(namespaceFilterManager).enableIfPresent(testNamespace);
             verify(extRefRepository).findById(testExtRefId);
             verify(extRefRepository).save(any(ExtRef.class));
@@ -256,16 +261,18 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
-            testExtRef.setExtRefName("Updated Process");
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-            ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
                     testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, emptyRequest);
 
-            assertNotNull(result);
-            assertEquals(testExtRefId, result.getExtRefId());
+            assertNotNull(response);
+            assertTrue(response.isUpdated());
+            assertEquals("External reference updated successfully.", response.getMessage());
+            assertNotNull(response.getExtRef());
+            assertEquals(testExtRefId, response.getExtRef().getExtRefId());
             verify(namespaceFilterManager).enableIfPresent(testNamespace);
             verify(extRefRepository).findById(testExtRefId);
             verify(extRefRepository).save(any(ExtRef.class));
@@ -307,6 +314,10 @@ class ExternalReferenceServiceTest {
         Schm schm2 = new Schm();
         schm2.setSchmId(schmId2);
         schm2.setSchmName("Schema 2");
+        schm2.setPublishVersion(1); // Published
+
+        // Ensure testSchm is also published
+        testSchm.setPublishVersion(1);
 
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
@@ -315,17 +326,19 @@ class ExternalReferenceServiceTest {
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
             when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
-            // Mock schema validation
-            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
-            when(schmRepository.findBySchmId(schmId2)).thenReturn(Optional.of(schm2));
+            // Mock schema validation with locking
+            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            when(schmRepository.findWithLockBySchmId(schmId2)).thenReturn(Optional.of(schm2));
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-            ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
                     testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request);
 
-            assertNotNull(result);
-            assertEquals(testExtRefId, result.getExtRefId());
-            verify(schmRepository, times(2)).findBySchmId(any(UUID.class));
+            assertNotNull(response);
+            assertTrue(response.isUpdated());
+            assertNotNull(response.getExtRef());
+            assertEquals(testExtRefId, response.getExtRef().getExtRefId());
+            verify(schmRepository, times(2)).findWithLockBySchmId(any(UUID.class));
             verify(schmExtRefXrefRepository, times(2)).save(any(SchmExtRefXref.class));
         }
     }
@@ -346,7 +359,7 @@ class ExternalReferenceServiceTest {
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
             // Schema doesn't exist
-            when(schmRepository.findBySchmId(nonExistentSchmId)).thenReturn(Optional.empty());
+            when(schmRepository.findWithLockBySchmId(nonExistentSchmId)).thenReturn(Optional.empty());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
@@ -355,7 +368,7 @@ class ExternalReferenceServiceTest {
             );
 
             assertTrue(exception.getMessage().contains("not found"));
-            verify(schmRepository).findBySchmId(nonExistentSchmId);
+            verify(schmRepository).findWithLockBySchmId(nonExistentSchmId);
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
         }
     }
@@ -391,6 +404,7 @@ class ExternalReferenceServiceTest {
         Schm schm3 = new Schm();
         schm3.setSchmId(schmId3);
         schm3.setSchmName("Schema 3");
+        schm3.setPublishVersion(1); // Published
 
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
@@ -401,22 +415,26 @@ class ExternalReferenceServiceTest {
                     .thenReturn(Arrays.asList(existingXref1, existingXref2));
             doNothing().when(schmExtRefXrefRepository).deleteAll(anyList());
             when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
-            // Mock schema validation - testSchmId already exists, add schmId3
-            when(schmRepository.findBySchmId(schmId3)).thenReturn(Optional.of(schm3));
+            // Mock schema validation with locking - testSchmId already exists, add schmId3
+            when(schmRepository.findWithLockBySchmId(schmId3)).thenReturn(Optional.of(schm3));
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-            ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
                     testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, request);
 
-            assertNotNull(result);
+            assertNotNull(response);
+            assertTrue(response.isUpdated());
+            assertNotNull(response.getExtRef());
 
             // Should delete only existingXref2 (schmId2 not in request)
-            verify(schmExtRefXrefRepository).deleteAll(argThat(list ->
-                    list.size() == 1 && ((SchmExtRefXref) list.get(0)).getSchmId().equals(schmId2)
-            ));
+            verify(schmExtRefXrefRepository).deleteAll(argThat(iterable -> {
+                List<SchmExtRefXref> list = new ArrayList<>();
+                iterable.forEach(list::add);
+                return list.size() == 1 && list.get(0).getSchmId().equals(schmId2);
+            }));
 
             // Should add only schmId3 (testSchmId already exists)
-            verify(schmRepository, times(1)).findBySchmId(schmId3);
+            verify(schmRepository, times(1)).findWithLockBySchmId(schmId3);
             verify(schmExtRefXrefRepository, times(1)).save(any(SchmExtRefXref.class));
         }
     }
@@ -442,11 +460,13 @@ class ExternalReferenceServiceTest {
                 when(schmExtRefXrefRepository.findByExtRefId(any(UUID.class))).thenReturn(Arrays.asList());
                 doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-                ExtRefDto result = externalReferenceService.createOrUpdateExternalReference(
+                ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
                         testNamespace, type, "Test " + type, extRef.getExtRefId(), "1.0.0", emptyRequest);
 
-                assertNotNull(result);
-                assertEquals(type, result.getExtRefType());
+                assertNotNull(response);
+                assertTrue(response.isUpdated());
+                assertNotNull(response.getExtRef());
+                assertEquals(type, response.getExtRef().getExtRefType());
             }
         }
     }
@@ -481,5 +501,243 @@ class ExternalReferenceServiceTest {
         assertEquals(testExtRef.getUpdatedDatetime(), dto.getUpdatedDatetime());
         assertEquals(testExtRef.getCreatedBy(), dto.getCreatedBy());
         assertEquals(testExtRef.getUpdatedBy(), dto.getUpdatedBy());
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_WithUnpublishedSchema_ThrowsException() {
+        // Test for race condition fix: cannot create reference to unpublished schema
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+        ExtRefWithSchemasRequest.SchemaReference schemaRef = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef.setSchmId(testSchmId);
+        schemaRef.setSchmName("Unpublished Schema");
+        request.setSchemas(Arrays.asList(schemaRef));
+
+        // Schema exists but is NOT published
+        testSchm.setPublishVersion(null);
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    externalReferenceService.createOrUpdateExternalReference(
+                            testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request)
+            );
+
+            assertTrue(exception.getMessage().contains("unpublished"));
+            assertTrue(exception.getMessage().contains("must be published"));
+            verify(schmRepository).findWithLockBySchmId(testSchmId);
+            verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_UsesPessimisticLocking_PreventingRaceCondition() {
+        // This test verifies pessimistic locking prevents the race condition where:
+        // - Thread A unpublishes a schema
+        // - Thread B creates a reference to that schema
+        // With locking, Thread B will block until Thread A completes
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+        ExtRefWithSchemasRequest.SchemaReference schemaRef = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef.setSchmId(testSchmId);
+        request.setSchemas(Arrays.asList(schemaRef));
+
+        testSchm.setPublishVersion(1); // Published
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
+            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request);
+
+            // Verify findWithLockBySchmId is called, NOT findBySchmId
+            // This ensures the pessimistic write lock is acquired
+            verify(schmRepository).findWithLockBySchmId(testSchmId);
+            verify(schmRepository, never()).findBySchmId(testSchmId);
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_Idempotent_NoChange() {
+        // Test idempotency: same data sent multiple times should not update
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+        ExtRefWithSchemasRequest.SchemaReference schemaRef = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef.setSchmId(testSchmId);
+        schemaRef.setSchmName("Schema 1");
+        request.setSchemas(Arrays.asList(schemaRef));
+
+        // Existing external reference with same name, type, and version
+        testExtRef.setExtRefName("Test Process");
+        testExtRef.setExtRefType(testExtRefType);
+        testExtRef.setExtRefVersion(testExtRefVersion);
+
+        // Existing schema association (same as request)
+        SchmExtRefXref existingXref = new SchmExtRefXref();
+        existingXref.setXrefId(UUID.randomUUID());
+        existingXref.setExtRefId(testExtRefId);
+        existingXref.setSchmId(testSchmId);
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId))
+                    .thenReturn(Arrays.asList(existingXref));
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request);
+
+            assertNotNull(response);
+            assertFalse(response.isUpdated()); // No update occurred
+            assertEquals("External reference is already up to date. No changes were made.", response.getMessage());
+            assertNotNull(response.getExtRef());
+            assertEquals(testExtRefId, response.getExtRef().getExtRefId());
+
+            // Verify no save or delete operations were performed
+            verify(extRefRepository, never()).save(any(ExtRef.class));
+            verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
+            verify(schmExtRefXrefRepository, never()).deleteAll(anyList());
+            verify(schmRepository, never()).findWithLockBySchmId(any(UUID.class));
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_Idempotent_DifferentName() {
+        // Test that update occurs when name is different
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+        request.setSchemas(Arrays.asList());
+
+        // Existing external reference with different name
+        testExtRef.setExtRefName("Old Name");
+        testExtRef.setExtRefType(testExtRefType);
+        testExtRef.setExtRefVersion(testExtRefVersion);
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType, "New Name", testExtRefId, testExtRefVersion, request);
+
+            assertNotNull(response);
+            assertTrue(response.isUpdated()); // Update occurred
+            assertEquals("External reference updated successfully.", response.getMessage());
+
+            // Verify save was called
+            verify(extRefRepository).save(any(ExtRef.class));
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_Idempotent_DifferentSchemas() {
+        // Test that update occurs when schema associations are different
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+        UUID newSchmId = UUID.randomUUID();
+        ExtRefWithSchemasRequest.SchemaReference schemaRef = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef.setSchmId(newSchmId);
+        schemaRef.setSchmName("New Schema");
+        request.setSchemas(Arrays.asList(schemaRef));
+
+        // Existing external reference with same metadata
+        testExtRef.setExtRefName("Test Process");
+        testExtRef.setExtRefType(testExtRefType);
+        testExtRef.setExtRefVersion(testExtRefVersion);
+
+        // Existing schema association is different (testSchmId vs newSchmId)
+        SchmExtRefXref existingXref = new SchmExtRefXref();
+        existingXref.setXrefId(UUID.randomUUID());
+        existingXref.setExtRefId(testExtRefId);
+        existingXref.setSchmId(testSchmId); // Different from request
+
+        Schm newSchm = new Schm();
+        newSchm.setSchmId(newSchmId);
+        newSchm.setPublishVersion(1); // Published
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId))
+                    .thenReturn(Arrays.asList(existingXref));
+            doNothing().when(schmExtRefXrefRepository).deleteAll(anyList());
+            when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
+            when(schmRepository.findWithLockBySchmId(newSchmId)).thenReturn(Optional.of(newSchm));
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request);
+
+            assertNotNull(response);
+            assertTrue(response.isUpdated()); // Update occurred
+            assertEquals("External reference updated successfully.", response.getMessage());
+
+            // Verify schema associations were updated
+            verify(schmExtRefXrefRepository).deleteAll(anyList());
+            verify(schmExtRefXrefRepository).save(any(SchmExtRefXref.class));
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_MixedPublishedAndUnpublished_OnlyFailsOnUnpublished() {
+        // Test that if multiple schemas are provided and one is unpublished, the operation fails
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+
+        ExtRefWithSchemasRequest.SchemaReference schemaRef1 = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef1.setSchmId(testSchmId);
+        schemaRef1.setSchmName("Published Schema");
+
+        UUID unpublishedSchmId = UUID.randomUUID();
+        ExtRefWithSchemasRequest.SchemaReference schemaRef2 = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef2.setSchmId(unpublishedSchmId);
+        schemaRef2.setSchmName("Unpublished Schema");
+
+        request.setSchemas(Arrays.asList(schemaRef1, schemaRef2));
+
+        testSchm.setPublishVersion(1); // Published
+
+        Schm unpublishedSchm = new Schm();
+        unpublishedSchm.setSchmId(unpublishedSchmId);
+        unpublishedSchm.setPublishVersion(null); // NOT published
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            when(schmRepository.findWithLockBySchmId(unpublishedSchmId)).thenReturn(Optional.of(unpublishedSchm));
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    externalReferenceService.createOrUpdateExternalReference(
+                            testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request)
+            );
+
+            assertTrue(exception.getMessage().contains("unpublished"));
+            // Should have checked the first schema (published - OK) then failed on second (unpublished)
+            verify(schmRepository).findWithLockBySchmId(testSchmId);
+            // The unpublished one may or may not be checked depending on iteration order
+            // No xref should be saved
+            verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
+        }
     }
 }

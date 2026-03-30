@@ -343,29 +343,34 @@ class SchemaServiceTest {
     @Test
     void testUnPublishSchemaVersion_Success() {
         testSchm.setPublishVersion(1);
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        // Verify pessimistic locking is used
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(Arrays.asList());
         when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
         schemaService.unPublishSchemaVersion(testNamespace, testSchmId);
 
+        // Verify the locked method was called (prevents race conditions)
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
         verify(schmExtRefXrefRepository).findBySchmId(testSchmId);
         verify(schmRepository).save(argThat(schm -> schm.getPublishVersion() == null));
     }
 
     @Test
     void testUnPublishSchemaVersion_SchemaNotFound_ThrowsException() {
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.empty());
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () ->
                 schemaService.unPublishSchemaVersion(testNamespace, testSchmId)
         );
+
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
     }
 
     @Test
     void testUnPublishSchemaVersion_SchemaInUse_ThrowsException() {
         testSchm.setPublishVersion(1);
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
         // Mock external references exist
         SchmExtRefXref xref = new SchmExtRefXref();
@@ -378,8 +383,26 @@ class SchemaServiceTest {
         );
 
         assertTrue(exception.getMessage().contains("cannot be unpublished as it is in use"));
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
         verify(schmExtRefXrefRepository).findBySchmId(testSchmId);
         verify(schmRepository, never()).save(any(Schm.class));
+    }
+
+    @Test
+    void testUnPublishSchemaVersion_UsesPessimisticLocking_PreventingRaceCondition() {
+        // This test verifies that pessimistic locking is used to prevent the race condition
+        // where a reference could be created between checking and unpublishing
+        testSchm.setPublishVersion(1);
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(Arrays.asList());
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        schemaService.unPublishSchemaVersion(testNamespace, testSchmId);
+
+        // Verify findWithLockBySchmId is called, NOT findBySchmId
+        // This ensures the pessimistic write lock is acquired, preventing concurrent modifications
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
+        verify(schmRepository, never()).findBySchmId(testSchmId);
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.ssnc.schemaService.service;
 
 import com.ssnc.schemaService.dto.ExtRefDto;
+import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.entity.ExtRef;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -95,11 +97,12 @@ public class ExternalReferenceService {
 
     /**
      * Create or update external reference with associated schemas.
-     * This method will always delete existing schema associations and create new ones based on the request.
+     * This method implements idempotency - if the record already exists with the same
+     * name, type, version, and schema associations, it returns success without updating.
      * If the schemas array is empty, all associations will be removed.
      */
     @Transactional
-    public ExtRefDto createOrUpdateExternalReference(
+    public ExtRefResponse createOrUpdateExternalReference(
             String nameSpace,
             String extRefType,
             String extRefName,
@@ -118,8 +121,48 @@ public class ExternalReferenceService {
         // Check if external reference already exists
         Optional<ExtRef> existingExtRef = extRefRepository.findById(extRefId);
 
-        ExtRef extRef;
+        // Prepare requested schema IDs
+        final List<UUID> requestedSchmIds = (request.getSchemas() != null && !request.getSchemas().isEmpty())
+                ? request.getSchemas().stream()
+                    .map(ExtRefWithSchemasRequest.SchemaReference::getSchmId)
+                    .collect(Collectors.toList())
+                : new ArrayList<>();
+
+        // Check for idempotency - if record already exists with same values, return without updating
         if (existingExtRef.isPresent()) {
+            ExtRef existing = existingExtRef.get();
+
+            // Check if name, type, and version are the same
+            boolean metadataUnchanged = existing.getExtRefName().equals(extRefName)
+                    && existing.getExtRefType().equals(extRefType)
+                    && existing.getExtRefVersion().equals(extRefVersion);
+
+            if (metadataUnchanged) {
+                // Check if schema associations are the same
+                List<SchmExtRefXref> existingXrefs = schmExtRefXrefRepository.findByExtRefId(extRefId);
+                List<UUID> existingSchmIds = existingXrefs.stream()
+                        .map(SchmExtRefXref::getSchmId)
+                        .sorted()
+                        .collect(Collectors.toList());
+
+                List<UUID> sortedRequestedSchmIds = new ArrayList<>(requestedSchmIds);
+                sortedRequestedSchmIds.sort(UUID::compareTo);
+
+                // If schema associations are also the same, return without updating
+                if (existingSchmIds.equals(sortedRequestedSchmIds)) {
+                    return new ExtRefResponse(
+                            mapToDto(existing),
+                            "External reference is already up to date. No changes were made.",
+                            false
+                    );
+                }
+            }
+        }
+
+        ExtRef extRef;
+        boolean isUpdate = existingExtRef.isPresent();
+
+        if (isUpdate) {
             // Update existing
             extRef = existingExtRef.get();
             extRef.setExtRefName(extRefName);
@@ -148,13 +191,6 @@ public class ExternalReferenceService {
                 .map(SchmExtRefXref::getSchmId)
                 .collect(Collectors.toList());
 
-        List<UUID> requestedSchmIds = new ArrayList<>();
-        if (request.getSchemas() != null && !request.getSchemas().isEmpty()) {
-            requestedSchmIds = request.getSchemas().stream()
-                    .map(ExtRefWithSchemasRequest.SchemaReference::getSchmId)
-                    .collect(Collectors.toList());
-        }
-
         // Determine what to delete (in existing but not in requested)
         List<SchmExtRefXref> toDelete = existingXrefs.stream()
                 .filter(xref -> !requestedSchmIds.contains(xref.getSchmId()))
@@ -171,13 +207,25 @@ public class ExternalReferenceService {
         }
 
         // Create new associations
+        // First validate all schemas, then save (fail-fast approach)
         if (!toAdd.isEmpty()) {
+            // Step 1: Validate all schemas exist and are published
             for (UUID schmId : toAdd) {
-                // Validate schema exists
-                schmRepository.findBySchmId(schmId)
+                // Use pessimistic lock to prevent unpublish race condition
+                Schm schema = schmRepository.findWithLockBySchmId(schmId)
                         .orElseThrow(() -> new IllegalArgumentException(
                                 String.format("Schema %s not found", schmId)));
 
+                // Only allow references to published schemas
+                if (schema.getPublishVersion() == null) {
+                    throw new IllegalArgumentException(
+                            String.format("Cannot create reference to unpublished schema %s. " +
+                                    "Schema must be published before creating external references.", schmId));
+                }
+            }
+
+            // Step 2: All validations passed, now save the associations
+            for (UUID schmId : toAdd) {
                 SchmExtRefXref xref = new SchmExtRefXref();
                 xref.setTenantName(tenantName);
                 xref.setSchmId(schmId);
@@ -187,7 +235,11 @@ public class ExternalReferenceService {
             }
         }
 
-        return mapToDto(extRef);
+        String message = isUpdate
+                ? "External reference updated successfully."
+                : "External reference created successfully.";
+
+        return new ExtRefResponse(mapToDto(extRef), message, true);
     }
 
     /**

@@ -265,14 +265,21 @@ public class SchemaService {
     }
 
     /**
-     * Unpublish a schema by setting publish version to null
+     * Unpublish a schema by setting publish version to null.
+     * Uses pessimistic locking to prevent race conditions where a reference
+     * could be created between checking for references and unpublishing.
      */
     @Transactional
     public void unPublishSchemaVersion(String namespace, UUID schmId) {
         namespaceFilterManager.enableIfPresent(namespace);
-        Optional<Schm> schemaOpt = schmRepository.findBySchmId(schmId);
+
+        // Use pessimistic write lock to prevent concurrent modifications
+        // This ensures no other transaction can create references while we're unpublishing
+        Optional<Schm> schemaOpt = schmRepository.findWithLockBySchmId(schmId);
+
         if (schemaOpt.isPresent()) {
             // Check if schema is referenced by any external references
+            // The lock held above prevents new references from being created during this check
             List<SchmExtRefXref> xrefs = schmExtRefXrefRepository.findBySchmId(schmId);
             if (!xrefs.isEmpty()) {
                 throw new IllegalStateException(String.format(ErrorMessages.SCHEMA_IN_USE, schmId));

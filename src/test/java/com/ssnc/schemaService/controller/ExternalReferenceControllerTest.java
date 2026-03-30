@@ -1,6 +1,7 @@
 package com.ssnc.schemaService.controller;
 
 import com.ssnc.schemaService.dto.ExtRefDto;
+import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.service.ExternalReferenceService;
@@ -148,16 +149,22 @@ class ExternalReferenceControllerTest {
         ExtRefWithSchemasRequest emptyRequest = new ExtRefWithSchemasRequest();
         emptyRequest.setSchemas(Arrays.asList());
 
+        ExtRefResponse extRefResponse = new ExtRefResponse(
+                testExtRefDto, "External reference created successfully.", true);
+
         when(externalReferenceService.createOrUpdateExternalReference(
                 testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, emptyRequest))
-                .thenReturn(testExtRefDto);
+                .thenReturn(extRefResponse);
 
-        ResponseEntity<ExtRefDto> response = externalReferenceController
+        ResponseEntity<ExtRefResponse> response = externalReferenceController
                 .createOrUpdateExternalReference(
                         testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, emptyRequest);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testExtRefDto, response.getBody());
+        assertNotNull(response.getBody());
+        assertEquals(testExtRefDto, response.getBody().getExtRef());
+        assertEquals("External reference created successfully.", response.getBody().getMessage());
+        assertTrue(response.getBody().isUpdated());
         verify(externalReferenceService).createOrUpdateExternalReference(
                 testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, emptyRequest);
     }
@@ -168,16 +175,22 @@ class ExternalReferenceControllerTest {
         emptyRequest.setSchemas(Arrays.asList());
 
         testExtRefDto.setExtRefName("Updated Process");
+        ExtRefResponse extRefResponse = new ExtRefResponse(
+                testExtRefDto, "External reference updated successfully.", true);
+
         when(externalReferenceService.createOrUpdateExternalReference(
                 testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, emptyRequest))
-                .thenReturn(testExtRefDto);
+                .thenReturn(extRefResponse);
 
-        ResponseEntity<ExtRefDto> response = externalReferenceController
+        ResponseEntity<ExtRefResponse> response = externalReferenceController
                 .createOrUpdateExternalReference(
                         testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, emptyRequest);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals("Updated Process", response.getBody().getExtRefName());
+        assertNotNull(response.getBody());
+        assertEquals("Updated Process", response.getBody().getExtRef().getExtRefName());
+        assertEquals("External reference updated successfully.", response.getBody().getMessage());
+        assertTrue(response.getBody().isUpdated());
         verify(externalReferenceService).createOrUpdateExternalReference(
                 testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, emptyRequest);
     }
@@ -191,7 +204,7 @@ class ExternalReferenceControllerTest {
                 testNamespace, "InvalidType", "Test", testExtRefId, testExtRefVersion, emptyRequest))
                 .thenThrow(new IllegalArgumentException("Invalid ExtRefType: InvalidType"));
 
-        ResponseEntity<ExtRefDto> response = externalReferenceController
+        ResponseEntity<ExtRefResponse> response = externalReferenceController
                 .createOrUpdateExternalReference(
                         testNamespace, "InvalidType", "Test", testExtRefId, testExtRefVersion, emptyRequest);
 
@@ -213,16 +226,21 @@ class ExternalReferenceControllerTest {
 
         request.setSchemas(Arrays.asList(schemaRef1, schemaRef2));
 
+        ExtRefResponse extRefResponse = new ExtRefResponse(
+                testExtRefDto, "External reference created successfully.", true);
+
         when(externalReferenceService.createOrUpdateExternalReference(
                 testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request))
-                .thenReturn(testExtRefDto);
+                .thenReturn(extRefResponse);
 
-        ResponseEntity<ExtRefDto> response = externalReferenceController
+        ResponseEntity<ExtRefResponse> response = externalReferenceController
                 .createOrUpdateExternalReference(
                         testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testExtRefDto, response.getBody());
+        assertNotNull(response.getBody());
+        assertEquals(testExtRefDto, response.getBody().getExtRef());
+        assertTrue(response.getBody().isUpdated());
         verify(externalReferenceService).createOrUpdateExternalReference(
                 testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request);
     }
@@ -246,5 +264,34 @@ class ExternalReferenceControllerTest {
             assertEquals(1, response.getBody().size());
             assertEquals(type, response.getBody().get(0).getExtRefType());
         }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_Idempotent() {
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+        request.setSchemas(Arrays.asList());
+
+        // Mock idempotent response (no changes made)
+        ExtRefResponse extRefResponse = new ExtRefResponse(
+                testExtRefDto,
+                "External reference is already up to date. No changes were made.",
+                false);
+
+        when(externalReferenceService.createOrUpdateExternalReference(
+                testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request))
+                .thenReturn(extRefResponse);
+
+        ResponseEntity<ExtRefResponse> response = externalReferenceController
+                .createOrUpdateExternalReference(
+                        testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(testExtRefDto, response.getBody().getExtRef());
+        assertEquals("External reference is already up to date. No changes were made.",
+                response.getBody().getMessage());
+        assertFalse(response.getBody().isUpdated());
+        verify(externalReferenceService).createOrUpdateExternalReference(
+                testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request);
     }
 }

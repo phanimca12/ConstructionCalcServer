@@ -1,6 +1,7 @@
 package com.ssnc.schemaService.controller;
 
 import com.ssnc.schemaService.dto.ExtRefDto;
+import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.service.ExternalReferenceService;
@@ -67,7 +68,9 @@ public class ExternalReferenceController {
 
     /**
      * PUT /extRef/{nameSpace}/type/{extRefType}/name/{extRefName}/id/{extRefId}/version/{extRefVersion}/schemas
-     * Create or update an external reference with associated schemas
+     * Create or update an external reference with associated schemas.
+     * This endpoint is idempotent - if the same data is sent multiple times, it will only create/update once
+     * and return a success message for subsequent identical requests.
      *
      * @param nameSpace - Namespace filter
      * @param extRefType - External reference type (Process, Automation, PresentationFlow, Sampling, UXBuilder)
@@ -75,10 +78,10 @@ public class ExternalReferenceController {
      * @param extRefId - External reference ID (UUID)
      * @param extRefVersion - External reference version
      * @param request - REQUIRED request body containing list of schemas to associate (can be empty array)
-     * @return Created or updated external reference
+     * @return Response containing the external reference, a message, and an update flag
      */
     @PutMapping("/type/{extRefType}/name/{extRefName}/id/{extRefId}/version/{extRefVersion}/schemas")
-    public ResponseEntity<ExtRefDto> createOrUpdateExternalReference(
+    public ResponseEntity<ExtRefResponse> createOrUpdateExternalReference(
             @PathVariable("nameSpace") String nameSpace,
             @PathVariable("extRefType") String extRefType,
             @PathVariable("extRefName") String extRefName,
@@ -87,9 +90,9 @@ public class ExternalReferenceController {
             @RequestBody ExtRefWithSchemasRequest request) {
 
         try {
-            ExtRefDto extRef = externalReferenceService.createOrUpdateExternalReference(
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
                     nameSpace, extRefType, extRefName, extRefId, extRefVersion, request);
-            return ResponseEntity.ok(extRef);
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }

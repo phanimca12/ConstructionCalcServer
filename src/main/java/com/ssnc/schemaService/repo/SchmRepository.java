@@ -2,10 +2,14 @@ package com.ssnc.schemaService.repo;
 
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmData;
+import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -86,6 +90,14 @@ public interface SchmRepository extends JpaRepository<Schm, UUID>, JpaSpecificat
      * Get schema by ID
      */
     Optional<Schm> findBySchmId(UUID schmId);
+
+    /**
+     * Get schema by ID with pessimistic write lock to prevent race conditions.
+     * Use this when you need to check-then-modify a schema atomically.
+     * Spring Data JPA will derive the query and apply the lock.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<Schm> findWithLockBySchmId(UUID schmId);
 
     Optional<Schm> findBySchmName(String name);
 }

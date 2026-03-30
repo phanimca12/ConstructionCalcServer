@@ -2,6 +2,7 @@ package com.ssnc.schemaService.config;
 
 import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.tenant.TenantContext;
+import com.ssnc.shared.config.JwtSecurityProperties;
 import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.annotation.PostConstruct;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -20,6 +21,12 @@ public class TestConfig {
         JwtClaimsContext mockContext = mock(JwtClaimsContext.class);
         when(mockContext.getUserId()).thenReturn("testUser");
         return mockContext;
+    }
+
+    @Bean
+    @Primary
+    public JwtSecurityProperties jwtSecurityProperties() {
+        return mock(JwtSecurityProperties.class);
     }
 
     @PostConstruct
