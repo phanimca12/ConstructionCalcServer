@@ -384,6 +384,7 @@ class SchemaServiceTest {
 
     @Test
     void testLockSchema_Success() {
+        testSchm.setLockBy(null); // Not locked
         when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
@@ -393,6 +394,32 @@ class SchemaServiceTest {
                 testUserId.equals(schm.getLockBy())
         ));
         verify(jwtClaimsContext, atLeastOnce()).getUserId();
+    }
+
+    @Test
+    void testLockSchema_AlreadyLockedBySameUser_Success() {
+        testSchm.setLockBy(testUserId); // Already locked by same user
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        schemaService.lockSchema(testNamespace, testSchmId);
+
+        verify(schmRepository).save(argThat(schm ->
+                testUserId.equals(schm.getLockBy())
+        ));
+    }
+
+    @Test
+    void testLockSchema_AlreadyLockedByDifferentUser_ThrowsException() {
+        testSchm.setLockBy("otherUser"); // Locked by different user
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
+                schemaService.lockSchema(testNamespace, testSchmId)
+        );
+
+        assertTrue(exception.getMessage().contains("already locked by"));
+        verify(schmRepository, never()).save(any(Schm.class));
     }
 
     @Test
@@ -419,7 +446,32 @@ class SchemaServiceTest {
 
     @Test
     void testUnlockSchema_Success() {
-        testSchm.setLockBy(testUserId);
+        testSchm.setLockBy(testUserId); // Locked by same user
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        schemaService.unlockSchema(testNamespace, testSchmId);
+
+        verify(schmRepository).save(argThat(schm -> schm.getLockBy() == null));
+    }
+
+    @Test
+    void testUnlockSchema_LockedByDifferentUser_ThrowsException() {
+        testSchm.setLockBy("otherUser"); // Locked by different user
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
+                schemaService.unlockSchema(testNamespace, testSchmId)
+        );
+
+        assertTrue(exception.getMessage().contains("Cannot unlock"));
+        verify(schmRepository, never()).save(any(Schm.class));
+    }
+
+    @Test
+    void testUnlockSchema_SystemUserCanUnlockAny() {
+        testSchm.setLockBy("otherUser"); // Locked by different user
+        when(jwtClaimsContext.getUserId()).thenReturn(AppConstants.SYSTEM_USER);
         when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
@@ -453,6 +505,26 @@ class SchemaServiceTest {
         assertEquals(3, result.size());
         assertEquals("Apple Schema", result.get(0).getName());
         assertEquals("Mango Schema", result.get(1).getName());
+        assertEquals("Zebra Schema", result.get(2).getName());
+    }
+
+    @Test
+    void testGetSchemas_SortByNameAsc_WithNulls() {
+        Schm schm1 = createTestSchm("Zebra Schema");
+        Schm schm2 = createTestSchm(null); // Null name
+        Schm schm3 = createTestSchm("Apple Schema");
+
+        List<Schm> unsortedSchemas = Arrays.asList(schm1, schm2, schm3);
+        when(schmRepository.findAll(any(Specification.class))).thenReturn(unsortedSchemas);
+        when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
+                .thenReturn(Optional.empty());
+
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "nameAsc", "none");
+
+        // Should not throw NPE, nulls should be first
+        assertEquals(3, result.size());
+        assertNull(result.get(0).getName()); // Null first
+        assertEquals("Apple Schema", result.get(1).getName());
         assertEquals("Zebra Schema", result.get(2).getName());
     }
 
@@ -728,8 +800,9 @@ class SchemaServiceTest {
         extRef2.setCreatedBy(testUserId);
         extRef2.setUpdatedBy(testUserId);
 
-        when(extRefRepository.findById(extRefId1)).thenReturn(Optional.of(extRef1));
-        when(extRefRepository.findById(extRefId2)).thenReturn(Optional.of(extRef2));
+        // Mock batch fetch (fix N+1 query)
+        when(extRefRepository.findAllById(Arrays.asList(extRefId1, extRefId2)))
+                .thenReturn(Arrays.asList(extRef1, extRef2));
 
         // Execute
         List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId);
@@ -747,8 +820,8 @@ class SchemaServiceTest {
         verify(namespaceFilterManager).enableIfPresent(testNamespace);
         verify(schmRepository).findBySchmId(testSchmId);
         verify(schmExtRefXrefRepository).findBySchmId(testSchmId);
-        verify(extRefRepository).findById(extRefId1);
-        verify(extRefRepository).findById(extRefId2);
+        verify(extRefRepository).findAllById(anyList());
+        verify(extRefRepository, never()).findById(any());
     }
 
     @Test
@@ -768,6 +841,7 @@ class SchemaServiceTest {
     void testGetExternalReferencesBySchemaId_NoExternalReferences() {
         when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(Arrays.asList());
+        when(extRefRepository.findAllById(anyList())).thenReturn(Arrays.asList());
 
         List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId);
 
@@ -775,7 +849,6 @@ class SchemaServiceTest {
         assertEquals(0, result.size());
         verify(schmRepository).findBySchmId(testSchmId);
         verify(schmExtRefXrefRepository).findBySchmId(testSchmId);
-        verify(extRefRepository, never()).findById(any());
     }
 
     @Test
@@ -802,15 +875,15 @@ class SchemaServiceTest {
         extRef1.setExtRefType("API");
         extRef1.setExtRefVersion("1.0");
 
-        when(extRefRepository.findById(extRefId1)).thenReturn(Optional.of(extRef1));
-        when(extRefRepository.findById(extRefId2)).thenReturn(Optional.empty());
+        // Mock batch fetch - only extRef1 exists, extRef2 is missing
+        when(extRefRepository.findAllById(Arrays.asList(extRefId1, extRefId2)))
+                .thenReturn(Arrays.asList(extRef1)); // Only returns extRef1
 
         List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId);
 
         assertNotNull(result);
         assertEquals(1, result.size());
         assertEquals("API Reference", result.get(0).getExtRefName());
-        verify(extRefRepository).findById(extRefId1);
-        verify(extRefRepository).findById(extRefId2);
+        verify(extRefRepository).findAllById(anyList());
     }
 }

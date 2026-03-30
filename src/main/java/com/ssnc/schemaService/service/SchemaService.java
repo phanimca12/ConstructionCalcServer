@@ -112,7 +112,8 @@ public class SchemaService {
      */
     private Comparator<SchemaDto> getSortComparator(String sort) {
         if (sort == null) {
-            return Comparator.comparing(SchemaDto::getName);
+            return Comparator.comparing(SchemaDto::getName,
+                    Comparator.nullsFirst(Comparator.naturalOrder()));
         }
 
         switch (sort) {
@@ -123,11 +124,14 @@ public class SchemaService {
                 return Comparator.comparing(SchemaDto::getModifiedDateTime,
                         Comparator.nullsLast(Comparator.reverseOrder()));
             case "nameAsc":
-                return Comparator.comparing(SchemaDto::getName);
+                return Comparator.comparing(SchemaDto::getName,
+                        Comparator.nullsFirst(Comparator.naturalOrder()));
             case "nameDesc":
-                return Comparator.comparing(SchemaDto::getName).reversed();
+                return Comparator.comparing(SchemaDto::getName,
+                        Comparator.nullsFirst(Comparator.naturalOrder())).reversed();
             default:
-                return Comparator.comparing(SchemaDto::getName);
+                return Comparator.comparing(SchemaDto::getName,
+                        Comparator.nullsFirst(Comparator.naturalOrder()));
         }
    }
 
@@ -382,6 +386,12 @@ public class SchemaService {
         Schm schema = schmRepository.findBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
 
+        // Check if already locked by another user
+        if (schema.getLockBy() != null && !schema.getLockBy().equals(userName)) {
+            throw new IllegalStateException(
+                    String.format("Schema %s is already locked by %s", schmId, schema.getLockBy()));
+        }
+
         schema.setLockBy(userName);
         schmRepository.save(schema);
     }
@@ -393,8 +403,18 @@ public class SchemaService {
     public void unlockSchema(String namespace, UUID schmId) {
         namespaceFilterManager.enableIfPresent(namespace);
 
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+
         Schm schema = schmRepository.findBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
+
+        // Verify the current user owns the lock (or SYSTEM_USER can unlock any)
+        if (schema.getLockBy() != null && !schema.getLockBy().equals(userName)
+                && !AppConstants.SYSTEM_USER.equals(userName)) {
+            throw new IllegalStateException(
+                    String.format("Cannot unlock - schema %s is locked by %s", schmId, schema.getLockBy()));
+        }
 
         schema.setLockBy(null);
         schmRepository.save(schema);
@@ -414,11 +434,14 @@ public class SchemaService {
         // Get all cross-references for this schema
         List<SchmExtRefXref> xrefs = schmExtRefXrefRepository.findBySchmId(schmId);
 
-        // Map to ExtRefDto by looking up each external reference
-        return xrefs.stream()
-                .map(xref -> extRefRepository.findById(xref.getExtRefId()))
-                .filter(Optional::isPresent)
-                .map(Optional::get)
+        // Batch fetch all external references (fix N+1 query problem)
+        List<UUID> extRefIds = xrefs.stream()
+                .map(SchmExtRefXref::getExtRefId)
+                .collect(Collectors.toList());
+
+        List<ExtRef> extRefs = extRefRepository.findAllById(extRefIds);
+
+        return extRefs.stream()
                 .map(this::mapExtRefToDto)
                 .collect(Collectors.toList());
     }
