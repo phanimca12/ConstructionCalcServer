@@ -696,6 +696,65 @@ class ExternalReferenceServiceTest {
     }
 
     @Test
+    void testCreateOrUpdateExternalReference_WithNullSchemaId_ThrowsException() {
+        // Test that null schema ID in request is rejected
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+        ExtRefWithSchemasRequest.SchemaReference schemaRef = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef.setSchmId(null); // Null schema ID
+        schemaRef.setSchmName("Test Schema");
+        request.setSchemas(Arrays.asList(schemaRef));
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    externalReferenceService.createOrUpdateExternalReference(
+                            testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request)
+            );
+
+            assertTrue(exception.getMessage().contains("Schema ID cannot be null"));
+            // Should fail before any database operations
+            verify(extRefRepository, never()).save(any(ExtRef.class));
+            verify(schmRepository, never()).findWithLockBySchmId(any());
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_WithNullContextUser_UsesSystemUser() {
+        // Test that null jwtClaimsContext falls back to SYSTEM_USER
+        ExtRefWithSchemasRequest emptyRequest = new ExtRefWithSchemasRequest();
+        emptyRequest.setSchemas(Arrays.asList());
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            // Simulate null jwtClaimsContext
+            when(jwtClaimsContext.getUserId()).thenReturn(null);
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.save(any(ExtRef.class))).thenAnswer(invocation -> {
+                ExtRef saved = invocation.getArgument(0);
+                // Verify SYSTEM_USER was used
+                assertEquals("system", saved.getCreatedBy());
+                assertEquals("system", saved.getUpdatedBy());
+                return saved;
+            });
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, emptyRequest);
+
+            assertNotNull(response);
+            assertTrue(response.isUpdated());
+            verify(extRefRepository).save(any(ExtRef.class));
+        }
+    }
+
+    @Test
     void testCreateOrUpdateExternalReference_MixedPublishedAndUnpublished_OnlyFailsOnUnpublished() {
         // Test that if multiple schemas are provided and one is unpublished, the operation fails
         ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();

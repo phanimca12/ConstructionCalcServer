@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.service;
 
+import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
@@ -115,16 +116,22 @@ public class ExternalReferenceService {
         // Validate the type against the enum
         ExtRefType.fromString(extRefType);
 
-        String currentUser = jwtClaimsContext.getUserId();
+        String currentUser = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
         String tenantName = TenantContext.getTenantName();
 
         // Check if external reference already exists
         Optional<ExtRef> existingExtRef = extRefRepository.findById(extRefId);
 
-        // Prepare requested schema IDs
+        // Prepare requested schema IDs and validate they are not null
         final List<UUID> requestedSchmIds = (request.getSchemas() != null && !request.getSchemas().isEmpty())
                 ? request.getSchemas().stream()
                     .map(ExtRefWithSchemasRequest.SchemaReference::getSchmId)
+                    .peek(id -> {
+                        if (id == null) {
+                            throw new IllegalArgumentException("Schema ID cannot be null in request");
+                        }
+                    })
                     .collect(Collectors.toList())
                 : new ArrayList<>();
 
