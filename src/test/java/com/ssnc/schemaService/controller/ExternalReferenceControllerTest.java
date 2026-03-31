@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
@@ -150,7 +151,7 @@ class ExternalReferenceControllerTest {
         emptyRequest.setSchemas(Arrays.asList());
 
         ExtRefResponse extRefResponse = new ExtRefResponse(
-                testExtRefDto, "External reference created successfully.", true);
+                testExtRefDto, "ErrorMessages.EXTERNAL_REFERENCE_CREATED_SUCCESS", true);
 
         when(externalReferenceService.createOrUpdateExternalReference(
                 testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, emptyRequest))
@@ -163,7 +164,7 @@ class ExternalReferenceControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(testExtRefDto, response.getBody().getExtRef());
-        assertEquals("External reference created successfully.", response.getBody().getMessage());
+        assertEquals("ErrorMessages.EXTERNAL_REFERENCE_CREATED_SUCCESS", response.getBody().getMessage());
         assertTrue(response.getBody().isUpdated());
         verify(externalReferenceService).createOrUpdateExternalReference(
                 testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, emptyRequest);
@@ -176,7 +177,7 @@ class ExternalReferenceControllerTest {
 
         testExtRefDto.setExtRefName("Updated Process");
         ExtRefResponse extRefResponse = new ExtRefResponse(
-                testExtRefDto, "External reference updated successfully.", true);
+                testExtRefDto, "ErrorMessages.EXTERNAL_REFERENCE_UPDATED_SUCCESS", true);
 
         when(externalReferenceService.createOrUpdateExternalReference(
                 testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, emptyRequest))
@@ -189,7 +190,7 @@ class ExternalReferenceControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("Updated Process", response.getBody().getExtRef().getExtRefName());
-        assertEquals("External reference updated successfully.", response.getBody().getMessage());
+        assertEquals("ErrorMessages.EXTERNAL_REFERENCE_UPDATED_SUCCESS", response.getBody().getMessage());
         assertTrue(response.getBody().isUpdated());
         verify(externalReferenceService).createOrUpdateExternalReference(
                 testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, emptyRequest);
@@ -227,7 +228,7 @@ class ExternalReferenceControllerTest {
         request.setSchemas(Arrays.asList(schemaRef1, schemaRef2));
 
         ExtRefResponse extRefResponse = new ExtRefResponse(
-                testExtRefDto, "External reference created successfully.", true);
+                testExtRefDto, "ErrorMessages.EXTERNAL_REFERENCE_CREATED_SUCCESS", true);
 
         when(externalReferenceService.createOrUpdateExternalReference(
                 testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request))
@@ -274,7 +275,7 @@ class ExternalReferenceControllerTest {
         // Mock idempotent response (no changes made)
         ExtRefResponse extRefResponse = new ExtRefResponse(
                 testExtRefDto,
-                "External reference is already up to date. No changes were made.",
+                "ErrorMessages.EXTERNAL_REFERENCE_UP_TO_DATE",
                 false);
 
         when(externalReferenceService.createOrUpdateExternalReference(
@@ -288,7 +289,7 @@ class ExternalReferenceControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(testExtRefDto, response.getBody().getExtRef());
-        assertEquals("External reference is already up to date. No changes were made.",
+        assertEquals("ErrorMessages.EXTERNAL_REFERENCE_UP_TO_DATE",
                 response.getBody().getMessage());
         assertFalse(response.getBody().isUpdated());
         verify(externalReferenceService).createOrUpdateExternalReference(

@@ -1,6 +1,7 @@
 package com.ssnc.schemaService.service;
 
 import com.ssnc.schemaService.constants.AppConstants;
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
@@ -124,7 +125,7 @@ public class ExternalReferenceService {
                     .map(ExtRefWithSchemasRequest.SchemaReference::getSchmId)
                     .peek(id -> {
                         if (id == null) {
-                            throw new IllegalArgumentException("Schema ID cannot be null in request");
+                            throw new IllegalArgumentException(ErrorMessages.SCHEMA_ID_CANNOT_BE_NULL);
                         }
                     })
                     .collect(Collectors.toList())
@@ -135,8 +136,19 @@ public class ExternalReferenceService {
                 ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
         String tenantName = TenantContext.getTenantName();
 
-        // Check if external reference already exists
+        // Check if external reference already exists by ID
         Optional<ExtRef> existingExtRef = extRefRepository.findById(extRefId);
+
+        // Check for unique constraint violation (tenant_name, ext_ref_name, ext_ref_type, ext_ref_version)
+        // This prevents database constraint violations and provides clear error messages
+        Optional<ExtRef> existingByUnique = extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(
+                extRefName, extRefType, extRefVersion);
+
+        if (existingByUnique.isPresent() && !existingByUnique.get().getExtRefId().equals(extRefId)) {
+            throw new IllegalArgumentException(String.format(
+                    ErrorMessages.EXTERNAL_REFERENCE_DUPLICATE,
+                    extRefName, extRefType, extRefVersion, existingByUnique.get().getExtRefId()));
+        }
 
         // Check for idempotency - if record already exists with same values, return without updating
         if (existingExtRef.isPresent()) {
@@ -162,7 +174,7 @@ public class ExternalReferenceService {
                 if (existingSchmIds.equals(sortedRequestedSchmIds)) {
                     return new ExtRefResponse(
                             mapToDto(existing),
-                            "External reference is already up to date. No changes were made.",
+                            ErrorMessages.EXTERNAL_REFERENCE_UP_TO_DATE,
                             false
                     );
                 }
@@ -221,13 +233,12 @@ public class ExternalReferenceService {
                 // Use pessimistic lock to prevent unpublish race condition
                 Schm schema = schmRepository.findWithLockBySchmId(schmId)
                         .orElseThrow(() -> new IllegalArgumentException(
-                                String.format("Schema %s not found", schmId)));
+                                String.format(ErrorMessages.SCHEMA_NOT_FOUND_FOR_REFERENCE, schmId)));
 
                 // Only allow references to published schemas
                 if (schema.getPublishVersion() == null) {
                     throw new IllegalArgumentException(
-                            String.format("Cannot create reference to unpublished schema %s. " +
-                                    "Schema must be published before creating external references.", schmId));
+                            String.format(ErrorMessages.CANNOT_REFERENCE_UNPUBLISHED_SCHEMA, schmId));
                 }
             }
         }
@@ -251,8 +262,8 @@ public class ExternalReferenceService {
         }
 
         String message = isUpdate
-                ? "External reference updated successfully."
-                : "External reference created successfully.";
+                ? ErrorMessages.EXTERNAL_REFERENCE_UPDATED_SUCCESS
+                : ErrorMessages.EXTERNAL_REFERENCE_CREATED_SUCCESS;
 
         return new ExtRefResponse(mapToDto(extRef), message, true);
     }

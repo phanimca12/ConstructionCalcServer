@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.service;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
@@ -242,7 +243,7 @@ class ExternalReferenceServiceTest {
 
             assertNotNull(response);
             assertTrue(response.isUpdated());
-            assertEquals("External reference created successfully.", response.getMessage());
+            assertEquals(ErrorMessages.EXTERNAL_REFERENCE_CREATED_SUCCESS, response.getMessage());
             assertNotNull(response.getExtRef());
             assertEquals(testExtRefId, response.getExtRef().getExtRefId());
             assertEquals("Test Process", response.getExtRef().getExtRefName());
@@ -270,7 +271,7 @@ class ExternalReferenceServiceTest {
 
             assertNotNull(response);
             assertTrue(response.isUpdated());
-            assertEquals("External reference updated successfully.", response.getMessage());
+            assertEquals(ErrorMessages.EXTERNAL_REFERENCE_UPDATED_SUCCESS, response.getMessage());
             assertNotNull(response.getExtRef());
             assertEquals(testExtRefId, response.getExtRef().getExtRefId());
             verify(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -602,7 +603,7 @@ class ExternalReferenceServiceTest {
 
             assertNotNull(response);
             assertFalse(response.isUpdated()); // No update occurred
-            assertEquals("External reference is already up to date. No changes were made.", response.getMessage());
+            assertEquals(ErrorMessages.EXTERNAL_REFERENCE_UP_TO_DATE, response.getMessage());
             assertNotNull(response.getExtRef());
             assertEquals(testExtRefId, response.getExtRef().getExtRefId());
 
@@ -638,7 +639,7 @@ class ExternalReferenceServiceTest {
 
             assertNotNull(response);
             assertTrue(response.isUpdated()); // Update occurred
-            assertEquals("External reference updated successfully.", response.getMessage());
+            assertEquals(ErrorMessages.EXTERNAL_REFERENCE_UPDATED_SUCCESS, response.getMessage());
 
             // Verify save was called
             verify(extRefRepository).save(any(ExtRef.class));
@@ -687,7 +688,7 @@ class ExternalReferenceServiceTest {
 
             assertNotNull(response);
             assertTrue(response.isUpdated()); // Update occurred
-            assertEquals("External reference updated successfully.", response.getMessage());
+            assertEquals(ErrorMessages.EXTERNAL_REFERENCE_UPDATED_SUCCESS, response.getMessage());
 
             // Verify schema associations were updated
             verify(schmExtRefXrefRepository).deleteAll(anyList());
@@ -714,7 +715,7 @@ class ExternalReferenceServiceTest {
                             testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request)
             );
 
-            assertTrue(exception.getMessage().contains("Schema ID cannot be null"));
+            assertTrue(exception.getMessage().contains(ErrorMessages.SCHEMA_ID_CANNOT_BE_NULL));
 
             // CRITICAL: Verify validation happens BEFORE any database operations
             // No database reads should occur
@@ -818,6 +819,92 @@ class ExternalReferenceServiceTest {
 
             // Validation happened first
             verify(schmRepository).findWithLockBySchmId(invalidSchmId);
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_UniqueConstraintViolation_ThrowsClearError() {
+        // Test that unique constraint (tenant_name, name, type, version) is validated
+        // and provides clear error message instead of database constraint violation
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+        request.setSchemas(Arrays.asList());
+
+        // Existing external reference with same name, type, version but DIFFERENT ID
+        UUID existingExtRefId = UUID.randomUUID();
+        ExtRef existingExtRef = new ExtRef();
+        existingExtRef.setExtRefId(existingExtRefId);
+        existingExtRef.setTenantName("client1Id");
+        existingExtRef.setExtRefName("Test Process");
+        existingExtRef.setExtRefType(testExtRefType);
+        existingExtRef.setExtRefVersion(testExtRefVersion);
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            // No record with testExtRefId (new ID)
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+
+            // But a record EXISTS with same name/type/version and different ID
+            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(
+                    "Test Process", testExtRefType, testExtRefVersion))
+                    .thenReturn(Optional.of(existingExtRef));
+
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            // Execute - should throw clear validation error
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    externalReferenceService.createOrUpdateExternalReference(
+                            testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request)
+            );
+
+            // Verify clear error message
+            assertTrue(exception.getMessage().contains("already exists with ID"));
+            assertTrue(exception.getMessage().contains(existingExtRefId.toString()));
+            assertTrue(exception.getMessage().contains("Test Process"));
+            assertTrue(exception.getMessage().contains(testExtRefType));
+            assertTrue(exception.getMessage().contains(testExtRefVersion));
+
+            // Verify no save operations occurred
+            verify(extRefRepository, never()).save(any(ExtRef.class));
+            verify(schmExtRefXrefRepository, never()).save(any());
+            verify(schmExtRefXrefRepository, never()).deleteAll(any());
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_SameIdDifferentMetadata_UpdatesSuccessfully() {
+        // Test that updating an existing external reference with different metadata works
+        // (same ID, different name/type/version is allowed - it's an update)
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+        request.setSchemas(Arrays.asList());
+
+        // Existing external reference with same ID
+        testExtRef.setExtRefName("Old Name");
+        testExtRef.setExtRefType(testExtRefType);
+        testExtRef.setExtRefVersion("1.0.0");
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
+
+            // No other record with new name/type/version
+            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(
+                    "New Name", testExtRefType, "2.0.0"))
+                    .thenReturn(Optional.empty());
+
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            // Execute - should succeed (update allowed)
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType, "New Name", testExtRefId, "2.0.0", request);
+
+            assertNotNull(response);
+            assertTrue(response.isUpdated());
+            assertEquals(ErrorMessages.EXTERNAL_REFERENCE_UPDATED_SUCCESS, response.getMessage());
+            verify(extRefRepository).save(any(ExtRef.class));
         }
     }
 

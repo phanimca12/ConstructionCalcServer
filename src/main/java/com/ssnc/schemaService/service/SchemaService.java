@@ -88,18 +88,18 @@ public class SchemaService {
      * Filter schemas based on withVersion parameter
      */
     private boolean filterByVersion(SchemaDto schemaDto, String withVersion) {
-        if (withVersion == null || "none".equalsIgnoreCase(withVersion)) {
+        if (withVersion == null || AppConstants.VERSION_NAME_NONE.equalsIgnoreCase(withVersion)) {
             return true;
         }
 
         switch (withVersion.toLowerCase()) {
-            case "draft":
+            case AppConstants.VERSION_NAME_DRAFT:
                 // Only include schemas that have a draft version
                 return schemaDto.getDraft() != null;
-            case "published":
+            case AppConstants.VERSION_NAME_PUBLISHED:
                 // Only include schemas that have a published version
                 return schemaDto.getPublished() != null;
-            case "latest":
+            case AppConstants.VERSION_NAME_LATEST:
                 // Include schemas that have at least one version (draft or published)
                 return schemaDto.getDraft() != null || schemaDto.getPublished() != null;
             default:
@@ -117,16 +117,16 @@ public class SchemaService {
         }
 
         switch (sort) {
-            case "versionUpdateAsc":
+            case AppConstants.SORT_VERSION_UPDATE_ASC:
                 return Comparator.comparing(SchemaDto::getModifiedDateTime,
                         Comparator.nullsLast(Comparator.naturalOrder()));
-            case "versionUpdateDesc":
+            case AppConstants.SORT_VERSION_UPDATE_DESC:
                 return Comparator.comparing(SchemaDto::getModifiedDateTime,
                         Comparator.nullsLast(Comparator.reverseOrder()));
-            case "nameAsc":
+            case AppConstants.SORT_NAME_ASC:
                 return Comparator.comparing(SchemaDto::getName,
                         Comparator.nullsFirst(Comparator.naturalOrder()));
-            case "nameDesc":
+            case AppConstants.SORT_NAME_DESC:
                 return Comparator.comparing(SchemaDto::getName,
                         Comparator.nullsFirst(Comparator.naturalOrder())).reversed();
             default:
@@ -409,7 +409,7 @@ public class SchemaService {
         // Note: If locked by the SAME user, this is idempotent and succeeds
         if (schema.getLockBy() != null && !schema.getLockBy().equals(userName)) {
             throw new IllegalStateException(
-                    String.format("Schema %s is already locked by %s", schmId, schema.getLockBy()));
+                    String.format(ErrorMessages.SCHEMA_ALREADY_LOCKED, schmId, schema.getLockBy()));
         }
 
         // Set lock (idempotent if already locked by same user)
@@ -443,7 +443,7 @@ public class SchemaService {
         if (schema.getLockBy() != null && !schema.getLockBy().equals(userName)
                 && !AppConstants.SYSTEM_USER.equals(userName)) {
             throw new IllegalStateException(
-                    String.format("Cannot unlock - schema %s is locked by %s", schmId, schema.getLockBy()));
+                    String.format(ErrorMessages.SCHEMA_UNLOCK_NOT_PERMITTED, schmId, schema.getLockBy()));
         }
 
         schema.setLockBy(null);
