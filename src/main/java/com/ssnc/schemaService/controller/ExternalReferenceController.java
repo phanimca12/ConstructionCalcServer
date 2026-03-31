@@ -80,9 +80,14 @@ public class ExternalReferenceController {
 
     /**
      * PUT /extRef/{nameSpace}/type/{extRefType}/name/{extRefName}/id/{extRefId}/version/{extRefVersion}/schemas
-     * Create or update an external reference with associated schemas.
-     * This endpoint is idempotent - if the same data is sent multiple times, it will only create/update once
-     * and return a success message for subsequent identical requests.
+     * Create an external reference with associated schemas.
+     *
+     * IMMUTABILITY: Once created, an external reference version is IMMUTABLE. You cannot change
+     * the name, type, or schema associations for an existing version. To make changes, create
+     * a new version.
+     *
+     * This endpoint is idempotent - if the exact same data is sent multiple times, it will only
+     * create once and return a success message for subsequent identical requests.
      *
      * @param nameSpace - Namespace filter
      * @param extRefType - External reference type (Process, Automation, PresentationFlow, Sampling, UXBuilder)
@@ -91,6 +96,7 @@ public class ExternalReferenceController {
      * @param extRefVersion - External reference version
      * @param request - REQUIRED request body containing list of schemas to associate (can be empty array)
      * @return Response containing the external reference, a message, and an update flag or error response
+     * @throws IllegalArgumentException if trying to modify an existing version (400 Bad Request)
      */
     @PutMapping("/type/{extRefType}/name/{extRefName}/id/{extRefId}/version/{extRefVersion}/schemas")
     public ResponseEntity<?> createOrUpdateExternalReference(

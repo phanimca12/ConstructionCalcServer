@@ -28,7 +28,8 @@ public final class ErrorMessages {
     public static final String EXTERNAL_REFERENCE_DUPLICATE = "External reference with name='%s', type='%s', version='%s' already exists with ID %s. Cannot create a different external reference with the same name, type, and version.";
     public static final String EXTERNAL_REFERENCE_UP_TO_DATE = "External reference is already up to date. No changes were made.";
     public static final String EXTERNAL_REFERENCE_CREATED_SUCCESS = "External reference created successfully.";
-    public static final String EXTERNAL_REFERENCE_UPDATED_SUCCESS = "External reference updated successfully.";
+    public static final String EXTERNAL_REFERENCE_IMMUTABLE = "External reference with ID %s and version '%s' already exists and is immutable. Cannot modify name, type, or schema associations for an existing version. Create a new version if changes are needed.";
+    public static final String EXTERNAL_REFERENCE_VERSION_IMMUTABLE = "External reference version '%s' for ID %s is immutable. Existing schemas: %s. Requested schemas: %s. Create a new version if different schema associations are needed.";
 
     // Tenant related messages
     public static final String TENANT_NOT_FOUND = "Tenant not found";

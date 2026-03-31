@@ -100,10 +100,17 @@ public class ExternalReferenceService {
     }
 
     /**
-     * Create or update external reference with associated schemas.
-     * This method implements idempotency - if the record already exists with the same
-     * name, type, version, and schema associations, it returns success without updating.
-     * If the schemas array is empty, all associations will be removed.
+     * Create external reference with associated schemas.
+     *
+     * IMMUTABILITY RULE: Once an external reference is created with a specific version,
+     * it is IMMUTABLE. You cannot change the name, type, or schema associations for an
+     * existing version. If changes are needed, create a new version.
+     *
+     * This method implements idempotency - if the record already exists with identical
+     * data (name, type, version, and schema associations), it returns success without
+     * making any changes.
+     *
+     * @throws IllegalArgumentException if trying to modify an existing version
      */
     @Transactional
     public ExtRefResponse createOrUpdateExternalReference(
@@ -151,93 +158,79 @@ public class ExternalReferenceService {
                     extRefName, extRefType, extRefVersion, existingByUnique.get().getExtRefId()));
         }
 
-        // Check for idempotency - if record already exists with same values, return without updating
+        // IMMUTABILITY CHECK: If external reference exists, it must be identical (idempotent)
+        // or an error must be thrown. Updates are NOT allowed.
         if (existingExtRef.isPresent()) {
             ExtRef existing = existingExtRef.get();
 
-            // Check if name, type, and version are the same (null-safe comparison)
-            boolean metadataUnchanged = Objects.equals(existing.getExtRefName(), extRefName)
+            // Check if ALL metadata matches (name, type, version)
+            boolean metadataMatches = Objects.equals(existing.getExtRefName(), extRefName)
                     && Objects.equals(existing.getExtRefType(), extRefType)
                     && Objects.equals(existing.getExtRefVersion(), extRefVersion);
 
-            if (metadataUnchanged) {
-                // Check if schema associations are the same
-                List<SchmExtRefXref> existingXrefs = schmExtRefXrefRepository.findByExtRefId(extRefId);
-                List<UUID> existingSchmIds = existingXrefs.stream()
-                        .map(SchmExtRefXref::getSchmId)
-                        .sorted()
-                        .collect(Collectors.toList());
+            // Get existing schema associations
+            List<SchmExtRefXref> existingXrefs = schmExtRefXrefRepository.findByExtRefId(extRefId);
+            List<UUID> existingSchmIds = existingXrefs.stream()
+                    .map(SchmExtRefXref::getSchmId)
+                    .sorted()
+                    .collect(Collectors.toList());
 
-                List<UUID> sortedRequestedSchmIds = new ArrayList<>(requestedSchmIds);
-                sortedRequestedSchmIds.sort(UUID::compareTo);
+            List<UUID> sortedRequestedSchmIds = new ArrayList<>(requestedSchmIds);
+            sortedRequestedSchmIds.sort(UUID::compareTo);
 
-                // If schema associations are also the same, return without updating
-                if (existingSchmIds.equals(sortedRequestedSchmIds)) {
-                    return new ExtRefResponse(
-                            mapToDto(existing),
-                            ErrorMessages.EXTERNAL_REFERENCE_UP_TO_DATE,
-                            false
-                    );
-                }
+            boolean schemasMatch = existingSchmIds.equals(sortedRequestedSchmIds);
+
+            // If EVERYTHING matches, this is idempotent - return success
+            if (metadataMatches && schemasMatch) {
+                return new ExtRefResponse(
+                        mapToDto(existing),
+                        ErrorMessages.EXTERNAL_REFERENCE_UP_TO_DATE,
+                        false
+                );
             }
+
+            // If anything differs, throw error - versions are IMMUTABLE
+            if (!metadataMatches) {
+                throw new IllegalArgumentException(String.format(
+                        ErrorMessages.EXTERNAL_REFERENCE_IMMUTABLE,
+                        extRefId, extRefVersion));
+            }
+
+            // Metadata matches but schemas differ
+            throw new IllegalArgumentException(String.format(
+                    ErrorMessages.EXTERNAL_REFERENCE_VERSION_IMMUTABLE,
+                    extRefVersion, extRefId, existingSchmIds, sortedRequestedSchmIds));
         }
 
-        ExtRef extRef;
-        boolean isUpdate = existingExtRef.isPresent();
-
-        if (isUpdate) {
-            // Update existing
-            extRef = existingExtRef.get();
-            extRef.setExtRefName(extRefName);
-            extRef.setExtRefType(extRefType);
-            extRef.setExtRefVersion(extRefVersion);
-            extRef.setUpdatedBy(currentUser);
-        } else {
-            // Create new
-            extRef = new ExtRef();
-            extRef.setExtRefId(extRefId);
-            extRef.setTenantName(tenantName);
-            extRef.setExtRefName(extRefName);
-            extRef.setExtRefType(extRefType);
-            extRef.setExtRefVersion(extRefVersion);
-            extRef.setCreatedBy(currentUser);
-            extRef.setUpdatedBy(currentUser);
-        }
+        // At this point, external reference does NOT exist (or was idempotent and already returned)
+        // Create new external reference
+        ExtRef extRef = new ExtRef();
+        extRef.setExtRefId(extRefId);
+        extRef.setTenantName(tenantName);
+        extRef.setExtRefName(extRefName);
+        extRef.setExtRefType(extRefType);
+        extRef.setExtRefVersion(extRefVersion);
+        extRef.setCreatedBy(currentUser);
+        extRef.setUpdatedBy(currentUser);
 
         extRef = extRefRepository.save(extRef);
 
-        // Handle schema associations with differential update (more efficient than delete all + recreate)
-        List<SchmExtRefXref> existingXrefs = schmExtRefXrefRepository.findByExtRefId(extRefId);
+        // CRITICAL: Sort UUIDs before locking to prevent deadlocks
+        // Without this, concurrent requests locking the same schemas in different orders
+        // can deadlock: Request A locks [UUID-111, UUID-222], Request B locks [UUID-222, UUID-111]
+        // We use sortedSchmIds consistently in both validation AND insertion for clarity and maintainability
+        List<UUID> sortedSchmIds = new ArrayList<>(requestedSchmIds);
+        Collections.sort(sortedSchmIds);
 
-        // Get the set of existing and requested schema IDs
-        List<UUID> existingSchmIds = existingXrefs.stream()
-                .map(SchmExtRefXref::getSchmId)
-                .collect(Collectors.toList());
-
-        // Determine what to delete (in existing but not in requested)
-        List<SchmExtRefXref> toDelete = existingXrefs.stream()
-                .filter(xref -> !requestedSchmIds.contains(xref.getSchmId()))
-                .collect(Collectors.toList());
-
-        // Determine what to add (in requested but not in existing)
-        List<UUID> toAdd = requestedSchmIds.stream()
-                .filter(schmId -> !existingSchmIds.contains(schmId))
-                .collect(Collectors.toList());
-
-        // ===== VALIDATE ALL OPERATIONS BEFORE MAKING ANY CHANGES =====
+        // ===== VALIDATE ALL SCHEMAS BEFORE CREATING ASSOCIATIONS =====
         // This ensures we fail fast without partial updates.
         // While @Transactional would rollback on exception, it's clearer and more efficient
         // to validate everything first.
-        if (!toAdd.isEmpty()) {
-            // CRITICAL: Sort UUIDs before locking to prevent deadlocks
-            // Without this, concurrent requests locking the same schemas in different orders
-            // can deadlock: Request A locks [UUID-111, UUID-222], Request B locks [UUID-222, UUID-111]
-            List<UUID> sortedToAdd = new ArrayList<>(toAdd);
-            Collections.sort(sortedToAdd);
-
+        if (!sortedSchmIds.isEmpty()) {
             // Validate all schemas exist and are published BEFORE making any changes
-            for (UUID schmId : sortedToAdd) {
+            for (UUID schmId : sortedSchmIds) {
                 // Use pessimistic lock to prevent unpublish race condition
+                // Locks are held until end of transaction (@Transactional method)
                 Schm schema = schmRepository.findWithLockBySchmId(schmId)
                         .orElseThrow(() -> new IllegalArgumentException(
                                 String.format(ErrorMessages.SCHEMA_NOT_FOUND_FOR_REFERENCE, schmId)));
@@ -250,17 +243,10 @@ public class ExternalReferenceService {
             }
         }
 
-        // ===== ALL VALIDATIONS PASSED - NOW PERFORM THE CHANGES =====
-        // Delete removed associations
-        if (!toDelete.isEmpty()) {
-            schmExtRefXrefRepository.deleteAll(toDelete);
-        }
-
-        // Create new associations
-        // Note: We don't need to re-sort here because schema validation already locked them
-        // in sorted order above, ensuring no other transaction can interfere
-        if (!toAdd.isEmpty()) {
-            for (UUID schmId : toAdd) {
+        // ===== ALL VALIDATIONS PASSED - NOW CREATE SCHEMA ASSOCIATIONS =====
+        // Create associations for all requested schemas
+        if (!sortedSchmIds.isEmpty()) {
+            for (UUID schmId : sortedSchmIds) {
                 SchmExtRefXref xref = new SchmExtRefXref();
                 xref.setTenantName(tenantName);
                 xref.setSchmId(schmId);
@@ -270,11 +256,10 @@ public class ExternalReferenceService {
             }
         }
 
-        String message = isUpdate
-                ? ErrorMessages.EXTERNAL_REFERENCE_UPDATED_SUCCESS
-                : ErrorMessages.EXTERNAL_REFERENCE_CREATED_SUCCESS;
-
-        return new ExtRefResponse(mapToDto(extRef), message, true);
+        return new ExtRefResponse(
+                mapToDto(extRef),
+                ErrorMessages.EXTERNAL_REFERENCE_CREATED_SUCCESS,
+                true);
     }
 
     /**
