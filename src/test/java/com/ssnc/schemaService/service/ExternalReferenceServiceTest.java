@@ -953,4 +953,85 @@ class ExternalReferenceServiceTest {
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
         }
     }
+
+    @Test
+    void testCreateOrUpdateExternalReference_LocksInSortedOrder_PreventingDeadlock() {
+        // Test that schemas are locked in sorted UUID order to prevent deadlock
+        // Deadlock scenario without sorting:
+        //   Request A: locks [UUID-222, UUID-111] (reverse order)
+        //   Request B: locks [UUID-111, UUID-222] (forward order)
+        //   Result: A holds 222 waiting for 111, B holds 111 waiting for 222 = DEADLOCK
+        //
+        // With sorting: both requests lock [UUID-111, UUID-222] = no deadlock
+
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+
+        // Create UUIDs that would cause deadlock if not sorted
+        UUID uuid1 = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        UUID uuid2 = UUID.fromString("22222222-2222-2222-2222-222222222222");
+        UUID uuid3 = UUID.fromString("33333333-3333-3333-3333-333333333333");
+
+        // Request them in REVERSE order to test sorting
+        ExtRefWithSchemasRequest.SchemaReference schemaRef3 = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef3.setSchmId(uuid3);
+        schemaRef3.setSchmName("Schema 3");
+
+        ExtRefWithSchemasRequest.SchemaReference schemaRef2 = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef2.setSchmId(uuid2);
+        schemaRef2.setSchmName("Schema 2");
+
+        ExtRefWithSchemasRequest.SchemaReference schemaRef1 = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef1.setSchmId(uuid1);
+        schemaRef1.setSchmName("Schema 1");
+
+        // Add in reverse order: 3, 2, 1
+        request.setSchemas(Arrays.asList(schemaRef3, schemaRef2, schemaRef1));
+
+        Schm schm1 = new Schm();
+        schm1.setSchmId(uuid1);
+        schm1.setPublishVersion(1);
+
+        Schm schm2 = new Schm();
+        schm2.setSchmId(uuid2);
+        schm2.setPublishVersion(1);
+
+        Schm schm3 = new Schm();
+        schm3.setSchmId(uuid3);
+        schm3.setPublishVersion(1);
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(anyString(), anyString(), anyString()))
+                    .thenReturn(Optional.empty());
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
+
+            // Mock the repository to return schemas - locks should be acquired in SORTED order (1, 2, 3)
+            when(schmRepository.findWithLockBySchmId(uuid1)).thenReturn(Optional.of(schm1));
+            when(schmRepository.findWithLockBySchmId(uuid2)).thenReturn(Optional.of(schm2));
+            when(schmRepository.findWithLockBySchmId(uuid3)).thenReturn(Optional.of(schm3));
+
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request);
+
+            assertNotNull(response);
+            assertTrue(response.isUpdated());
+            assertEquals(ErrorMessages.EXTERNAL_REFERENCE_CREATED_SUCCESS, response.getMessage());
+
+            // Verify that locks were acquired in SORTED order (1, 2, 3), not request order (3, 2, 1)
+            // This prevents deadlock by ensuring consistent lock ordering across all requests
+            org.mockito.InOrder inOrder = inOrder(schmRepository);
+            inOrder.verify(schmRepository).findWithLockBySchmId(uuid1); // FIRST (smallest UUID)
+            inOrder.verify(schmRepository).findWithLockBySchmId(uuid2); // SECOND
+            inOrder.verify(schmRepository).findWithLockBySchmId(uuid3); // THIRD (largest UUID)
+
+            // Verify all schemas were saved
+            verify(schmExtRefXrefRepository, times(3)).save(any(SchmExtRefXref.class));
+        }
+    }
 }

@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -228,8 +229,14 @@ public class ExternalReferenceService {
         // While @Transactional would rollback on exception, it's clearer and more efficient
         // to validate everything first.
         if (!toAdd.isEmpty()) {
+            // CRITICAL: Sort UUIDs before locking to prevent deadlocks
+            // Without this, concurrent requests locking the same schemas in different orders
+            // can deadlock: Request A locks [UUID-111, UUID-222], Request B locks [UUID-222, UUID-111]
+            List<UUID> sortedToAdd = new ArrayList<>(toAdd);
+            Collections.sort(sortedToAdd);
+
             // Validate all schemas exist and are published BEFORE making any changes
-            for (UUID schmId : toAdd) {
+            for (UUID schmId : sortedToAdd) {
                 // Use pessimistic lock to prevent unpublish race condition
                 Schm schema = schmRepository.findWithLockBySchmId(schmId)
                         .orElseThrow(() -> new IllegalArgumentException(
@@ -250,6 +257,8 @@ public class ExternalReferenceService {
         }
 
         // Create new associations
+        // Note: We don't need to re-sort here because schema validation already locked them
+        // in sorted order above, ensuring no other transaction can interfere
         if (!toAdd.isEmpty()) {
             for (UUID schmId : toAdd) {
                 SchmExtRefXref xref = new SchmExtRefXref();
