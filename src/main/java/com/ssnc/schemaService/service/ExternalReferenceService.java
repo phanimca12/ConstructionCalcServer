@@ -203,17 +203,6 @@ public class ExternalReferenceService {
         }
 
         // At this point, external reference does NOT exist (or was idempotent and already returned)
-        // Create new external reference
-        ExtRef extRef = new ExtRef();
-        extRef.setExtRefId(extRefId);
-        extRef.setTenantName(tenantName);
-        extRef.setExtRefName(extRefName);
-        extRef.setExtRefType(extRefType);
-        extRef.setExtRefVersion(extRefVersion);
-        extRef.setCreatedBy(currentUser);
-        extRef.setUpdatedBy(currentUser);
-
-        extRef = extRefRepository.save(extRef);
 
         // CRITICAL: Sort UUIDs before locking to prevent deadlocks
         // Without this, concurrent requests locking the same schemas in different orders
@@ -222,10 +211,9 @@ public class ExternalReferenceService {
         List<UUID> sortedSchmIds = new ArrayList<>(requestedSchmIds);
         Collections.sort(sortedSchmIds);
 
-        // ===== VALIDATE ALL SCHEMAS BEFORE CREATING ASSOCIATIONS =====
-        // This ensures we fail fast without partial updates.
-        // While @Transactional would rollback on exception, it's clearer and more efficient
-        // to validate everything first.
+        // ===== VALIDATE ALL SCHEMAS BEFORE ANY DATABASE WRITES =====
+        // SECURITY: Fail fast validation prevents data corruption
+        // Validate schemas BEFORE saving ExtRef to avoid orphaned records if validation fails
         if (!sortedSchmIds.isEmpty()) {
             // Validate all schemas exist and are published BEFORE making any changes
             for (UUID schmId : sortedSchmIds) {
@@ -243,7 +231,20 @@ public class ExternalReferenceService {
             }
         }
 
-        // ===== ALL VALIDATIONS PASSED - NOW CREATE SCHEMA ASSOCIATIONS =====
+        // ===== ALL VALIDATIONS PASSED - NOW CREATE EXTERNAL REFERENCE =====
+        // Create new external reference entity
+        ExtRef extRef = new ExtRef();
+        extRef.setExtRefId(extRefId);
+        extRef.setTenantName(tenantName);
+        extRef.setExtRefName(extRefName);
+        extRef.setExtRefType(extRefType);
+        extRef.setExtRefVersion(extRefVersion);
+        extRef.setCreatedBy(currentUser);
+        extRef.setUpdatedBy(currentUser);
+
+        extRef = extRefRepository.save(extRef);
+
+        // ===== CREATE SCHEMA ASSOCIATIONS =====
         // Create associations for all requested schemas
         if (!sortedSchmIds.isEmpty()) {
             for (UUID schmId : sortedSchmIds) {

@@ -98,10 +98,18 @@ public class SchemaService {
                 .collect(Collectors.toList());
 
         // Apply pagination manually (since filtering/sorting happens in Java)
-        int start = (int) pageable.getOffset();
+        // SECURITY: Validate offset to prevent integer overflow DoS attack
+        long offset = pageable.getOffset();
+        if (offset < 0 || offset > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(
+                    String.format("Invalid pagination offset: %d. Must be between 0 and %d",
+                            offset, Integer.MAX_VALUE));
+        }
+        int start = (int) offset;
         int end = Math.min(start + pageable.getPageSize(), filteredSchemas.size());
 
-        if (start > filteredSchemas.size()) {
+        // Use >= to handle edge case where start equals size
+        if (start >= filteredSchemas.size()) {
             return new PageImpl<>(new ArrayList<>(), pageable, filteredSchemas.size());
         }
 
@@ -225,11 +233,19 @@ public class SchemaService {
         }
 
         // Apply pagination to versions list
-        int start = (int) pageable.getOffset();
+        // SECURITY: Validate offset to prevent integer overflow DoS attack
+        long offset = pageable.getOffset();
+        if (offset < 0 || offset > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(
+                    String.format("Invalid pagination offset: %d. Must be between 0 and %d",
+                            offset, Integer.MAX_VALUE));
+        }
+        int start = (int) offset;
         int end = Math.min(start + pageable.getPageSize(), versions.size());
 
         List<SchemaVersionDto> paginatedVersions;
-        if (start > versions.size()) {
+        // Use >= to handle edge case where start equals size
+        if (start >= versions.size()) {
             paginatedVersions = new ArrayList<>();
         } else {
             paginatedVersions = versions.subList(start, end).stream()
@@ -528,10 +544,18 @@ public class SchemaService {
                 .collect(Collectors.toList());
 
         // Apply pagination manually
-        int start = (int) pageable.getOffset();
+        // SECURITY: Validate offset to prevent integer overflow DoS attack
+        long offset = pageable.getOffset();
+        if (offset < 0 || offset > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(
+                    String.format("Invalid pagination offset: %d. Must be between 0 and %d",
+                            offset, Integer.MAX_VALUE));
+        }
+        int start = (int) offset;
         int end = Math.min(start + pageable.getPageSize(), extRefDtos.size());
 
-        if (start > extRefDtos.size()) {
+        // Use >= to handle edge case where start equals size
+        if (start >= extRefDtos.size()) {
             return new PageImpl<>(new ArrayList<>(), pageable, extRefDtos.size());
         }
 

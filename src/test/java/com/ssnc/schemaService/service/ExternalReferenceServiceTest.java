@@ -356,6 +356,8 @@ class ExternalReferenceServiceTest {
 
             assertTrue(exception.getMessage().contains("not found"));
             verify(schmRepository).findWithLockBySchmId(nonExistentSchmId);
+            // SECURITY: Verify NO saves occurred when validation failed
+            verify(extRefRepository, never()).save(any(ExtRef.class));
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
         }
     }
@@ -453,6 +455,8 @@ class ExternalReferenceServiceTest {
             assertTrue(exception.getMessage().contains("unpublished"));
             assertTrue(exception.getMessage().contains("must be published"));
             verify(schmRepository).findWithLockBySchmId(testSchmId);
+            // SECURITY: Verify NO saves occurred when validation failed
+            verify(extRefRepository, never()).save(any(ExtRef.class));
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
         }
     }
@@ -739,12 +743,12 @@ class ExternalReferenceServiceTest {
 
             assertTrue(exception.getMessage().contains("not found"));
 
-            // CRITICAL: Verify NO saves occurred before validation failed
-            // External reference was saved but no schema associations were created
-            verify(extRefRepository).save(any(ExtRef.class)); // ExtRef is saved before schema validation
-            verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class)); // But no xrefs saved
+            // CRITICAL: Verify NO saves occurred when validation failed
+            // SECURITY FIX: Schema validation now happens BEFORE ExtRef save to prevent data corruption
+            verify(extRefRepository, never()).save(any(ExtRef.class)); // No ExtRef saved if validation fails
+            verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class)); // No xrefs saved
 
-            // Validation happened in sorted order
+            // Validation happened in sorted order before any saves
             verify(schmRepository).findWithLockBySchmId(validSchmId); // First (passed)
             verify(schmRepository).findWithLockBySchmId(invalidSchmId2); // Second (failed)
         }
@@ -886,7 +890,8 @@ class ExternalReferenceServiceTest {
             inOrder.verify(schmRepository).findWithLockBySchmId(publishedSchmId);  // First (smaller UUID)
             inOrder.verify(schmRepository).findWithLockBySchmId(unpublishedSchmId);  // Second (larger UUID) - fails here
 
-            // No xref should be saved because validation failed
+            // SECURITY: No saves should occur because validation failed
+            verify(extRefRepository, never()).save(any(ExtRef.class));
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
         }
     }
