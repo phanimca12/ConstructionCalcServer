@@ -35,6 +35,10 @@
         foreign key (nmspc_name) references nmspc,
         foreign key (tenant_name) references tenant
     );
+
+    -- Indexes for foreign key columns (improves JOIN and lookup performance)
+    create index idx_schm_nmspc_name on schm(nmspc_name);
+    create index idx_schm_tenant_name on schm(tenant_name);
     create table schm_data (
         schm_version integer not null,
         created_datetime ${timestamp},
@@ -48,6 +52,9 @@
         primary key (schm_version, SCHM_ID),
         foreign key (schm_id) references schm
     );
+
+    -- Index for foreign key column (improves JOIN and lookup performance)
+    create index idx_schm_data_schm_id on schm_data(schm_id);
 
     create table ext_ref (
         ext_ref_id ${guid} not null,
@@ -64,7 +71,8 @@
         constraint uk_ext_ref_tenant_name_type_version unique (tenant_name, ext_ref_name, ext_ref_type, ext_ref_version)
     );
 
-    -- Indexes for ext_ref table to improve query performance
+    -- Indexes for performance optimization
+    create index idx_ext_ref_tenant_name on ext_ref(tenant_name);
     create index idx_ext_ref_type on ext_ref(ext_ref_type);
     create index idx_ext_ref_type_id_version on ext_ref(ext_ref_type, ext_ref_id, ext_ref_version);
 
@@ -81,7 +89,8 @@
         foreign key (ext_ref_id) references ext_ref
     );
 
-    -- Indexes for schm_ext_ref_xref table to improve query performance
+    -- Indexes for foreign key columns (improves JOIN, lookup, and cascade delete performance)
+    create index idx_xref_tenant_name on schm_ext_ref_xref(tenant_name);
     create index idx_xref_schm_id on schm_ext_ref_xref(schm_id);
     create index idx_xref_ext_ref_id on schm_ext_ref_xref(ext_ref_id);
 
