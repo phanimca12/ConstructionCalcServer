@@ -1,11 +1,13 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.dto.ErrorResponse;
 import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.service.ExternalReferenceService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,10 +27,10 @@ public class ExternalReferenceController {
      *
      * @param nameSpace - Namespace filter
      * @param type - Optional external reference type (Process, Automation, PresentationFlow, Sampling, UXBuilder)
-     * @return List of external references
+     * @return List of external references or error response
      */
     @GetMapping
-    public ResponseEntity<List<ExtRefDto>> getExternalReferences(
+    public ResponseEntity<?> getExternalReferences(
             @PathVariable("nameSpace") String nameSpace,
             @RequestParam(required = false) String type) {
 
@@ -36,7 +38,12 @@ public class ExternalReferenceController {
             List<ExtRefDto> extRefs = externalReferenceService.getExternalReferences(nameSpace, type);
             return ResponseEntity.ok(extRefs);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            ErrorResponse errorResponse = new ErrorResponse(
+                    HttpStatus.BAD_REQUEST.value(),
+                    "Bad Request",
+                    e.getMessage()
+            );
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 
@@ -48,10 +55,10 @@ public class ExternalReferenceController {
      * @param extRefType - External reference type (Process, Automation, PresentationFlow, Sampling, UXBuilder)
      * @param extRefId - External reference ID (UUID)
      * @param extRefVersion - External reference version
-     * @return List of schemas associated with the external reference
+     * @return List of schemas associated with the external reference or error response
      */
     @GetMapping("/type/{extRefType}/id/{extRefId}/version/{extRefVersion}/schemas")
-    public ResponseEntity<List<SchemaDto>> getSchemasByExternalReference(
+    public ResponseEntity<?> getSchemasByExternalReference(
             @PathVariable("nameSpace") String nameSpace,
             @PathVariable("extRefType") String extRefType,
             @PathVariable("extRefId") UUID extRefId,
@@ -62,7 +69,12 @@ public class ExternalReferenceController {
                     nameSpace, extRefType, extRefId, extRefVersion);
             return ResponseEntity.ok(schemas);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            ErrorResponse errorResponse = new ErrorResponse(
+                    HttpStatus.BAD_REQUEST.value(),
+                    "Bad Request",
+                    e.getMessage()
+            );
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 
@@ -78,10 +90,10 @@ public class ExternalReferenceController {
      * @param extRefId - External reference ID (UUID)
      * @param extRefVersion - External reference version
      * @param request - REQUIRED request body containing list of schemas to associate (can be empty array)
-     * @return Response containing the external reference, a message, and an update flag
+     * @return Response containing the external reference, a message, and an update flag or error response
      */
     @PutMapping("/type/{extRefType}/name/{extRefName}/id/{extRefId}/version/{extRefVersion}/schemas")
-    public ResponseEntity<ExtRefResponse> createOrUpdateExternalReference(
+    public ResponseEntity<?> createOrUpdateExternalReference(
             @PathVariable("nameSpace") String nameSpace,
             @PathVariable("extRefType") String extRefType,
             @PathVariable("extRefName") String extRefName,
@@ -94,7 +106,12 @@ public class ExternalReferenceController {
                     nameSpace, extRefType, extRefName, extRefId, extRefVersion, request);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
+            ErrorResponse errorResponse = new ErrorResponse(
+                    HttpStatus.BAD_REQUEST.value(),
+                    "Bad Request",
+                    e.getMessage()
+            );
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 }
