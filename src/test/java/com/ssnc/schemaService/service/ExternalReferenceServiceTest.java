@@ -911,20 +911,27 @@ class ExternalReferenceServiceTest {
     @Test
     void testCreateOrUpdateExternalReference_MixedPublishedAndUnpublished_OnlyFailsOnUnpublished() {
         // Test that if multiple schemas are provided and one is unpublished, the operation fails
+        // UUIDs are created in specific order to ensure deterministic locking sequence
         ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
 
+        // Create UUIDs in deterministic order so published comes first alphabetically
+        UUID publishedSchmId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        UUID unpublishedSchmId = UUID.fromString("22222222-2222-2222-2222-222222222222");
+
         ExtRefWithSchemasRequest.SchemaReference schemaRef1 = new ExtRefWithSchemasRequest.SchemaReference();
-        schemaRef1.setSchmId(testSchmId);
+        schemaRef1.setSchmId(publishedSchmId);
         schemaRef1.setSchmName("Published Schema");
 
-        UUID unpublishedSchmId = UUID.randomUUID();
         ExtRefWithSchemasRequest.SchemaReference schemaRef2 = new ExtRefWithSchemasRequest.SchemaReference();
         schemaRef2.setSchmId(unpublishedSchmId);
         schemaRef2.setSchmName("Unpublished Schema");
 
-        request.setSchemas(Arrays.asList(schemaRef1, schemaRef2));
+        // Add in reverse order to test that sorting happens
+        request.setSchemas(Arrays.asList(schemaRef2, schemaRef1));
 
-        testSchm.setPublishVersion(1); // Published
+        Schm publishedSchm = new Schm();
+        publishedSchm.setSchmId(publishedSchmId);
+        publishedSchm.setPublishVersion(1); // Published
 
         Schm unpublishedSchm = new Schm();
         unpublishedSchm.setSchmId(unpublishedSchmId);
@@ -934,9 +941,11 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(anyString(), anyString(), anyString()))
+                    .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
-            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            when(schmRepository.findWithLockBySchmId(publishedSchmId)).thenReturn(Optional.of(publishedSchm));
             when(schmRepository.findWithLockBySchmId(unpublishedSchmId)).thenReturn(Optional.of(unpublishedSchm));
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
@@ -946,10 +955,14 @@ class ExternalReferenceServiceTest {
             );
 
             assertTrue(exception.getMessage().contains("unpublished"));
-            // Should have checked the first schema (published - OK) then failed on second (unpublished)
-            verify(schmRepository).findWithLockBySchmId(testSchmId);
-            // The unpublished one may or may not be checked depending on iteration order
-            // No xref should be saved
+
+            // With sorted locking, published schema (UUID 1111...) is locked FIRST, then unpublished (UUID 2222...)
+            // Published schema should pass validation, unpublished should fail
+            org.mockito.InOrder inOrder = inOrder(schmRepository);
+            inOrder.verify(schmRepository).findWithLockBySchmId(publishedSchmId);  // First (smaller UUID)
+            inOrder.verify(schmRepository).findWithLockBySchmId(unpublishedSchmId);  // Second (larger UUID) - fails here
+
+            // No xref should be saved because validation failed
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
         }
     }
