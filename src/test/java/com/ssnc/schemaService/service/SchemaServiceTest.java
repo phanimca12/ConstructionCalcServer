@@ -408,11 +408,12 @@ class SchemaServiceTest {
     @Test
     void testLockSchema_Success() {
         testSchm.setLockBy(null); // Not locked
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
         schemaService.lockSchema(testNamespace, testSchmId);
 
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
         verify(schmRepository).save(argThat(schm ->
                 testUserId.equals(schm.getLockBy())
         ));
@@ -422,11 +423,12 @@ class SchemaServiceTest {
     @Test
     void testLockSchema_AlreadyLockedBySameUser_Success() {
         testSchm.setLockBy(testUserId); // Already locked by same user
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
         schemaService.lockSchema(testNamespace, testSchmId);
 
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
         verify(schmRepository).save(argThat(schm ->
                 testUserId.equals(schm.getLockBy())
         ));
@@ -435,33 +437,37 @@ class SchemaServiceTest {
     @Test
     void testLockSchema_AlreadyLockedByDifferentUser_ThrowsException() {
         testSchm.setLockBy("otherUser"); // Locked by different user
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
                 schemaService.lockSchema(testNamespace, testSchmId)
         );
 
         assertTrue(exception.getMessage().contains("already locked by"));
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
         verify(schmRepository, never()).save(any(Schm.class));
     }
 
     @Test
     void testLockSchema_SchemaNotFound_ThrowsException() {
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.empty());
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () ->
                 schemaService.lockSchema(testNamespace, testSchmId)
         );
+
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
     }
 
     @Test
     void testLockSchema_WithNullJwtContext_UsesSYSTEMUser() {
         when(jwtClaimsContext.getUserId()).thenReturn(null);
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
         schemaService.lockSchema(testNamespace, testSchmId);
 
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
         verify(schmRepository).save(argThat(schm ->
                 AppConstants.SYSTEM_USER.equals(schm.getLockBy())
         ));
@@ -470,24 +476,26 @@ class SchemaServiceTest {
     @Test
     void testUnlockSchema_Success() {
         testSchm.setLockBy(testUserId); // Locked by same user
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
         schemaService.unlockSchema(testNamespace, testSchmId);
 
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
         verify(schmRepository).save(argThat(schm -> schm.getLockBy() == null));
     }
 
     @Test
     void testUnlockSchema_LockedByDifferentUser_ThrowsException() {
         testSchm.setLockBy("otherUser"); // Locked by different user
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
                 schemaService.unlockSchema(testNamespace, testSchmId)
         );
 
         assertTrue(exception.getMessage().contains("Cannot unlock"));
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
         verify(schmRepository, never()).save(any(Schm.class));
     }
 
@@ -495,21 +503,52 @@ class SchemaServiceTest {
     void testUnlockSchema_SystemUserCanUnlockAny() {
         testSchm.setLockBy("otherUser"); // Locked by different user
         when(jwtClaimsContext.getUserId()).thenReturn(AppConstants.SYSTEM_USER);
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
         schemaService.unlockSchema(testNamespace, testSchmId);
 
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
         verify(schmRepository).save(argThat(schm -> schm.getLockBy() == null));
     }
 
     @Test
     void testUnlockSchema_SchemaNotFound_ThrowsException() {
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.empty());
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () ->
                 schemaService.unlockSchema(testNamespace, testSchmId)
         );
+
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
+    }
+
+    @Test
+    void testLockSchema_UsesPessimisticLocking_PreventingRaceCondition() {
+        // This test verifies that pessimistic locking is used to prevent race conditions
+        testSchm.setLockBy(null);
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        schemaService.lockSchema(testNamespace, testSchmId);
+
+        // Verify findWithLockBySchmId is called, NOT findBySchmId
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
+        verify(schmRepository, never()).findBySchmId(testSchmId);
+    }
+
+    @Test
+    void testUnlockSchema_UsesPessimisticLocking_PreventingRaceCondition() {
+        // This test verifies that pessimistic locking is used to prevent race conditions
+        testSchm.setLockBy(testUserId);
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        schemaService.unlockSchema(testNamespace, testSchmId);
+
+        // Verify findWithLockBySchmId is called, NOT findBySchmId
+        verify(schmRepository).findWithLockBySchmId(testSchmId);
+        verify(schmRepository, never()).findBySchmId(testSchmId);
     }
 
     @Test
