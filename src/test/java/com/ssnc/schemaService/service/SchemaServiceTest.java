@@ -538,6 +538,30 @@ class SchemaServiceTest {
     }
 
     @Test
+    void testLockSchema_IdempotentBehavior_SameUserMultipleCalls() {
+        // This test verifies that lockSchema is idempotent when the same user calls it multiple times
+        // This is intentional behavior to allow safe retries and prevent lock state corruption
+        testSchm.setLockBy(testUserId); // Already locked by same user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        // Call lock multiple times - all should succeed (idempotent)
+        schemaService.lockSchema(testNamespace, testSchmId);
+        schemaService.lockSchema(testNamespace, testSchmId);
+        schemaService.lockSchema(testNamespace, testSchmId);
+
+        // All calls should succeed without exception
+        // Verify pessimistic lock was acquired each time (preventing concurrent different users)
+        verify(schmRepository, times(3)).findWithLockBySchmId(testSchmId);
+        verify(schmRepository, times(3)).save(any(Schm.class));
+
+        // Verify final state: still locked by the same user
+        verify(schmRepository, atLeast(1)).save(argThat(schm ->
+                testUserId.equals(schm.getLockBy())
+        ));
+    }
+
+    @Test
     void testUnlockSchema_UsesPessimisticLocking_PreventingRaceCondition() {
         // This test verifies that pessimistic locking is used to prevent race conditions
         testSchm.setLockBy(testUserId);

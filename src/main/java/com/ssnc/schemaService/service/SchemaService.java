@@ -381,7 +381,18 @@ public class SchemaService {
     }
 
     /**
-     * Lock a schema
+     * Lock a schema for editing.
+     * This operation is idempotent - if the same user calls lock multiple times,
+     * it will succeed without error. This allows clients to safely retry lock operations
+     * and ensures lock state remains consistent even with concurrent requests from the same user.
+     *
+     * Uses pessimistic locking to prevent race conditions where different users
+     * might try to acquire the lock simultaneously.
+     *
+     * @param namespace the namespace
+     * @param schmId the schema ID
+     * @throws IllegalArgumentException if schema not found
+     * @throws IllegalStateException if schema is locked by a different user
      */
     @Transactional
     public void lockSchema(String namespace, UUID schmId) {
@@ -390,22 +401,32 @@ public class SchemaService {
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
                 ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
-        // Use pessimistic locking to prevent race condition
+        // Use pessimistic locking to prevent race condition between different users
         Schm schema = schmRepository.findWithLockBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
 
-        // Check if already locked by another user
+        // Check if already locked by a DIFFERENT user
+        // Note: If locked by the SAME user, this is idempotent and succeeds
         if (schema.getLockBy() != null && !schema.getLockBy().equals(userName)) {
             throw new IllegalStateException(
                     String.format("Schema %s is already locked by %s", schmId, schema.getLockBy()));
         }
 
+        // Set lock (idempotent if already locked by same user)
         schema.setLockBy(userName);
         schmRepository.save(schema);
     }
 
     /**
-     * Unlock a schema
+     * Unlock a schema.
+     * Uses pessimistic locking to prevent race conditions during unlock operations.
+     *
+     * Only the user who locked the schema (or SYSTEM_USER) can unlock it.
+     *
+     * @param namespace the namespace
+     * @param schmId the schema ID
+     * @throws IllegalArgumentException if schema not found
+     * @throws IllegalStateException if schema is locked by a different user
      */
     @Transactional
     public void unlockSchema(String namespace, UUID schmId) {

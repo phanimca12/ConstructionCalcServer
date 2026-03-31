@@ -697,7 +697,7 @@ class ExternalReferenceServiceTest {
 
     @Test
     void testCreateOrUpdateExternalReference_WithNullSchemaId_ThrowsException() {
-        // Test that null schema ID in request is rejected
+        // Test that null schema ID in request is rejected BEFORE any database operations
         ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
         ExtRefWithSchemasRequest.SchemaReference schemaRef = new ExtRefWithSchemasRequest.SchemaReference();
         schemaRef.setSchmId(null); // Null schema ID
@@ -707,7 +707,6 @@ class ExternalReferenceServiceTest {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
@@ -716,8 +715,16 @@ class ExternalReferenceServiceTest {
             );
 
             assertTrue(exception.getMessage().contains("Schema ID cannot be null"));
-            // Should fail before any database operations
+
+            // CRITICAL: Verify validation happens BEFORE any database operations
+            // No database reads should occur
+            verify(extRefRepository, never()).findById(any());
+            verify(schmExtRefXrefRepository, never()).findByExtRefId(any());
+
+            // No database writes should occur
             verify(extRefRepository, never()).save(any(ExtRef.class));
+            verify(schmExtRefXrefRepository, never()).save(any());
+            verify(schmExtRefXrefRepository, never()).deleteAll(any());
             verify(schmRepository, never()).findWithLockBySchmId(any());
         }
     }
@@ -751,6 +758,66 @@ class ExternalReferenceServiceTest {
             assertNotNull(response);
             assertTrue(response.isUpdated());
             verify(extRefRepository).save(any(ExtRef.class));
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_ValidationBeforeChanges_NoPartialUpdates() {
+        // This test verifies that ALL validations happen BEFORE any changes are made
+        // If validation fails, NO changes should be committed (fail-fast principle)
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+
+        // Request wants to:
+        // - Keep testSchmId (already exists)
+        // - Remove schmId2 (currently associated)
+        // - Add invalidSchmId (will fail validation - not found)
+        UUID invalidSchmId = UUID.randomUUID();
+        ExtRefWithSchemasRequest.SchemaReference schemaRef1 = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef1.setSchmId(testSchmId);
+        schemaRef1.setSchmName("Schema 1");
+
+        ExtRefWithSchemasRequest.SchemaReference schemaRef2 = new ExtRefWithSchemasRequest.SchemaReference();
+        schemaRef2.setSchmId(invalidSchmId);
+        schemaRef2.setSchmName("Invalid Schema");
+
+        request.setSchemas(Arrays.asList(schemaRef1, schemaRef2));
+
+        // Existing has testSchmId and schmId2
+        UUID schmId2 = UUID.randomUUID();
+        SchmExtRefXref existingXref1 = new SchmExtRefXref();
+        existingXref1.setSchmId(testSchmId);
+
+        SchmExtRefXref existingXref2 = new SchmExtRefXref();
+        existingXref2.setSchmId(schmId2); // This would be deleted if validation passed
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
+            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId))
+                    .thenReturn(Arrays.asList(existingXref1, existingXref2));
+
+            // testSchmId already exists, so won't be validated
+            // invalidSchmId will fail validation (not found)
+            when(schmRepository.findWithLockBySchmId(invalidSchmId)).thenReturn(Optional.empty());
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            // Execute - should throw exception during validation
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    externalReferenceService.createOrUpdateExternalReference(
+                            testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request)
+            );
+
+            assertTrue(exception.getMessage().contains("not found"));
+
+            // CRITICAL: Verify NO deletions occurred before validation failed
+            // If deleteAll was called, it would mean partial update happened
+            verify(schmExtRefXrefRepository, never()).deleteAll(anyList());
+            verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
+
+            // Validation happened first
+            verify(schmRepository).findWithLockBySchmId(invalidSchmId);
         }
     }
 

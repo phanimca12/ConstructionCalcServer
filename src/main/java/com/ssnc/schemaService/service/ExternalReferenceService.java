@@ -112,19 +112,13 @@ public class ExternalReferenceService {
             String extRefVersion,
             ExtRefWithSchemasRequest request) {
 
+        // ===== INPUT VALIDATION - ALL DONE BEFORE ANY DATABASE OPERATIONS =====
         namespaceFilterManager.enableIfPresent(nameSpace);
 
         // Validate the type against the enum
         ExtRefType.fromString(extRefType);
 
-        String currentUser = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
-                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
-        String tenantName = TenantContext.getTenantName();
-
-        // Check if external reference already exists
-        Optional<ExtRef> existingExtRef = extRefRepository.findById(extRefId);
-
-        // Prepare requested schema IDs and validate they are not null
+        // Validate and prepare requested schema IDs - check for nulls BEFORE any DB operations
         final List<UUID> requestedSchmIds = (request.getSchemas() != null && !request.getSchemas().isEmpty())
                 ? request.getSchemas().stream()
                     .map(ExtRefWithSchemasRequest.SchemaReference::getSchmId)
@@ -135,6 +129,14 @@ public class ExternalReferenceService {
                     })
                     .collect(Collectors.toList())
                 : new ArrayList<>();
+
+        // ===== DATABASE OPERATIONS START HERE =====
+        String currentUser = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+        String tenantName = TenantContext.getTenantName();
+
+        // Check if external reference already exists
+        Optional<ExtRef> existingExtRef = extRefRepository.findById(extRefId);
 
         // Check for idempotency - if record already exists with same values, return without updating
         if (existingExtRef.isPresent()) {
@@ -209,15 +211,12 @@ public class ExternalReferenceService {
                 .filter(schmId -> !existingSchmIds.contains(schmId))
                 .collect(Collectors.toList());
 
-        // Delete removed associations
-        if (!toDelete.isEmpty()) {
-            schmExtRefXrefRepository.deleteAll(toDelete);
-        }
-
-        // Create new associations
-        // First validate all schemas, then save (fail-fast approach)
+        // ===== VALIDATE ALL OPERATIONS BEFORE MAKING ANY CHANGES =====
+        // This ensures we fail fast without partial updates.
+        // While @Transactional would rollback on exception, it's clearer and more efficient
+        // to validate everything first.
         if (!toAdd.isEmpty()) {
-            // Step 1: Validate all schemas exist and are published
+            // Validate all schemas exist and are published BEFORE making any changes
             for (UUID schmId : toAdd) {
                 // Use pessimistic lock to prevent unpublish race condition
                 Schm schema = schmRepository.findWithLockBySchmId(schmId)
@@ -231,8 +230,16 @@ public class ExternalReferenceService {
                                     "Schema must be published before creating external references.", schmId));
                 }
             }
+        }
 
-            // Step 2: All validations passed, now save the associations
+        // ===== ALL VALIDATIONS PASSED - NOW PERFORM THE CHANGES =====
+        // Delete removed associations
+        if (!toDelete.isEmpty()) {
+            schmExtRefXrefRepository.deleteAll(toDelete);
+        }
+
+        // Create new associations
+        if (!toAdd.isEmpty()) {
             for (UUID schmId : toAdd) {
                 SchmExtRefXref xref = new SchmExtRefXref();
                 xref.setTenantName(tenantName);
