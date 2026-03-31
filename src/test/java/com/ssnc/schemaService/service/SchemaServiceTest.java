@@ -16,6 +16,9 @@ import com.ssnc.schemaService.repo.SchmExtRefXrefRepository;
 import com.ssnc.schemaService.repo.SchmFilterCriteria;
 import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.tenant.NamespaceFilterManager;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import com.ssnc.shared.security.JwtClaimsContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -181,7 +184,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
                 .thenReturn(Optional.empty());
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "none");
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "none", PageRequest.of(0, 20)).getContent();
 
         assertNotNull(result);
         assertEquals(3, result.size());
@@ -587,7 +590,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
                 .thenReturn(Optional.empty());
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "nameAsc", "none");
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "nameAsc", "none", PageRequest.of(0, 20)).getContent();
 
         assertEquals(3, result.size());
         assertEquals("Apple Schema", result.get(0).getName());
@@ -606,7 +609,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
                 .thenReturn(Optional.empty());
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "nameAsc", "none");
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "nameAsc", "none", PageRequest.of(0, 20)).getContent();
 
         // Should not throw NPE, nulls should be first
         assertEquals(3, result.size());
@@ -626,7 +629,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
                 .thenReturn(Optional.empty());
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "nameDesc", "none");
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "nameDesc", "none", PageRequest.of(0, 20)).getContent();
 
         assertEquals(3, result.size());
         assertEquals("Zebra Schema", result.get(0).getName());
@@ -645,7 +648,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
                 .thenReturn(Optional.empty());
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "versionUpdateDesc", "none");
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "versionUpdateDesc", "none", PageRequest.of(0, 20)).getContent();
 
         assertEquals(3, result.size());
         assertEquals("Schema 2", result.get(0).getName());
@@ -664,7 +667,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
                 .thenReturn(Optional.empty());
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "versionUpdateAsc", "none");
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, "versionUpdateAsc", "none", PageRequest.of(0, 20)).getContent();
 
         assertEquals(3, result.size());
         assertEquals("Schema 2", result.get(0).getName());
@@ -717,7 +720,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(schm3Id, true))
                 .thenReturn(Optional.of(draft3));
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "draft");
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "draft", PageRequest.of(0, 20)).getContent();
 
         assertEquals(2, result.size());
         assertTrue(result.stream().anyMatch(s -> s.getName().equals("Schema 1")));
@@ -748,7 +751,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
                 .thenReturn(Optional.empty());
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "published");
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "published", PageRequest.of(0, 20)).getContent();
 
         assertEquals(2, result.size());
         assertTrue(result.stream().anyMatch(s -> s.getName().equals("Schema 1")));
@@ -784,7 +787,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(schm3Id, true))
                 .thenReturn(Optional.of(draft3));
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "latest");
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "latest", PageRequest.of(0, 20)).getContent();
 
         assertEquals(2, result.size());
         assertTrue(result.stream().anyMatch(s -> s.getName().equals("Schema 1")));
@@ -810,7 +813,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
                 .thenReturn(Optional.empty());
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "none");
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "none", PageRequest.of(0, 20)).getContent();
 
         assertEquals(3, result.size());
     }
@@ -829,7 +832,7 @@ class SchemaServiceTest {
         when(schmDataRepository.findByIdSchmIdAndIsDraft(any(UUID.class), eq(true)))
                 .thenReturn(Optional.empty());
 
-        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, null);
+        List<SchemaDto> result = schemaService.getSchemas(testNamespace, null, null, null, null, null, null, null, PageRequest.of(0, 20)).getContent();
 
         assertEquals(2, result.size());
     }
@@ -892,7 +895,7 @@ class SchemaServiceTest {
                 .thenReturn(Arrays.asList(extRef1, extRef2));
 
         // Execute
-        List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId);
+        List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId, PageRequest.of(0, 20)).getContent();
 
         // Assert
         assertNotNull(result);
@@ -916,7 +919,7 @@ class SchemaServiceTest {
         when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () ->
-                schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId)
+                schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId, PageRequest.of(0, 20)).getContent()
         );
 
         verify(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -930,7 +933,7 @@ class SchemaServiceTest {
         when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(Arrays.asList());
         when(extRefRepository.findAllById(anyList())).thenReturn(Arrays.asList());
 
-        List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId);
+        List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId, PageRequest.of(0, 20)).getContent();
 
         assertNotNull(result);
         assertEquals(0, result.size());
@@ -966,7 +969,7 @@ class SchemaServiceTest {
         when(extRefRepository.findAllById(Arrays.asList(extRefId1, extRefId2)))
                 .thenReturn(Arrays.asList(extRef1)); // Only returns extRef1
 
-        List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId);
+        List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId, PageRequest.of(0, 20)).getContent();
 
         assertNotNull(result);
         assertEquals(1, result.size());

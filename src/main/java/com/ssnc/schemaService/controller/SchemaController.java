@@ -7,6 +7,8 @@ import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
 import com.ssnc.schemaService.service.SchemaService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -25,10 +27,21 @@ public class SchemaController {
 
     /**
      * GET /schemas/{nameSpace}
-     * Get schemas with optional filtering and sorting
+     * Get schemas with optional filtering, sorting, and pagination
+     *
+     * @param nameSpace - Namespace filter
+     * @param name - Optional name filter
+     * @param type - Optional schema type filter
+     * @param group - Optional group filter
+     * @param modifiedByUser - Optional user filter
+     * @param versionModifiedByUser - Optional version modified by user filter
+     * @param sort - Optional sort parameter
+     * @param withVersion - Optional version filter (none, draft, published)
+     * @param pageable - Pagination parameters (page, size, sort)
+     * @return Paginated list of schemas
      */
     @GetMapping
-    public ResponseEntity<List<SchemaDto>> getSchemas(
+    public ResponseEntity<Page<SchemaDto>> getSchemas(
             @PathVariable("nameSpace") String nameSpace,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String type,
@@ -36,9 +49,10 @@ public class SchemaController {
             @RequestParam(required = false) String modifiedByUser,
             @RequestParam(required = false) String versionModifiedByUser,
             @RequestParam(required = false) String sort,
-            @RequestParam(required = false, defaultValue = "none") String withVersion) {
-        List<SchemaDto> schemas = schemaService.getSchemas(
-                nameSpace, name, type, group, modifiedByUser, versionModifiedByUser, sort, withVersion);
+            @RequestParam(required = false, defaultValue = "none") String withVersion,
+            Pageable pageable) {
+        Page<SchemaDto> schemas = schemaService.getSchemas(
+                nameSpace, name, type, group, modifiedByUser, versionModifiedByUser, sort, withVersion, pageable);
         return ResponseEntity.ok(schemas);
     }
 
@@ -61,20 +75,29 @@ public class SchemaController {
 
     /**
      * GET /schemas/{nameSpace}/{id}
-     * Get schema by ID with optional version filtering
+     * Get schema by ID with optional version filtering and pagination
+     *
+     * @param nameSpace - Namespace filter
+     * @param id - Schema ID
+     * @param versionNumber - Optional version number filter
+     * @param versionName - Optional version name filter (draft, published)
+     * @param pageable - Pagination parameters (page, size, sort)
+     * @return Paginated list of schema versions
      */
     @GetMapping("/{id}")
-    public ResponseEntity<List<SchemaWithVersionDto>> getSchemaById(
+    public ResponseEntity<Page<SchemaWithVersionDto>> getSchemaById(
             @PathVariable("nameSpace") String nameSpace,
             @PathVariable("id") String id,
             @RequestParam(required = false) String versionNumber,
-            @RequestParam(required = false) String versionName) {
+            @RequestParam(required = false) String versionName,
+            Pageable pageable) {
 
-        List<SchemaWithVersionDto> result = schemaService.getSchemasById(
+        Page<SchemaWithVersionDto> result = schemaService.getSchemasById(
                 nameSpace,
                 UUID.fromString(id),
                 versionNumber,
-                versionName
+                versionName,
+                pageable
         );
 
         if (result.isEmpty()) {
@@ -245,13 +268,19 @@ public class SchemaController {
 
     /**
      * GET /schemas/{nameSpace}/{id}/extRefs
-     * Get external references for a schema
+     * Get external references for a schema with pagination
+     *
+     * @param nameSpace - Namespace filter
+     * @param id - Schema ID
+     * @param pageable - Pagination parameters (page, size, sort)
+     * @return Paginated list of external references
      */
     @GetMapping("/{id}/extRefs")
-    public ResponseEntity<List<ExtRefDto>> getSchemaExternalReferences(
+    public ResponseEntity<Page<ExtRefDto>> getSchemaExternalReferences(
             @PathVariable("nameSpace") String nameSpace,
-            @PathVariable("id") String id) {
-        List<ExtRefDto> extRefs = schemaService.getExternalReferencesBySchemaId(nameSpace, UUID.fromString(id));
+            @PathVariable("id") String id,
+            Pageable pageable) {
+        Page<ExtRefDto> extRefs = schemaService.getExternalReferencesBySchemaId(nameSpace, UUID.fromString(id), pageable);
         return ResponseEntity.ok(extRefs);
     }
 }

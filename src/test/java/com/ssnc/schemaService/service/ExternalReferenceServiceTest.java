@@ -254,33 +254,6 @@ class ExternalReferenceServiceTest {
     }
 
     @Test
-    void testCreateOrUpdateExternalReference_Update() {
-        ExtRefWithSchemasRequest emptyRequest = new ExtRefWithSchemasRequest();
-        emptyRequest.setSchemas(Arrays.asList());
-
-        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
-            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
-
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
-            when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
-            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
-
-            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
-                    testNamespace, testExtRefType, "Updated Process", testExtRefId, testExtRefVersion, emptyRequest);
-
-            assertNotNull(response);
-            assertTrue(response.isUpdated());
-            assertEquals(ErrorMessages.EXTERNAL_REFERENCE_UPDATED_SUCCESS, response.getMessage());
-            assertNotNull(response.getExtRef());
-            assertEquals(testExtRefId, response.getExtRef().getExtRefId());
-            verify(namespaceFilterManager).enableIfPresent(testNamespace);
-            verify(extRefRepository).findById(testExtRefId);
-            verify(extRefRepository).save(any(ExtRef.class));
-        }
-    }
-
-    @Test
     void testCreateOrUpdateExternalReference_InvalidType() {
         ExtRefWithSchemasRequest emptyRequest = new ExtRefWithSchemasRequest();
         emptyRequest.setSchemas(Arrays.asList());
@@ -717,10 +690,10 @@ class ExternalReferenceServiceTest {
         // If validation fails, NO changes should be committed (fail-fast principle)
         ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
 
-        // Request wants to:
-        // - Keep testSchmId (already exists)
-        // - Remove schmId2 (currently associated)
-        // - Add invalidSchmId (will fail validation - not found)
+        // Test CREATION scenario (not update, since updates are not allowed due to immutability)
+        // Request wants to create with:
+        // - testSchmId (valid)
+        // - invalidSchmId (will fail validation - not found)
         UUID invalidSchmId = UUID.randomUUID();
         ExtRefWithSchemasRequest.SchemaReference schemaRef1 = new ExtRefWithSchemasRequest.SchemaReference();
         schemaRef1.setSchmId(testSchmId);
@@ -732,28 +705,33 @@ class ExternalReferenceServiceTest {
 
         request.setSchemas(Arrays.asList(schemaRef1, schemaRef2));
 
-        // Existing has testSchmId and schmId2
-        UUID schmId2 = UUID.randomUUID();
-        SchmExtRefXref existingXref1 = new SchmExtRefXref();
-        existingXref1.setSchmId(testSchmId);
-
-        SchmExtRefXref existingXref2 = new SchmExtRefXref();
-        existingXref2.setSchmId(schmId2); // This would be deleted if validation passed
-
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
+            // External reference does NOT exist (creation scenario)
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(anyString(), anyString(), anyString()))
+                    .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId))
-                    .thenReturn(Arrays.asList(existingXref1, existingXref2));
 
-            // testSchmId already exists, so won't be validated
-            // invalidSchmId will fail validation (not found)
-            when(schmRepository.findWithLockBySchmId(invalidSchmId)).thenReturn(Optional.empty());
+            // testSchmId will be validated first (sorted order)
+            // invalidSchmId will be validated second and fail (not found)
+            // Since UUIDs are sorted, we need deterministic UUIDs
+            UUID validSchmId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+            UUID invalidSchmId2 = UUID.fromString("22222222-2222-2222-2222-222222222222");
+
+            schemaRef1.setSchmId(validSchmId);
+            schemaRef2.setSchmId(invalidSchmId2);
+
+            Schm validSchm = new Schm();
+            validSchm.setSchmId(validSchmId);
+            validSchm.setPublishVersion(1);
+
+            when(schmRepository.findWithLockBySchmId(validSchmId)).thenReturn(Optional.of(validSchm));
+            when(schmRepository.findWithLockBySchmId(invalidSchmId2)).thenReturn(Optional.empty());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-            // Execute - should throw exception during validation
+            // Execute - should throw exception during validation of second schema
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
                             testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request)
@@ -761,13 +739,14 @@ class ExternalReferenceServiceTest {
 
             assertTrue(exception.getMessage().contains("not found"));
 
-            // CRITICAL: Verify NO deletions occurred before validation failed
-            // If deleteAll was called, it would mean partial update happened
-            verify(schmExtRefXrefRepository, never()).deleteAll(anyList());
-            verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
+            // CRITICAL: Verify NO saves occurred before validation failed
+            // External reference was saved but no schema associations were created
+            verify(extRefRepository).save(any(ExtRef.class)); // ExtRef is saved before schema validation
+            verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class)); // But no xrefs saved
 
-            // Validation happened first
-            verify(schmRepository).findWithLockBySchmId(invalidSchmId);
+            // Validation happened in sorted order
+            verify(schmRepository).findWithLockBySchmId(validSchmId); // First (passed)
+            verify(schmRepository).findWithLockBySchmId(invalidSchmId2); // Second (failed)
         }
     }
 

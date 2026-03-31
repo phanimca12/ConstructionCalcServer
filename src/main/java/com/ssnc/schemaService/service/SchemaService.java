@@ -21,6 +21,9 @@ import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -57,11 +60,22 @@ public class SchemaService {
     private ExtRefRepository extRefRepository;
 
     /**
-     * Get schemas with optional filtering and sorting
+     * Get schemas with optional filtering, sorting, and pagination
+     *
+     * @param namespace - Namespace filter
+     * @param name - Optional name filter
+     * @param type - Optional schema type filter
+     * @param group - Optional group filter
+     * @param modifiedByUser - Optional user filter
+     * @param versionModifiedByUser - Optional version modified by user filter
+     * @param sort - Optional sort parameter
+     * @param withVersion - Optional version filter (none, draft, published, latest)
+     * @param pageable - Pagination parameters
+     * @return Paginated list of schemas
      */
-    public List<SchemaDto> getSchemas(String namespace, String name, String type, String group,
+    public Page<SchemaDto> getSchemas(String namespace, String name, String type, String group,
                                        String modifiedByUser, String versionModifiedByUser,
-                                       String sort, String withVersion) {
+                                       String sort, String withVersion, Pageable pageable) {
         namespaceFilterManager.enableIfPresent(namespace);
 
         SchmFilterCriteria criteria = new SchmFilterCriteria();
@@ -73,15 +87,26 @@ public class SchemaService {
         criteria.setSort(sort);
         criteria.setWithVersion(withVersion);
 
+        // Get all schemas matching criteria (filtering done at DB level)
         List<Schm> schemas = schmRepository.findAll(SchmSpecifications.withFilters(criteria));
 
-
-        // Map to DTOs and apply version filtering
-        return schemas.stream()
+        // Map to DTOs and apply version filtering and sorting
+        List<SchemaDto> filteredSchemas = schemas.stream()
                 .map(this::mapToSchemaResponse)
                 .filter(schemaDto -> filterByVersion(schemaDto, withVersion))
                 .sorted(getSortComparator(sort))
                 .collect(Collectors.toList());
+
+        // Apply pagination manually (since filtering/sorting happens in Java)
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), filteredSchemas.size());
+
+        if (start > filteredSchemas.size()) {
+            return new PageImpl<>(new ArrayList<>(), pageable, filteredSchemas.size());
+        }
+
+        List<SchemaDto> paginatedList = filteredSchemas.subList(start, end);
+        return new PageImpl<>(paginatedList, pageable, filteredSchemas.size());
     }
 
     /**
@@ -164,14 +189,21 @@ public class SchemaService {
     }
 
     /**
-     * Get schema by ID with optional version filtering
+     * Get schema by ID with optional version filtering and pagination
+     *
+     * @param namespace - Namespace filter
+     * @param schmId - Schema ID
+     * @param versionNumber - Optional version number filter
+     * @param versionName - Optional version name filter (published, latest)
+     * @param pageable - Pagination parameters (applies to versions list)
+     * @return Paginated schema with versions
      */
-    public List<SchemaWithVersionDto> getSchemasById(String namespace, UUID schmId, String versionNumber, String versionName) {
+    public Page<SchemaWithVersionDto> getSchemasById(String namespace, UUID schmId, String versionNumber, String versionName, Pageable pageable) {
         namespaceFilterManager.enableIfPresent(namespace);
 
         Optional<Schm> schemaOpt = schmRepository.findBySchmId(schmId);
         if (schemaOpt.isEmpty()) {
-            return new ArrayList<>();
+            return new PageImpl<>(new ArrayList<>(), pageable, 0);
         }
 
         Schm schema = schemaOpt.get();
@@ -192,11 +224,25 @@ public class SchemaService {
             versions = schmRepository.getAllVersions(schmId);
         }
 
+        // Apply pagination to versions list
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), versions.size());
+
+        List<SchemaVersionDto> paginatedVersions;
+        if (start > versions.size()) {
+            paginatedVersions = new ArrayList<>();
+        } else {
+            paginatedVersions = versions.subList(start, end).stream()
+                    .map(this::mapToVersionResponse)
+                    .collect(Collectors.toList());
+        }
+
         SchemaWithVersionDto response = new SchemaWithVersionDto();
         response.setSchema(mapToSchemaResponse(schema));
-        response.setVersions(versions.stream().map(this::mapToVersionResponse).collect(Collectors.toList()));
+        response.setVersions(paginatedVersions);
 
-        return List.of(response);
+        // Return page with single element (the schema), but versions inside are paginated
+        return new PageImpl<>(List.of(response), pageable, 1);
     }
 
     /**
@@ -451,10 +497,15 @@ public class SchemaService {
     }
 
     /**
-     * Get external references for a schema
+     * Get external references for a schema with pagination
+     *
+     * @param namespace - Namespace filter
+     * @param schmId - Schema ID
+     * @param pageable - Pagination parameters
+     * @return Paginated list of external references
      */
     @Transactional(readOnly = true)
-    public List<ExtRefDto> getExternalReferencesBySchemaId(String namespace, UUID schmId) {
+    public Page<ExtRefDto> getExternalReferencesBySchemaId(String namespace, UUID schmId, Pageable pageable) {
         namespaceFilterManager.enableIfPresent(namespace);
 
         // Verify schema exists
@@ -471,9 +522,21 @@ public class SchemaService {
 
         List<ExtRef> extRefs = extRefRepository.findAllById(extRefIds);
 
-        return extRefs.stream()
+        // Map to DTOs
+        List<ExtRefDto> extRefDtos = extRefs.stream()
                 .map(this::mapExtRefToDto)
                 .collect(Collectors.toList());
+
+        // Apply pagination manually
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), extRefDtos.size());
+
+        if (start > extRefDtos.size()) {
+            return new PageImpl<>(new ArrayList<>(), pageable, extRefDtos.size());
+        }
+
+        List<ExtRefDto> paginatedList = extRefDtos.subList(start, end);
+        return new PageImpl<>(paginatedList, pageable, extRefDtos.size());
     }
 
     /**
