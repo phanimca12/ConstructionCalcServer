@@ -390,7 +390,8 @@ public class SchemaService {
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
                 ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
-        Schm schema = schmRepository.findBySchmId(schmId)
+        // Use pessimistic locking to prevent race condition
+        Schm schema = schmRepository.findWithLockBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
 
         // Check if already locked by another user
@@ -413,7 +414,8 @@ public class SchemaService {
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
                 ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
-        Schm schema = schmRepository.findBySchmId(schmId)
+        // Use pessimistic locking to prevent race condition
+        Schm schema = schmRepository.findWithLockBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
 
         // Verify the current user owns the lock (or SYSTEM_USER can unlock any)

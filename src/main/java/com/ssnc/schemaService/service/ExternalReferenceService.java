@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -139,10 +140,10 @@ public class ExternalReferenceService {
         if (existingExtRef.isPresent()) {
             ExtRef existing = existingExtRef.get();
 
-            // Check if name, type, and version are the same
-            boolean metadataUnchanged = existing.getExtRefName().equals(extRefName)
-                    && existing.getExtRefType().equals(extRefType)
-                    && existing.getExtRefVersion().equals(extRefVersion);
+            // Check if name, type, and version are the same (null-safe comparison)
+            boolean metadataUnchanged = Objects.equals(existing.getExtRefName(), extRefName)
+                    && Objects.equals(existing.getExtRefType(), extRefType)
+                    && Objects.equals(existing.getExtRefVersion(), extRefVersion);
 
             if (metadataUnchanged) {
                 // Check if schema associations are the same

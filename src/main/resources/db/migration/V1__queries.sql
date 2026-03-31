@@ -60,8 +60,13 @@
         created_by varchar(256),
         updated_by varchar(256),
         primary key (ext_ref_id),
-        foreign key (tenant_name) references tenant
+        foreign key (tenant_name) references tenant,
+        constraint uk_ext_ref_tenant_name_type_version unique (tenant_name, ext_ref_name, ext_ref_type, ext_ref_version)
     );
+
+    -- Indexes for ext_ref table to improve query performance
+    create index idx_ext_ref_type on ext_ref(ext_ref_type);
+    create index idx_ext_ref_type_id_version on ext_ref(ext_ref_type, ext_ref_id, ext_ref_version);
 
     create table schm_ext_ref_xref (
         xref_id ${guid} not null,
@@ -75,4 +80,8 @@
         foreign key (schm_id) references schm,
         foreign key (ext_ref_id) references ext_ref
     );
+
+    -- Indexes for schm_ext_ref_xref table to improve query performance
+    create index idx_xref_schm_id on schm_ext_ref_xref(schm_id);
+    create index idx_xref_ext_ref_id on schm_ext_ref_xref(ext_ref_id);
 
