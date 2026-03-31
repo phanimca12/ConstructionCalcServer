@@ -122,6 +122,11 @@ public class ExternalReferenceService {
             ExtRefWithSchemasRequest request) {
 
         // ===== INPUT VALIDATION - ALL DONE BEFORE ANY DATABASE OPERATIONS =====
+        // Defensive null check (should be caught by @Valid but defense in depth)
+        if (request == null) {
+            throw new IllegalArgumentException(ErrorMessages.EXTERNAL_REFERENCE_REQUEST_BODY_NULL);
+        }
+
         namespaceFilterManager.enableIfPresent(nameSpace);
 
         // Validate the type against the enum

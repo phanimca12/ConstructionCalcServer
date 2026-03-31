@@ -31,6 +31,11 @@ public final class ErrorMessages {
     public static final String EXTERNAL_REFERENCE_IMMUTABLE = "External reference with ID %s and version '%s' already exists and is immutable. Cannot modify name, type, or schema associations for an existing version. Create a new version if changes are needed.";
     public static final String EXTERNAL_REFERENCE_VERSION_IMMUTABLE = "External reference version '%s' for ID %s is immutable. Existing schemas: %s. Requested schemas: %s. Create a new version if different schema associations are needed.";
 
+    // External reference validation messages
+    public static final String EXTERNAL_REFERENCE_REQUEST_BODY_NULL = "Request body cannot be null";
+    public static final String EXTERNAL_REFERENCE_SCHEMA_LIST_NULL = "Schema list cannot be null. Use empty list if no schemas to associate.";
+    public static final String EXTERNAL_REFERENCE_SCHEMA_ID_NULL = "Schema ID cannot be null";
+
     // Tenant related messages
     public static final String TENANT_NOT_FOUND = "Tenant not found";
     public static final String TENANT_ALREADY_ONBOARDED = "Tenant already onboarded: %s";
