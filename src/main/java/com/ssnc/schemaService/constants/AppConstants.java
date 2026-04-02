@@ -31,6 +31,15 @@ public final class AppConstants {
     public static final String VERSION_NAME_PUBLISHED = "published";
     public static final String VERSION_NAME_LATEST = "latest";
     public static final String VERSION_NAME_DRAFT = "draft";
+    public static final String VERSION_NAME_NONE = "none";
+
+    /**
+     * Sort parameter constants
+     */
+    public static final String SORT_VERSION_UPDATE_ASC = "versionUpdateAsc";
+    public static final String SORT_VERSION_UPDATE_DESC = "versionUpdateDesc";
+    public static final String SORT_NAME_ASC = "nameAsc";
+    public static final String SORT_NAME_DESC = "nameDesc";
 
     /**
      * Schema type constants

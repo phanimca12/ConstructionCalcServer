@@ -1,6 +1,7 @@
 package com.ssnc.schemaService.controller;
 
 import com.ssnc.schemaService.constants.ErrorMessages;
+import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
@@ -10,6 +11,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -58,44 +63,54 @@ class SchemaControllerTest {
 
     @Test
     void testGetSchemas() {
-        List<SchemaDto> expectedSchemas = Arrays.asList(testSchemaDto);
-        when(schemaService.getSchemas(testNamespace, null, null, null, false))
-                .thenReturn(expectedSchemas);
+        Pageable pageable = PageRequest.of(0, 20);
+        List<SchemaDto> schemas = Arrays.asList(testSchemaDto);
+        Page<SchemaDto> expectedPage = new PageImpl<>(schemas, pageable, schemas.size());
+
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "none", pageable))
+                .thenReturn(expectedPage);
 
         ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
-                testNamespace, null, null, null, false);
+                testNamespace, null, null, null, null, null, null, "none", pageable);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(expectedSchemas, response.getBody());
-        verify(schemaService).getSchemas(testNamespace, null, null, null, false);
+        assertEquals(schemas, response.getBody());
+        assertEquals(1, response.getBody().size());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "none", pageable);
     }
 
     @Test
     void testGetSchemasWithFilters() {
-        List<SchemaDto> expectedSchemas = Arrays.asList(testSchemaDto);
-        when(schemaService.getSchemas(testNamespace, "FormData", "group1", "application/json", true))
-                .thenReturn(expectedSchemas);
+        Pageable pageable = PageRequest.of(0, 20);
+        List<SchemaDto> schemas = Arrays.asList(testSchemaDto);
+        Page<SchemaDto> expectedPage = new PageImpl<>(schemas, pageable, schemas.size());
+
+        when(schemaService.getSchemas(testNamespace, "testSchema", "FormData", "group1", "user1", null, "nameAsc", "none", pageable))
+                .thenReturn(expectedPage);
 
         ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
-                testNamespace, "FormData", "group1", "application/json", true);
+                testNamespace, "testSchema", "FormData", "group1", "user1", null, "nameAsc", "none", pageable);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(expectedSchemas, response.getBody());
-        verify(schemaService).getSchemas(testNamespace, "FormData", "group1", "application/json", true);
+        assertEquals(schemas, response.getBody());
+        verify(schemaService).getSchemas(testNamespace, "testSchema", "FormData", "group1", "user1", null, "nameAsc", "none", pageable);
     }
 
     @Test
-    void testGetSchemasWithContentType() {
-        List<SchemaDto> expectedSchemas = Arrays.asList(testSchemaDto);
-        when(schemaService.getSchemas(testNamespace, null, null, "application/xml", false))
-                .thenReturn(expectedSchemas);
+    void testGetSchemasWithSort() {
+        Pageable pageable = PageRequest.of(0, 20);
+        List<SchemaDto> schemas = Arrays.asList(testSchemaDto);
+        Page<SchemaDto> expectedPage = new PageImpl<>(schemas, pageable, schemas.size());
+
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, null, "versionUpdateDesc", "latest", pageable))
+                .thenReturn(expectedPage);
 
         ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
-                testNamespace, null, null, "application/xml", false);
+                testNamespace, null, null, null, null, null, "versionUpdateDesc", "latest", pageable);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(expectedSchemas, response.getBody());
-        verify(schemaService).getSchemas(testNamespace, null, null, "application/xml", false);
+        assertEquals(schemas, response.getBody());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, "versionUpdateDesc", "latest", pageable);
     }
 
     @Test
@@ -125,27 +140,32 @@ class SchemaControllerTest {
 
     @Test
     void testGetSchemaById_Found() {
+        Pageable pageable = PageRequest.of(0, 20);
         SchemaWithVersionDto schemaWithVersion = new SchemaWithVersionDto();
         schemaWithVersion.setSchema(testSchemaDto);
-        List<SchemaWithVersionDto> expectedResult = Collections.singletonList(schemaWithVersion);
+        List<SchemaWithVersionDto> result = Collections.singletonList(schemaWithVersion);
+        Page<SchemaWithVersionDto> expectedPage = new PageImpl<>(result, pageable, result.size());
 
-        when(schemaService.getSchemasById(testNamespace, testSchemaId, null, null))
-                .thenReturn(expectedResult);
+        when(schemaService.getSchemasById(testNamespace, testSchemaId, null, null, pageable))
+                .thenReturn(expectedPage);
 
         ResponseEntity<List<SchemaWithVersionDto>> response = schemaController.getSchemaById(
-                testNamespace, testSchemaId.toString(), null, null);
+                testNamespace, testSchemaId.toString(), null, null, pageable);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(expectedResult, response.getBody());
+        assertEquals(result, response.getBody());
     }
 
     @Test
     void testGetSchemaById_NotFound() {
-        when(schemaService.getSchemasById(testNamespace, testSchemaId, null, null))
-                .thenReturn(Collections.emptyList());
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<SchemaWithVersionDto> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
+
+        when(schemaService.getSchemasById(testNamespace, testSchemaId, null, null, pageable))
+                .thenReturn(emptyPage);
 
         ResponseEntity<List<SchemaWithVersionDto>> response = schemaController.getSchemaById(
-                testNamespace, testSchemaId.toString(), null, null);
+                testNamespace, testSchemaId.toString(), null, null, pageable);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
@@ -216,6 +236,18 @@ class SchemaControllerTest {
                 testNamespace, testSchemaId.toString());
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(schemaService).unPublishSchemaVersion(testNamespace, testSchemaId);
+    }
+
+    @Test
+    void testUnPublishSchemaVersion_SchemaInUse() {
+        doThrow(new IllegalStateException("Schema cannot be unpublished as it is in use by external references"))
+                .when(schemaService).unPublishSchemaVersion(testNamespace, testSchemaId);
+
+        assertThrows(IllegalStateException.class, () ->
+                schemaController.unPublishSchemaVersion(testNamespace, testSchemaId.toString())
+        );
+
         verify(schemaService).unPublishSchemaVersion(testNamespace, testSchemaId);
     }
 
@@ -294,5 +326,181 @@ class SchemaControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(testVersionDto, response.getBody());
         verify(schemaService).updateDraftContent(testNamespace, testSchemaId, content);
+    }
+
+    @Test
+    void testLockSchema() {
+        doNothing().when(schemaService).lockSchema(testNamespace, testSchemaId);
+
+        ResponseEntity<Void> response = schemaController.lockSchema(
+                testNamespace, testSchemaId.toString());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(schemaService).lockSchema(testNamespace, testSchemaId);
+    }
+
+    @Test
+    void testUnlockSchema() {
+        doNothing().when(schemaService).unlockSchema(testNamespace, testSchemaId);
+
+        ResponseEntity<Void> response = schemaController.unlockSchema(
+                testNamespace, testSchemaId.toString());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(schemaService).unlockSchema(testNamespace, testSchemaId);
+    }
+
+    @Test
+    void testGetSchemas_WithVersionDraft() {
+        Pageable pageable = PageRequest.of(0, 20);
+        SchemaDto schema1 = new SchemaDto();
+        schema1.setId(UUID.randomUUID());
+        schema1.setName("Schema 1");
+        schema1.setDraft("1");
+
+        List<SchemaDto> schemas = Arrays.asList(schema1);
+        Page<SchemaDto> expectedPage = new PageImpl<>(schemas, pageable, schemas.size());
+
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "draft", pageable))
+                .thenReturn(expectedPage);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, null, null, null, null, null, null, "draft", pageable);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(schemas, response.getBody());
+        assertEquals(1, response.getBody().size());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "draft", pageable);
+    }
+
+    @Test
+    void testGetSchemas_WithVersionPublished() {
+        Pageable pageable = PageRequest.of(0, 20);
+        SchemaDto schema1 = new SchemaDto();
+        schema1.setId(UUID.randomUUID());
+        schema1.setName("Schema 1");
+        schema1.setPublished("2");
+
+        List<SchemaDto> schemas = Arrays.asList(schema1);
+        Page<SchemaDto> expectedPage = new PageImpl<>(schemas, pageable, schemas.size());
+
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "published", pageable))
+                .thenReturn(expectedPage);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, null, null, null, null, null, null, "published", pageable);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(schemas, response.getBody());
+        assertEquals(1, response.getBody().size());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "published", pageable);
+    }
+
+    @Test
+    void testGetSchemas_WithVersionLatest() {
+        Pageable pageable = PageRequest.of(0, 20);
+        SchemaDto schema1 = new SchemaDto();
+        schema1.setId(UUID.randomUUID());
+        schema1.setName("Schema 1");
+        schema1.setDraft("2");
+        schema1.setPublished("1");
+
+        List<SchemaDto> schemas = Arrays.asList(schema1);
+        Page<SchemaDto> expectedPage = new PageImpl<>(schemas, pageable, schemas.size());
+
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, null, null, "latest", pageable))
+                .thenReturn(expectedPage);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, null, null, null, null, null, null, "latest", pageable);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(schemas, response.getBody());
+        assertEquals(1, response.getBody().size());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "latest", pageable);
+    }
+
+    @Test
+    void testGetSchemas_WithModifiedByUserFilter() {
+        Pageable pageable = PageRequest.of(0, 20);
+        List<SchemaDto> schemas = Arrays.asList(testSchemaDto);
+        Page<SchemaDto> expectedPage = new PageImpl<>(schemas, pageable, schemas.size());
+
+        when(schemaService.getSchemas(testNamespace, null, null, null, "john.doe", null, null, "none", pageable))
+                .thenReturn(expectedPage);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, null, null, null, "john.doe", null, null, "none", pageable);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(schemas, response.getBody());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, "john.doe", null, null, "none", pageable);
+    }
+
+    @Test
+    void testGetSchemas_WithVersionModifiedByUserFilter() {
+        Pageable pageable = PageRequest.of(0, 20);
+        List<SchemaDto> schemas = Arrays.asList(testSchemaDto);
+        Page<SchemaDto> expectedPage = new PageImpl<>(schemas, pageable, schemas.size());
+
+        when(schemaService.getSchemas(testNamespace, null, null, null, null, "jane.smith", null, "none", pageable))
+                .thenReturn(expectedPage);
+
+        ResponseEntity<List<SchemaDto>> response = schemaController.getSchemas(
+                testNamespace, null, null, null, null, "jane.smith", null, "none", pageable);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(schemas, response.getBody());
+        verify(schemaService).getSchemas(testNamespace, null, null, null, null, "jane.smith", null, "none", pageable);
+    }
+
+    @Test
+    void testGetSchemaExternalReferences_Success() {
+        Pageable pageable = PageRequest.of(0, 20);
+        UUID extRefId1 = UUID.randomUUID();
+        UUID extRefId2 = UUID.randomUUID();
+
+        ExtRefDto extRef1 = new ExtRefDto();
+        extRef1.setExtRefId(extRefId1);
+        extRef1.setExtRefName("External Reference 1");
+        extRef1.setExtRefType("API");
+        extRef1.setExtRefVersion("1.0");
+
+        ExtRefDto extRef2 = new ExtRefDto();
+        extRef2.setExtRefId(extRefId2);
+        extRef2.setExtRefName("External Reference 2");
+        extRef2.setExtRefType("DATABASE");
+        extRef2.setExtRefVersion("2.0");
+
+        List<ExtRefDto> extRefs = Arrays.asList(extRef1, extRef2);
+        Page<ExtRefDto> expectedPage = new PageImpl<>(extRefs, pageable, extRefs.size());
+
+        when(schemaService.getExternalReferencesBySchemaId(testNamespace, testSchemaId, pageable))
+                .thenReturn(expectedPage);
+
+        ResponseEntity<List<ExtRefDto>> response = schemaController.getSchemaExternalReferences(
+                testNamespace, testSchemaId.toString(), pageable);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(extRefs, response.getBody());
+        assertEquals(2, response.getBody().size());
+        verify(schemaService).getExternalReferencesBySchemaId(testNamespace, testSchemaId, pageable);
+    }
+
+    @Test
+    void testGetSchemaExternalReferences_EmptyList() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<ExtRefDto> emptyPage = new PageImpl<>(Collections.emptyList(), pageable, 0);
+
+        when(schemaService.getExternalReferencesBySchemaId(testNamespace, testSchemaId, pageable))
+                .thenReturn(emptyPage);
+
+        ResponseEntity<List<ExtRefDto>> response = schemaController.getSchemaExternalReferences(
+                testNamespace, testSchemaId.toString(), pageable);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(0, response.getBody().size());
+        verify(schemaService).getExternalReferencesBySchemaId(testNamespace, testSchemaId, pageable);
     }
 }

@@ -9,12 +9,14 @@ import java.util.UUID;
 @Getter
 public class SchmFilterCriteria {
     private UUID schmId;
-    private String schemaName;
+    private String name;
     private String schemaType;
-    private String contentType;
     private String group;
     private String lockBy;
     private Integer publishVersion;
-    private Boolean publishedOnly;
+    private String modifiedByUser;
+    private String versionModifiedByUser;
+    private String sort;
+    private String withVersion;
 
 }

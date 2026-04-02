@@ -2,13 +2,18 @@ package com.ssnc.schemaService.service;
 
 import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.constants.ErrorMessages;
+import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
+import com.ssnc.schemaService.entity.ExtRef;
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmData;
 import com.ssnc.schemaService.entity.SchmDataId;
+import com.ssnc.schemaService.entity.SchmExtRefXref;
+import com.ssnc.schemaService.repo.ExtRefRepository;
 import com.ssnc.schemaService.repo.SchmDataRepository;
+import com.ssnc.schemaService.repo.SchmExtRefXrefRepository;
 import com.ssnc.schemaService.repo.SchmFilterCriteria;
 import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.repo.SchmSpecifications;
@@ -16,6 +21,9 @@ import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,6 +32,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,21 +53,120 @@ public class SchemaService {
     @Autowired
     private JwtClaimsContext jwtClaimsContext;
 
+    @Autowired
+    private SchmExtRefXrefRepository schmExtRefXrefRepository;
+
+    @Autowired
+    private ExtRefRepository extRefRepository;
+
     /**
-     * Get schemas with optional filtering by type, group, and content type
+     * Get schemas with optional filtering, sorting, and pagination
+     *
+     * @param namespace - Namespace filter
+     * @param name - Optional name filter
+     * @param type - Optional schema type filter
+     * @param group - Optional group filter
+     * @param modifiedByUser - Optional user filter
+     * @param versionModifiedByUser - Optional version modified by user filter
+     * @param sort - Optional sort parameter
+     * @param withVersion - Optional version filter (none, draft, published, latest)
+     * @param pageable - Pagination parameters
+     * @return Paginated list of schemas
      */
-    public List<SchemaDto> getSchemas(String namespace, String type, String group, String contentType, boolean publishedOnly) {
+    public Page<SchemaDto> getSchemas(String namespace, String name, String type, String group,
+                                       String modifiedByUser, String versionModifiedByUser,
+                                       String sort, String withVersion, Pageable pageable) {
         namespaceFilterManager.enableIfPresent(namespace);
 
         SchmFilterCriteria criteria = new SchmFilterCriteria();
+        criteria.setName(name);
         criteria.setSchemaType(type);
         criteria.setGroup(group);
-        criteria.setContentType(contentType);
-        criteria.setPublishedOnly(publishedOnly);
+        criteria.setModifiedByUser(modifiedByUser);
+        criteria.setVersionModifiedByUser(versionModifiedByUser);
+        criteria.setSort(sort);
+        criteria.setWithVersion(withVersion);
 
+        // Get all schemas matching criteria (filtering done at DB level)
         List<Schm> schemas = schmRepository.findAll(SchmSpecifications.withFilters(criteria));
-        return schemas.stream().map(this::mapToSchemaResponse).collect(Collectors.toList());
+
+        // Map to DTOs and apply version filtering and sorting
+        List<SchemaDto> filteredSchemas = schemas.stream()
+                .map(this::mapToSchemaResponse)
+                .filter(schemaDto -> filterByVersion(schemaDto, withVersion))
+                .sorted(getSortComparator(sort))
+                .collect(Collectors.toList());
+
+        // Apply pagination manually (since filtering/sorting happens in Java)
+        // SECURITY: Validate offset to prevent integer overflow DoS attack
+        long offset = pageable.getOffset();
+        if (offset < 0 || offset > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(
+                    String.format("Invalid pagination offset: %d. Must be between 0 and %d",
+                            offset, Integer.MAX_VALUE));
+        }
+        int start = (int) offset;
+        int end = Math.min(start + pageable.getPageSize(), filteredSchemas.size());
+
+        // Use >= to handle edge case where start equals size
+        if (start >= filteredSchemas.size()) {
+            return new PageImpl<>(new ArrayList<>(), pageable, filteredSchemas.size());
+        }
+
+        List<SchemaDto> paginatedList = filteredSchemas.subList(start, end);
+        return new PageImpl<>(paginatedList, pageable, filteredSchemas.size());
     }
+
+    /**
+     * Filter schemas based on withVersion parameter
+     */
+    private boolean filterByVersion(SchemaDto schemaDto, String withVersion) {
+        if (withVersion == null || AppConstants.VERSION_NAME_NONE.equalsIgnoreCase(withVersion)) {
+            return true;
+        }
+
+        switch (withVersion.toLowerCase()) {
+            case AppConstants.VERSION_NAME_DRAFT:
+                // Only include schemas that have a draft version
+                return schemaDto.getDraft() != null;
+            case AppConstants.VERSION_NAME_PUBLISHED:
+                // Only include schemas that have a published version
+                return schemaDto.getPublished() != null;
+            case AppConstants.VERSION_NAME_LATEST:
+                // Include schemas that have at least one version (draft or published)
+                return schemaDto.getDraft() != null || schemaDto.getPublished() != null;
+            default:
+                return true;
+        }
+    }
+
+    /**
+     * Get comparator based on sort parameter
+     */
+    private Comparator<SchemaDto> getSortComparator(String sort) {
+        if (sort == null) {
+            return Comparator.comparing(SchemaDto::getName,
+                    Comparator.nullsFirst(Comparator.naturalOrder()));
+        }
+
+        switch (sort) {
+            case AppConstants.SORT_VERSION_UPDATE_ASC:
+                return Comparator.comparing(SchemaDto::getModifiedDateTime,
+                        Comparator.nullsLast(Comparator.naturalOrder()));
+            case AppConstants.SORT_VERSION_UPDATE_DESC:
+                return Comparator.comparing(SchemaDto::getModifiedDateTime,
+                        Comparator.nullsLast(Comparator.reverseOrder()));
+            case AppConstants.SORT_NAME_ASC:
+                return Comparator.comparing(SchemaDto::getName,
+                        Comparator.nullsFirst(Comparator.naturalOrder()));
+            case AppConstants.SORT_NAME_DESC:
+                return Comparator.comparing(SchemaDto::getName,
+                        Comparator.nullsFirst(Comparator.naturalOrder())).reversed();
+            default:
+                return Comparator.comparing(SchemaDto::getName,
+                        Comparator.nullsFirst(Comparator.naturalOrder()));
+        }
+   }
 
     /**
      * Create a new schema
@@ -89,14 +197,21 @@ public class SchemaService {
     }
 
     /**
-     * Get schema by ID with optional version filtering
+     * Get schema by ID with optional version filtering and pagination
+     *
+     * @param namespace - Namespace filter
+     * @param schmId - Schema ID
+     * @param versionNumber - Optional version number filter
+     * @param versionName - Optional version name filter (published, latest)
+     * @param pageable - Pagination parameters (applies to versions list)
+     * @return Paginated schema with versions
      */
-    public List<SchemaWithVersionDto> getSchemasById(String namespace, UUID schmId, String versionNumber, String versionName) {
+    public Page<SchemaWithVersionDto> getSchemasById(String namespace, UUID schmId, String versionNumber, String versionName, Pageable pageable) {
         namespaceFilterManager.enableIfPresent(namespace);
 
         Optional<Schm> schemaOpt = schmRepository.findBySchmId(schmId);
         if (schemaOpt.isEmpty()) {
-            return new ArrayList<>();
+            return new PageImpl<>(new ArrayList<>(), pageable, 0);
         }
 
         Schm schema = schemaOpt.get();
@@ -117,11 +232,33 @@ public class SchemaService {
             versions = schmRepository.getAllVersions(schmId);
         }
 
+        // Apply pagination to versions list
+        // SECURITY: Validate offset to prevent integer overflow DoS attack
+        long offset = pageable.getOffset();
+        if (offset < 0 || offset > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(
+                    String.format("Invalid pagination offset: %d. Must be between 0 and %d",
+                            offset, Integer.MAX_VALUE));
+        }
+        int start = (int) offset;
+        int end = Math.min(start + pageable.getPageSize(), versions.size());
+
+        List<SchemaVersionDto> paginatedVersions;
+        // Use >= to handle edge case where start equals size
+        if (start >= versions.size()) {
+            paginatedVersions = new ArrayList<>();
+        } else {
+            paginatedVersions = versions.subList(start, end).stream()
+                    .map(this::mapToVersionResponse)
+                    .collect(Collectors.toList());
+        }
+
         SchemaWithVersionDto response = new SchemaWithVersionDto();
         response.setSchema(mapToSchemaResponse(schema));
-        response.setVersions(versions.stream().map(this::mapToVersionResponse).collect(Collectors.toList()));
+        response.setVersions(paginatedVersions);
 
-        return List.of(response);
+        // Return page with single element (the schema), but versions inside are paginated
+        return new PageImpl<>(List.of(response), pageable, 1);
     }
 
     /**
@@ -190,13 +327,26 @@ public class SchemaService {
     }
 
     /**
-     * Unpublish a schema by setting publish version to null
+     * Unpublish a schema by setting publish version to null.
+     * Uses pessimistic locking to prevent race conditions where a reference
+     * could be created between checking for references and unpublishing.
      */
     @Transactional
     public void unPublishSchemaVersion(String namespace, UUID schmId) {
         namespaceFilterManager.enableIfPresent(namespace);
-        Optional<Schm> schemaOpt = schmRepository.findBySchmId(schmId);
+
+        // Use pessimistic write lock to prevent concurrent modifications
+        // This ensures no other transaction can create references while we're unpublishing
+        Optional<Schm> schemaOpt = schmRepository.findWithLockBySchmId(schmId);
+
         if (schemaOpt.isPresent()) {
+            // Check if schema is referenced by any external references
+            // The lock held above prevents new references from being created during this check
+            List<SchmExtRefXref> xrefs = schmExtRefXrefRepository.findBySchmId(schmId);
+            if (!xrefs.isEmpty()) {
+                throw new IllegalStateException(String.format(ErrorMessages.SCHEMA_IN_USE, schmId));
+            }
+
             Schm schema = schemaOpt.get();
             schema.setPublishVersion(null);
             schmRepository.save(schema);
@@ -290,6 +440,144 @@ public class SchemaService {
             SchmData saved = schmDataRepository.save(newVersion);
             return mapToVersionResponse(saved);
         }
+    }
+
+    /**
+     * Lock a schema for editing.
+     * This operation is idempotent - if the same user calls lock multiple times,
+     * it will succeed without error. This allows clients to safely retry lock operations
+     * and ensures lock state remains consistent even with concurrent requests from the same user.
+     *
+     * Uses pessimistic locking to prevent race conditions where different users
+     * might try to acquire the lock simultaneously.
+     *
+     * @param namespace the namespace
+     * @param schmId the schema ID
+     * @throws IllegalArgumentException if schema not found
+     * @throws IllegalStateException if schema is locked by a different user
+     */
+    @Transactional
+    public void lockSchema(String namespace, UUID schmId) {
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+
+        // Use pessimistic locking to prevent race condition between different users
+        Schm schema = schmRepository.findWithLockBySchmId(schmId)
+                .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
+
+        // Check if already locked by a DIFFERENT user
+        // Note: If locked by the SAME user, this is idempotent and succeeds
+        if (schema.getLockBy() != null && !schema.getLockBy().equals(userName)) {
+            throw new IllegalStateException(
+                    String.format(ErrorMessages.SCHEMA_ALREADY_LOCKED, schmId, schema.getLockBy()));
+        }
+
+        // Set lock (idempotent if already locked by same user)
+        schema.setLockBy(userName);
+        schmRepository.save(schema);
+    }
+
+    /**
+     * Unlock a schema.
+     * Uses pessimistic locking to prevent race conditions during unlock operations.
+     *
+     * Only the user who locked the schema (or SYSTEM_USER) can unlock it.
+     *
+     * @param namespace the namespace
+     * @param schmId the schema ID
+     * @throws IllegalArgumentException if schema not found
+     * @throws IllegalStateException if schema is locked by a different user
+     */
+    @Transactional
+    public void unlockSchema(String namespace, UUID schmId) {
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+
+        // Use pessimistic locking to prevent race condition
+        Schm schema = schmRepository.findWithLockBySchmId(schmId)
+                .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
+
+        // Verify the current user owns the lock (or SYSTEM_USER can unlock any)
+        if (schema.getLockBy() != null && !schema.getLockBy().equals(userName)
+                && !AppConstants.SYSTEM_USER.equals(userName)) {
+            throw new IllegalStateException(
+                    String.format(ErrorMessages.SCHEMA_UNLOCK_NOT_PERMITTED, schmId, schema.getLockBy()));
+        }
+
+        schema.setLockBy(null);
+        schmRepository.save(schema);
+    }
+
+    /**
+     * Get external references for a schema with pagination
+     *
+     * @param namespace - Namespace filter
+     * @param schmId - Schema ID
+     * @param pageable - Pagination parameters
+     * @return Paginated list of external references
+     */
+    @Transactional(readOnly = true)
+    public Page<ExtRefDto> getExternalReferencesBySchemaId(String namespace, UUID schmId, Pageable pageable) {
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        // Verify schema exists
+        schmRepository.findBySchmId(schmId)
+                .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
+
+        // Get all cross-references for this schema
+        List<SchmExtRefXref> xrefs = schmExtRefXrefRepository.findBySchmId(schmId);
+
+        // Batch fetch all external references (fix N+1 query problem)
+        List<UUID> extRefIds = xrefs.stream()
+                .map(SchmExtRefXref::getExtRefId)
+                .collect(Collectors.toList());
+
+        List<ExtRef> extRefs = extRefRepository.findAllById(extRefIds);
+
+        // Map to DTOs
+        List<ExtRefDto> extRefDtos = extRefs.stream()
+                .map(this::mapExtRefToDto)
+                .collect(Collectors.toList());
+
+        // Apply pagination manually
+        // SECURITY: Validate offset to prevent integer overflow DoS attack
+        long offset = pageable.getOffset();
+        if (offset < 0 || offset > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(
+                    String.format("Invalid pagination offset: %d. Must be between 0 and %d",
+                            offset, Integer.MAX_VALUE));
+        }
+        int start = (int) offset;
+        int end = Math.min(start + pageable.getPageSize(), extRefDtos.size());
+
+        // Use >= to handle edge case where start equals size
+        if (start >= extRefDtos.size()) {
+            return new PageImpl<>(new ArrayList<>(), pageable, extRefDtos.size());
+        }
+
+        List<ExtRefDto> paginatedList = extRefDtos.subList(start, end);
+        return new PageImpl<>(paginatedList, pageable, extRefDtos.size());
+    }
+
+    /**
+     * Map ExtRef entity to ExtRefDto
+     */
+    private ExtRefDto mapExtRefToDto(ExtRef extRef) {
+        ExtRefDto dto = new ExtRefDto();
+        dto.setExtRefId(extRef.getExtRefId());
+        dto.setTenantName(extRef.getTenantName());
+        dto.setExtRefName(extRef.getExtRefName());
+        dto.setExtRefType(extRef.getExtRefType());
+        dto.setExtRefVersion(extRef.getExtRefVersion());
+        dto.setCreatedDatetime(extRef.getCreatedDatetime());
+        dto.setUpdatedDatetime(extRef.getUpdatedDatetime());
+        dto.setCreatedBy(extRef.getCreatedBy());
+        dto.setUpdatedBy(extRef.getUpdatedBy());
+        return dto;
     }
 
     /**
