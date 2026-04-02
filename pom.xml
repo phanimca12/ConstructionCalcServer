@@ -30,6 +30,10 @@
 			<id>projectlombok.org</id>
 			<url>https://projectlombok.org/edge-releases</url>
 		</pluginRepository>
+		<pluginRepository>
+			<id>hello2morrow.maven.repository</id>
+			<url>https://maven.hello2morrow.com/repository</url>
+		</pluginRepository>
 	</pluginRepositories>
 	<dependencies>
 		<dependency>
@@ -162,6 +166,26 @@
 								<descriptor>schemaservice-assembly-windows.xml</descriptor>
 							</descriptors>
 						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>com.hello2morrow</groupId>
+				<artifactId>sonargraph-maven-plugin</artifactId>
+				<version>15.5.0</version>
+				<configuration>
+					<activationCode>${sgActivationCode}</activationCode>
+					<autoUpdate>true</autoUpdate>
+					<uploadHostUrl>${sgHostUrl}</uploadHostUrl>
+					<branch>${sgBranchName}</branch>
+					<clientKey>${sgClientKey}</clientKey>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>create-report</goal>
+							<goal>dynamic-report</goal>
+						</goals>
 					</execution>
 				</executions>
 			</plugin>
