@@ -195,10 +195,11 @@ public class SchemaService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         String.format("Tenant not found: %s", tenantName)));
 
-        UUID nmspcId = nameSpaceRepository.findByNmspcName(namespace)
+        // SECURITY: Use tenant-aware namespace lookup to ensure proper isolation
+        UUID nmspcId = nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace)
                 .map(com.ssnc.schemaService.entity.Nmspc::getNmspcId)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        String.format("Namespace not found: %s", namespace)));
+                        String.format("Namespace not found: %s for tenant: %s", namespace, tenantName)));
 
         Schm schema = mapToSchmEntity(schemaDto);
         schema.setTenantId(tenantId);

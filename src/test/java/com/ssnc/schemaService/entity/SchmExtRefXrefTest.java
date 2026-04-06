@@ -15,20 +15,20 @@ class SchmExtRefXrefTest {
     }
 
     @Test
-    void testSetExtRefId_ConvertsToUppercase() {
+    void testSetExtRefId_StoresAsProvided() {
         xref.setExtRefId("xyz789");
-        assertEquals("XYZ789", xref.getExtRefId());
+        assertEquals("xyz789", xref.getExtRefId());
     }
 
     @Test
-    void testSetExtRefId_WithGuid_ConvertsToUppercase() {
+    void testSetExtRefId_WithGuid_StoresAsProvided() {
         String guid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
         xref.setExtRefId(guid);
-        assertEquals("A1B2C3D4-E5F6-7890-ABCD-EF1234567890", xref.getExtRefId());
+        assertEquals("a1b2c3d4-e5f6-7890-abcd-ef1234567890", xref.getExtRefId());
     }
 
     @Test
-    void testSetExtRefId_WithIntegerId_ConvertsToUppercase() {
+    void testSetExtRefId_WithIntegerId_StoresAsProvided() {
         xref.setExtRefId("9876543210");
         assertEquals("9876543210", xref.getExtRefId());
     }
@@ -40,8 +40,8 @@ class SchmExtRefXrefTest {
     }
 
     @Test
-    void testSetExtRefId_WithMixedCase_ConvertsToUppercase() {
+    void testSetExtRefId_WithMixedCase_StoresAsProvided() {
         xref.setExtRefId("MiXeD-CaSe-456");
-        assertEquals("MIXED-CASE-456", xref.getExtRefId());
+        assertEquals("MiXeD-CaSe-456", xref.getExtRefId());
     }
 }

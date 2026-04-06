@@ -10,14 +10,19 @@
 
     create table nmspc (
         nmspc_id ${guid} not null,
+        tenant_id ${guid} not null,
         nmspc_name varchar(32) not null,
         nmspc_desc varchar(4000),
         created_by varchar(256),
         updated_by varchar(256),
         created_datetime ${timestamp},
         updated_datetime ${timestamp},
-        primary key (nmspc_id)
+        primary key (nmspc_id),
+        foreign key (tenant_id) references tenant
     );
+
+    -- Index for foreign key column
+    create index idx_nmspc_tenant_id on nmspc(tenant_id);
 
     create table schm (
         schm_id ${guid} not null,
@@ -71,8 +76,7 @@
         created_datetime ${timestamp},
         updated_datetime ${timestamp},
         primary key (ext_ref_id),
-        foreign key (tenant_id) references tenant,
-        constraint chk_ext_ref_id_uppercase check (ext_ref_id = UPPER(ext_ref_id))
+        foreign key (tenant_id) references tenant
     );
 
     -- Indexes for performance optimization
@@ -90,8 +94,7 @@
         primary key (xref_id),
         foreign key (tenant_id) references tenant,
         foreign key (schm_id) references schm,
-        foreign key (ext_ref_id) references ext_ref,
-        constraint chk_xref_ext_ref_id_uppercase check (ext_ref_id = UPPER(ext_ref_id))
+        foreign key (ext_ref_id) references ext_ref
     );
 
     -- Indexes for foreign key columns (improves JOIN, lookup, and cascade delete performance)

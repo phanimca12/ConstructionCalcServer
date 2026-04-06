@@ -32,9 +32,10 @@ public class NamespaceFilterManager {
                     .orElseThrow(() -> new IllegalArgumentException(
                             String.format("Namespace not found: %s", ns)));
 
+            // Enable filter with UUID directly
             entityManager.unwrap(Session.class)
                          .enableFilter("namespaceFilter")
-                         .setParameter("namespaceId", nmspcId.toString());
+                         .setParameter("namespaceId", nmspcId);
         }
     }
 }

@@ -5,12 +5,15 @@ import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.NameSpaceDto;
 import com.ssnc.schemaService.entity.Nmspc;
 import com.ssnc.schemaService.repo.NameSpaceRepository;
+import com.ssnc.schemaService.repo.TenantRepository;
+import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class NameSpaceService {
@@ -19,13 +22,25 @@ public class NameSpaceService {
     NameSpaceRepository nameSpaceRepository;
 
     @Autowired
+    private TenantRepository tenantRepository;
+
+    @Autowired
     private JwtClaimsContext jwtClaimsContext;
 
     public NameSpaceDto createNameSpace(NameSpaceDto nameSpaceDto) {
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
                 ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
+        String tenantName = TenantContext.getTenantName();
+
+        // Resolve tenant_id from tenant_name
+        UUID tenantId = tenantRepository.findByTenantName(tenantName)
+                .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        String.format("Tenant not found: %s", tenantName)));
+
         Nmspc nmspc = new Nmspc();
+        nmspc.setTenantId(tenantId);
         nmspc.setNmspcName(nameSpaceDto.getName());
         nmspc.setDescription(nameSpaceDto.getDescription());
         nmspc.setCreatedBy(userName);
@@ -39,6 +54,7 @@ public class NameSpaceService {
     private NameSpaceDto mapToNameSpaceDto(Nmspc nmspc) {
         NameSpaceDto dto = new NameSpaceDto();
         dto.setNmspcId(nmspc.getNmspcId());
+        dto.setTenantId(nmspc.getTenantId());
         dto.setName(nmspc.getNmspcName());
         dto.setDescription(nmspc.getDescription());
         dto.setCreatedByUser(nmspc.getCreatedBy());

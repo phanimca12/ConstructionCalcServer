@@ -8,6 +8,7 @@ import java.util.UUID;
 @Data
 public class NameSpaceDto {
     private UUID nmspcId;
+    private UUID tenantId;
     private String name;
     private String description;
     private String createdByUser;

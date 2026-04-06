@@ -15,28 +15,28 @@ class ExtRefTest {
     }
 
     @Test
-    void testSetExtRefId_ConvertsToUppercase() {
+    void testSetExtRefId_StoresAsProvided() {
         extRef.setExtRefId("abc123");
-        assertEquals("ABC123", extRef.getExtRefId());
+        assertEquals("abc123", extRef.getExtRefId());
     }
 
     @Test
-    void testSetExtRefId_WithGuid_ConvertsToUppercase() {
+    void testSetExtRefId_WithGuid_StoresAsProvided() {
         String guid = "550e8400-e29b-41d4-a716-446655440000";
         extRef.setExtRefId(guid);
-        assertEquals("550E8400-E29B-41D4-A716-446655440000", extRef.getExtRefId());
+        assertEquals("550e8400-e29b-41d4-a716-446655440000", extRef.getExtRefId());
     }
 
     @Test
-    void testSetExtRefId_WithIntegerId_ConvertsToUppercase() {
+    void testSetExtRefId_WithIntegerId_StoresAsProvided() {
         extRef.setExtRefId("1234567890");
         assertEquals("1234567890", extRef.getExtRefId());
     }
 
     @Test
-    void testSetExtRefId_WithMixedCase_ConvertsToUppercase() {
+    void testSetExtRefId_WithMixedCase_StoresAsProvided() {
         extRef.setExtRefId("AbC-DeF-123");
-        assertEquals("ABC-DEF-123", extRef.getExtRefId());
+        assertEquals("AbC-DeF-123", extRef.getExtRefId());
     }
 
     @Test
@@ -46,7 +46,7 @@ class ExtRefTest {
     }
 
     @Test
-    void testSetExtRefId_WithAlreadyUppercase_RemainsUnchanged() {
+    void testSetExtRefId_WithUppercase_StoresAsProvided() {
         extRef.setExtRefId("ALREADY-UPPERCASE-123");
         assertEquals("ALREADY-UPPERCASE-123", extRef.getExtRefId());
     }

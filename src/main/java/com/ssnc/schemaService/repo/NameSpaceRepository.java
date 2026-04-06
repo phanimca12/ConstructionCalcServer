@@ -9,4 +9,5 @@ import java.util.UUID;
 public interface NameSpaceRepository extends JpaRepository<Nmspc, UUID> {
     Optional<Nmspc> findByNmspcName(String nameSpace);
     Optional<Nmspc> findByNmspcId(UUID nmspcId);
+    Optional<Nmspc> findByTenantIdAndNmspcName(UUID tenantId, String nameSpace);
 }

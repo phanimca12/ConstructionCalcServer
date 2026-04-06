@@ -15,7 +15,7 @@ import java.util.UUID;
 @Table(name = "SCHM", schema = "SCHMDB")
 @FilterDef(
         name = "namespaceFilter",
-        parameters = @ParamDef(name = "namespaceId", type = String.class)
+        parameters = @ParamDef(name = "namespaceId", type = UUID.class)
 )
 @Filter(
         name = "namespaceFilter",

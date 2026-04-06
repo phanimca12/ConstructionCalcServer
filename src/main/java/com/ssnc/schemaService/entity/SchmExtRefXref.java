@@ -1,7 +1,6 @@
 package com.ssnc.schemaService.entity;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
@@ -27,16 +26,7 @@ public class SchmExtRefXref {
     private UUID schmId;
 
     @Column(name = "EXT_REF_ID", nullable = false, length = 64)
-    @Setter(AccessLevel.NONE)  // Prevent Lombok from generating setter - we have a custom one
     private String extRefId;
-
-    /**
-     * Custom setter to ensure ext_ref_id is always stored in uppercase.
-     * SECURITY: This setter is critical for data integrity with the database CHECK constraint.
-     */
-    public void setExtRefId(String extRefId) {
-        this.extRefId = (extRefId != null) ? extRefId.toUpperCase() : null;
-    }
 
     @Column(name = "CREATED_BY", length = 256)
     private String createdBy;

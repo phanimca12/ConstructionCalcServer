@@ -18,6 +18,9 @@ public class Nmspc {
     @Column(name = "NMSPC_ID", nullable = false)
     private UUID nmspcId;
 
+    @Column(name = "TENANT_ID", nullable = false, updatable = false)
+    private UUID tenantId;
+
     @Column(name = "NMSPC_NAME", length = 32, nullable = false)
     private String nmspcName;
 
@@ -37,5 +40,9 @@ public class Nmspc {
     @UpdateTimestamp
     @Column(name = "UPDATED_DATETIME")
     private LocalDateTime updatedDatetime;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "TENANT_ID", insertable = false, updatable = false)
+    private Tenant tenant;
 
 }

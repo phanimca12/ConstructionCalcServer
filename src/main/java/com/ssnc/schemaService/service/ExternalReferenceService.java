@@ -112,12 +112,9 @@ public class ExternalReferenceService {
         // Validate the type against the enum
         ExtRefType.fromString(extRefType);
 
-        // Normalize extRefId to uppercase for case-insensitive lookup
-        String normalizedExtRefId = (extRefId != null) ? extRefId.toUpperCase() : null;
-
         List<SchmExtRefXref> xrefs = schmExtRefXrefRepository
                 .findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
-                        extRefType, normalizedExtRefId, extRefVersion);
+                        extRefType, extRefId, extRefVersion);
 
         // Batch fetch all schemas (fix N+1 query problem)
         List<UUID> schmIds = xrefs.stream()
@@ -184,9 +181,6 @@ public class ExternalReferenceService {
         // Validate the type against the enum
         ExtRefType.fromString(extRefType);
 
-        // Normalize extRefId to uppercase for case-insensitive storage and lookup
-        final String normalizedExtRefId = (extRefId != null) ? extRefId.toUpperCase() : null;
-
         // Validate and prepare requested schema IDs - check for nulls BEFORE any DB operations
         final List<UUID> requestedSchmIds = (request.getSchemas() != null && !request.getSchemas().isEmpty())
                 ? request.getSchemas().stream()
@@ -211,7 +205,7 @@ public class ExternalReferenceService {
                         String.format("Tenant not found: %s", tenantName)));
 
         // Check if external reference already exists by ID
-        Optional<ExtRef> existingExtRef = extRefRepository.findById(normalizedExtRefId);
+        Optional<ExtRef> existingExtRef = extRefRepository.findById(extRefId);
 
         // SECURITY: Check for unique constraint violation (tenant_id, ext_ref_name, ext_ref_type, ext_ref_version)
         // CRITICAL: Must filter by tenantId to prevent cross-tenant data leakage
@@ -220,7 +214,7 @@ public class ExternalReferenceService {
                 .findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
                         tenantId, extRefName, extRefType, extRefVersion);
 
-        if (existingByUnique.isPresent() && !existingByUnique.get().getExtRefId().equals(normalizedExtRefId)) {
+        if (existingByUnique.isPresent() && !existingByUnique.get().getExtRefId().equals(extRefId)) {
             throw new IllegalArgumentException(String.format(
                     ErrorMessages.EXTERNAL_REFERENCE_DUPLICATE,
                     extRefName, extRefType, extRefVersion, existingByUnique.get().getExtRefId()));
@@ -237,7 +231,7 @@ public class ExternalReferenceService {
                     && Objects.equals(existing.getExtRefVersion(), extRefVersion);
 
             // Get existing schema associations
-            List<SchmExtRefXref> existingXrefs = schmExtRefXrefRepository.findByExtRefId(normalizedExtRefId);
+            List<SchmExtRefXref> existingXrefs = schmExtRefXrefRepository.findByExtRefId(extRefId);
             List<UUID> existingSchmIds = existingXrefs.stream()
                     .map(SchmExtRefXref::getSchmId)
                     .sorted()
@@ -261,13 +255,13 @@ public class ExternalReferenceService {
             if (!metadataMatches) {
                 throw new IllegalArgumentException(String.format(
                         ErrorMessages.EXTERNAL_REFERENCE_IMMUTABLE,
-                        normalizedExtRefId, extRefVersion));
+                        extRefId, extRefVersion));
             }
 
             // Metadata matches but schemas differ
             throw new IllegalArgumentException(String.format(
                     ErrorMessages.EXTERNAL_REFERENCE_VERSION_IMMUTABLE,
-                    extRefVersion, normalizedExtRefId, existingSchmIds, sortedRequestedSchmIds));
+                    extRefVersion, extRefId, existingSchmIds, sortedRequestedSchmIds));
         }
 
         // At this point, external reference does NOT exist (or was idempotent and already returned)
@@ -302,7 +296,7 @@ public class ExternalReferenceService {
         // ===== ALL VALIDATIONS PASSED - NOW CREATE EXTERNAL REFERENCE =====
         // Create new external reference entity
         ExtRef extRef = new ExtRef();
-        extRef.setExtRefId(normalizedExtRefId);
+        extRef.setExtRefId(extRefId);
         extRef.setTenantId(tenantId);
         extRef.setExtRefName(extRefName);
         extRef.setExtRefType(extRefType);
@@ -335,7 +329,7 @@ public class ExternalReferenceService {
                 SchmExtRefXref xref = new SchmExtRefXref();
                 xref.setTenantId(tenantId);
                 xref.setSchmId(schmId);
-                xref.setExtRefId(normalizedExtRefId);
+                xref.setExtRefId(extRefId);
                 xref.setCreatedBy(currentUser);
                 xrefs.add(xref);
             }
