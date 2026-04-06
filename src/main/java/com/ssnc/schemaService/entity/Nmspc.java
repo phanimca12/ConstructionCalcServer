@@ -6,8 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "NMSPC", schema = "SCHMDB")
@@ -15,26 +14,28 @@ import java.util.List;
 public class Nmspc {
 
     @Id
-    @Column(name = "NMSPC_NAME", length = 32)
+    @GeneratedValue
+    @Column(name = "NMSPC_ID", nullable = false)
+    private UUID nmspcId;
+
+    @Column(name = "NMSPC_NAME", length = 32, nullable = false)
     private String nmspcName;
 
     @Column(name = "NMSPC_DESC", length = 4000)
     private String description;
 
-    @CreationTimestamp
-    @Column(name = "CREATED_DATETIME", updatable = false)
-    private LocalDateTime createdDatetime;
-
     @Column(name = "CREATED_BY", length = 256)
     private String createdBy;
-
-    @UpdateTimestamp
-    @Column(name = "UPDATED_DATETIME")
-    private LocalDateTime updatedDatetime;
 
     @Column(name = "UPDATED_BY", length = 256)
     private String updatedBy;
 
+    @CreationTimestamp
+    @Column(name = "CREATED_DATETIME", updatable = false)
+    private LocalDateTime createdDatetime;
 
+    @UpdateTimestamp
+    @Column(name = "UPDATED_DATETIME")
+    private LocalDateTime updatedDatetime;
 
 }

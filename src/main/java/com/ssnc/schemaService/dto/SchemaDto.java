@@ -8,12 +8,14 @@ import java.util.UUID;
 @Data
 public class SchemaDto {
     private UUID id;
+    private UUID tenantId;
+    private UUID nmspcId;
     private String name;
     private String description;
     private String schemaType;
     private String contentType;
     private String lockBy;
-    private String group;
+    private String schmGroup;
 
     private String published;
     private String draft;

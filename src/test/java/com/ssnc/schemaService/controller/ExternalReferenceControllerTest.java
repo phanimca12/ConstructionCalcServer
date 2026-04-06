@@ -33,7 +33,7 @@ class ExternalReferenceControllerTest {
     private ExternalReferenceController externalReferenceController;
 
     private String testNamespace;
-    private UUID testExtRefId;
+    private String testExtRefId;
     private String testExtRefType;
     private String testExtRefVersion;
     private ExtRefDto testExtRefDto;
@@ -43,7 +43,7 @@ class ExternalReferenceControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         testNamespace = "testNamespace";
-        testExtRefId = UUID.randomUUID();
+        testExtRefId = "TEST-CTRL-REF-456";
         testExtRefType = "Process";
         testExtRefVersion = "1.0.0";
 

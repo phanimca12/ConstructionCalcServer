@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,7 +34,7 @@ class NameSpaceControllerTest {
         MockitoAnnotations.openMocks(this);
 
         testNameSpaceDto = new NameSpaceDto();
-        testNameSpaceDto.setId("testNamespace");
+        testNameSpaceDto.setNmspcId(UUID.randomUUID());
         testNameSpaceDto.setName("testNamespace");
         testNameSpaceDto.setDescription("Test Namespace Description");
         testNameSpaceDto.setCreatedByUser("testUser");
@@ -100,7 +101,7 @@ class NameSpaceControllerTest {
     @Test
     void testGetAllNameSpaces_Success() {
         NameSpaceDto namespace2 = new NameSpaceDto();
-        namespace2.setId("namespace2");
+        namespace2.setNmspcId(UUID.randomUUID());
         namespace2.setName("namespace2");
         namespace2.setDescription("Second namespace");
 

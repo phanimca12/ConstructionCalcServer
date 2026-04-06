@@ -1,16 +1,18 @@
 package com.ssnc.schemaService.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.TenantId;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "SCHM_EXT_REF_XREF", schema = "SCHMDB")
-@Data
+@Getter
+@Setter
 public class SchmExtRefXref {
 
     @Id
@@ -18,25 +20,34 @@ public class SchmExtRefXref {
     @Column(name = "XREF_ID", nullable = false)
     private UUID xrefId;
 
-    /**
-     * Hibernate 6 tenant discriminator column
-     */
-    @TenantId
-    @Column(name = "TENANT_NAME", nullable = false, updatable = false)
-    private String tenantName;
+    @Column(name = "TENANT_ID", nullable = false, updatable = false)
+    private UUID tenantId;
 
     @Column(name = "SCHM_ID", nullable = false)
     private UUID schmId;
 
-    @Column(name = "EXT_REF_ID", nullable = false)
-    private UUID extRefId;
+    @Column(name = "EXT_REF_ID", nullable = false, length = 64)
+    @Setter(AccessLevel.NONE)  // Prevent Lombok from generating setter - we have a custom one
+    private String extRefId;
+
+    /**
+     * Custom setter to ensure ext_ref_id is always stored in uppercase.
+     * SECURITY: This setter is critical for data integrity with the database CHECK constraint.
+     */
+    public void setExtRefId(String extRefId) {
+        this.extRefId = (extRefId != null) ? extRefId.toUpperCase() : null;
+    }
+
+    @Column(name = "CREATED_BY", length = 256)
+    private String createdBy;
 
     @CreationTimestamp
     @Column(name = "CREATED_DATETIME", updatable = false)
     private LocalDateTime createdDatetime;
 
-    @Column(name = "CREATED_BY", length = 256)
-    private String createdBy;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "TENANT_ID", insertable = false, updatable = false)
+    private Tenant tenant;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "SCHM_ID", insertable = false, updatable = false)

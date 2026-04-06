@@ -93,6 +93,7 @@ public class TenantService {
 
     private TenantDto mapToTenantDto(Tenant tenant) {
         TenantDto dto = new TenantDto();
+        dto.setTenantId(tenant.getTenantId());
         dto.setName(tenant.getTenantName());
         dto.setCreatedByUser(tenant.getCreatedBy());
         dto.setCreateDateTime(tenant.getCreatedDatetime());

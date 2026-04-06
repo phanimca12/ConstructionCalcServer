@@ -12,16 +12,18 @@ class SchemaExtRefXrefDtoTest {
 
     private SchemaExtRefXrefDto xrefDto;
     private UUID testXrefId;
+    private UUID testTenantId;
     private UUID testSchmId;
-    private UUID testExtRefId;
+    private String testExtRefId;
     private LocalDateTime testDateTime;
 
     @BeforeEach
     void setUp() {
         xrefDto = new SchemaExtRefXrefDto();
         testXrefId = UUID.randomUUID();
+        testTenantId = UUID.randomUUID();
         testSchmId = UUID.randomUUID();
-        testExtRefId = UUID.randomUUID();
+        testExtRefId = "550e8400-e29b-41d4-a716-446655440000";
         testDateTime = LocalDateTime.now();
     }
 
@@ -32,9 +34,9 @@ class SchemaExtRefXrefDtoTest {
     }
 
     @Test
-    void testTenantName() {
-        xrefDto.setTenantName("client1Id");
-        assertEquals("client1Id", xrefDto.getTenantName());
+    void testTenantId() {
+        xrefDto.setTenantId(testTenantId);
+        assertEquals(testTenantId, xrefDto.getTenantId());
     }
 
     @Test
@@ -88,12 +90,13 @@ class SchemaExtRefXrefDtoTest {
     @Test
     void testAllFields() {
         UUID xrefId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
         UUID schmId = UUID.randomUUID();
-        UUID extRefId = UUID.randomUUID();
+        String extRefId = "9876543210";
         LocalDateTime createdDateTime = LocalDateTime.now();
 
         xrefDto.setXrefId(xrefId);
-        xrefDto.setTenantName("client2Id");
+        xrefDto.setTenantId(tenantId);
         xrefDto.setSchmId(schmId);
         xrefDto.setExtRefId(extRefId);
         xrefDto.setCreatedDatetime(createdDateTime);
@@ -104,7 +107,7 @@ class SchemaExtRefXrefDtoTest {
         xrefDto.setExtRefVersion("2.5.0");
 
         assertEquals(xrefId, xrefDto.getXrefId());
-        assertEquals("client2Id", xrefDto.getTenantName());
+        assertEquals(tenantId, xrefDto.getTenantId());
         assertEquals(schmId, xrefDto.getSchmId());
         assertEquals(extRefId, xrefDto.getExtRefId());
         assertEquals(createdDateTime, xrefDto.getCreatedDatetime());
@@ -118,7 +121,7 @@ class SchemaExtRefXrefDtoTest {
     @Test
     void testNullValues() {
         assertNull(xrefDto.getXrefId());
-        assertNull(xrefDto.getTenantName());
+        assertNull(xrefDto.getTenantId());
         assertNull(xrefDto.getSchmId());
         assertNull(xrefDto.getExtRefId());
         assertNull(xrefDto.getCreatedDatetime());

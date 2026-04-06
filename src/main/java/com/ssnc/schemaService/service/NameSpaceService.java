@@ -38,7 +38,7 @@ public class NameSpaceService {
 
     private NameSpaceDto mapToNameSpaceDto(Nmspc nmspc) {
         NameSpaceDto dto = new NameSpaceDto();
-        dto.setId(nmspc.getNmspcName());
+        dto.setNmspcId(nmspc.getNmspcId());
         dto.setName(nmspc.getNmspcName());
         dto.setDescription(nmspc.getDescription());
         dto.setCreatedByUser(nmspc.getCreatedBy());
@@ -49,7 +49,7 @@ public class NameSpaceService {
     }
 
     public NameSpaceDto getNameSpaceByName(String name) {
-        Nmspc nmspc = nameSpaceRepository.findBynmspcName(name)
+        Nmspc nmspc = nameSpaceRepository.findByNmspcName(name)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorMessages.NAMESPACE_NOT_FOUND));
         return mapToNameSpaceDto(nmspc);
     }

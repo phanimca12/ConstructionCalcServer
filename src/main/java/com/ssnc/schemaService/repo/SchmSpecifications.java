@@ -42,7 +42,7 @@ public final class SchmSpecifications {
             if (criteria.getGroup() != null) {
                 predicates.add(
                         cb.equal(
-                                cb.lower(root.get("group")),
+                                cb.lower(root.get("schmGroup")),
                                 criteria.getGroup().toLowerCase()
                         )
                 );

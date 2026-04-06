@@ -17,6 +17,7 @@ import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,11 +48,25 @@ public class ExternalReferenceService {
     @Autowired
     private JwtClaimsContext jwtClaimsContext;
 
+    @Autowired
+    private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
+
+    @Autowired
+    private com.ssnc.schemaService.repo.NameSpaceRepository nameSpaceRepository;
+
     /**
      * Get external references with optional type filter
      */
     @Transactional(readOnly = true)
     public List<ExtRefDto> getExternalReferences(String nameSpace, String type) {
+        // Defense in depth: Validate input lengths
+        if (nameSpace != null && nameSpace.length() > 32) {
+            throw new IllegalArgumentException("Namespace must not exceed 32 characters");
+        }
+        if (type != null && type.length() > 64) {
+            throw new IllegalArgumentException("Type must not exceed 64 characters");
+        }
+
         namespaceFilterManager.enableIfPresent(nameSpace);
 
         List<ExtRef> extRefs;
@@ -75,24 +90,44 @@ public class ExternalReferenceService {
     public List<SchemaDto> getSchemasByExternalReference(
             String nameSpace,
             String extRefType,
-            UUID extRefId,
+            String extRefId,
             String extRefVersion) {
+
+        // Defense in depth: Validate input lengths
+        if (nameSpace != null && nameSpace.length() > 32) {
+            throw new IllegalArgumentException("Namespace must not exceed 32 characters");
+        }
+        if (extRefType != null && extRefType.length() > 64) {
+            throw new IllegalArgumentException("External reference type must not exceed 64 characters");
+        }
+        if (extRefId != null && extRefId.length() > 64) {
+            throw new IllegalArgumentException("External reference ID must not exceed 64 characters");
+        }
+        if (extRefVersion != null && extRefVersion.length() > 64) {
+            throw new IllegalArgumentException("External reference version must not exceed 64 characters");
+        }
 
         namespaceFilterManager.enableIfPresent(nameSpace);
 
         // Validate the type against the enum
         ExtRefType.fromString(extRefType);
 
+        // Normalize extRefId to uppercase for case-insensitive lookup
+        String normalizedExtRefId = (extRefId != null) ? extRefId.toUpperCase() : null;
+
         List<SchmExtRefXref> xrefs = schmExtRefXrefRepository
                 .findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
-                        extRefType, extRefId, extRefVersion);
+                        extRefType, normalizedExtRefId, extRefVersion);
 
         // Batch fetch all schemas (fix N+1 query problem)
         List<UUID> schmIds = xrefs.stream()
                 .map(SchmExtRefXref::getSchmId)
                 .collect(Collectors.toList());
 
-        List<Schm> schemas = schmRepository.findAllById(schmIds);
+        // Avoid unnecessary database call if no schemas to fetch
+        List<Schm> schemas = schmIds.isEmpty()
+                ? Collections.emptyList()
+                : schmRepository.findAllById(schmIds);
 
         return schemas.stream()
                 .map(this::mapSchmToDto)
@@ -117,11 +152,28 @@ public class ExternalReferenceService {
             String nameSpace,
             String extRefType,
             String extRefName,
-            UUID extRefId,
+            String extRefId,
             String extRefVersion,
             ExtRefWithSchemasRequest request) {
 
         // ===== INPUT VALIDATION - ALL DONE BEFORE ANY DATABASE OPERATIONS =====
+        // Defense in depth: Validate input lengths to prevent database truncation errors
+        if (nameSpace != null && nameSpace.length() > 32) {
+            throw new IllegalArgumentException("Namespace must not exceed 32 characters");
+        }
+        if (extRefType != null && extRefType.length() > 64) {
+            throw new IllegalArgumentException("External reference type must not exceed 64 characters");
+        }
+        if (extRefName != null && extRefName.length() > 256) {
+            throw new IllegalArgumentException("External reference name must not exceed 256 characters");
+        }
+        if (extRefId != null && extRefId.length() > 64) {
+            throw new IllegalArgumentException("External reference ID must not exceed 64 characters");
+        }
+        if (extRefVersion != null && extRefVersion.length() > 64) {
+            throw new IllegalArgumentException("External reference version must not exceed 64 characters");
+        }
+
         // Defensive null check (should be caught by @Valid but defense in depth)
         if (request == null) {
             throw new IllegalArgumentException(ErrorMessages.EXTERNAL_REFERENCE_REQUEST_BODY_NULL);
@@ -131,6 +183,9 @@ public class ExternalReferenceService {
 
         // Validate the type against the enum
         ExtRefType.fromString(extRefType);
+
+        // Normalize extRefId to uppercase for case-insensitive storage and lookup
+        final String normalizedExtRefId = (extRefId != null) ? extRefId.toUpperCase() : null;
 
         // Validate and prepare requested schema IDs - check for nulls BEFORE any DB operations
         final List<UUID> requestedSchmIds = (request.getSchemas() != null && !request.getSchemas().isEmpty())
@@ -149,15 +204,23 @@ public class ExternalReferenceService {
                 ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
         String tenantName = TenantContext.getTenantName();
 
+        // Resolve tenant_id from tenant_name
+        UUID tenantId = tenantRepository.findByTenantName(tenantName)
+                .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        String.format("Tenant not found: %s", tenantName)));
+
         // Check if external reference already exists by ID
-        Optional<ExtRef> existingExtRef = extRefRepository.findById(extRefId);
+        Optional<ExtRef> existingExtRef = extRefRepository.findById(normalizedExtRefId);
 
-        // Check for unique constraint violation (tenant_name, ext_ref_name, ext_ref_type, ext_ref_version)
+        // SECURITY: Check for unique constraint violation (tenant_id, ext_ref_name, ext_ref_type, ext_ref_version)
+        // CRITICAL: Must filter by tenantId to prevent cross-tenant data leakage
         // This prevents database constraint violations and provides clear error messages
-        Optional<ExtRef> existingByUnique = extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(
-                extRefName, extRefType, extRefVersion);
+        Optional<ExtRef> existingByUnique = extRefRepository
+                .findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
+                        tenantId, extRefName, extRefType, extRefVersion);
 
-        if (existingByUnique.isPresent() && !existingByUnique.get().getExtRefId().equals(extRefId)) {
+        if (existingByUnique.isPresent() && !existingByUnique.get().getExtRefId().equals(normalizedExtRefId)) {
             throw new IllegalArgumentException(String.format(
                     ErrorMessages.EXTERNAL_REFERENCE_DUPLICATE,
                     extRefName, extRefType, extRefVersion, existingByUnique.get().getExtRefId()));
@@ -174,7 +237,7 @@ public class ExternalReferenceService {
                     && Objects.equals(existing.getExtRefVersion(), extRefVersion);
 
             // Get existing schema associations
-            List<SchmExtRefXref> existingXrefs = schmExtRefXrefRepository.findByExtRefId(extRefId);
+            List<SchmExtRefXref> existingXrefs = schmExtRefXrefRepository.findByExtRefId(normalizedExtRefId);
             List<UUID> existingSchmIds = existingXrefs.stream()
                     .map(SchmExtRefXref::getSchmId)
                     .sorted()
@@ -198,13 +261,13 @@ public class ExternalReferenceService {
             if (!metadataMatches) {
                 throw new IllegalArgumentException(String.format(
                         ErrorMessages.EXTERNAL_REFERENCE_IMMUTABLE,
-                        extRefId, extRefVersion));
+                        normalizedExtRefId, extRefVersion));
             }
 
             // Metadata matches but schemas differ
             throw new IllegalArgumentException(String.format(
                     ErrorMessages.EXTERNAL_REFERENCE_VERSION_IMMUTABLE,
-                    extRefVersion, extRefId, existingSchmIds, sortedRequestedSchmIds));
+                    extRefVersion, normalizedExtRefId, existingSchmIds, sortedRequestedSchmIds));
         }
 
         // At this point, external reference does NOT exist (or was idempotent and already returned)
@@ -239,27 +302,45 @@ public class ExternalReferenceService {
         // ===== ALL VALIDATIONS PASSED - NOW CREATE EXTERNAL REFERENCE =====
         // Create new external reference entity
         ExtRef extRef = new ExtRef();
-        extRef.setExtRefId(extRefId);
-        extRef.setTenantName(tenantName);
+        extRef.setExtRefId(normalizedExtRefId);
+        extRef.setTenantId(tenantId);
         extRef.setExtRefName(extRefName);
         extRef.setExtRefType(extRefType);
         extRef.setExtRefVersion(extRefVersion);
         extRef.setCreatedBy(currentUser);
         extRef.setUpdatedBy(currentUser);
 
-        extRef = extRefRepository.save(extRef);
+        // RACE CONDITION HANDLING: Wrap save in try-catch to handle concurrent duplicate creation
+        // Between our check (line 217) and save, another request may create same record
+        try {
+            extRef = extRefRepository.save(extRef);
+        } catch (DataIntegrityViolationException e) {
+            // Check if this was our unique constraint violation
+            String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            if (errorMsg.contains("uk_ext_ref_tenant_id_name_type_version") ||
+                errorMsg.contains("unique") && errorMsg.contains("ext_ref")) {
+                throw new IllegalArgumentException(String.format(
+                        ErrorMessages.EXTERNAL_REFERENCE_DUPLICATE,
+                        extRefName, extRefType, extRefVersion, "another record"));
+            }
+            // Re-throw if it's a different constraint or database error
+            throw e;
+        }
 
         // ===== CREATE SCHEMA ASSOCIATIONS =====
-        // Create associations for all requested schemas
+        // Create associations for all requested schemas using batch save to avoid N+1 writes
         if (!sortedSchmIds.isEmpty()) {
+            List<SchmExtRefXref> xrefs = new ArrayList<>();
             for (UUID schmId : sortedSchmIds) {
                 SchmExtRefXref xref = new SchmExtRefXref();
-                xref.setTenantName(tenantName);
+                xref.setTenantId(tenantId);
                 xref.setSchmId(schmId);
-                xref.setExtRefId(extRefId);
+                xref.setExtRefId(normalizedExtRefId);
                 xref.setCreatedBy(currentUser);
-                schmExtRefXrefRepository.save(xref);
+                xrefs.add(xref);
             }
+            // Batch save all cross-references in one operation
+            schmExtRefXrefRepository.saveAll(xrefs);
         }
 
         return new ExtRefResponse(
@@ -274,7 +355,7 @@ public class ExternalReferenceService {
     private ExtRefDto mapToDto(ExtRef extRef) {
         ExtRefDto dto = new ExtRefDto();
         dto.setExtRefId(extRef.getExtRefId());
-        dto.setTenantName(extRef.getTenantName());
+        dto.setTenantId(extRef.getTenantId());
         dto.setExtRefName(extRef.getExtRefName());
         dto.setExtRefType(extRef.getExtRefType());
         dto.setExtRefVersion(extRef.getExtRefVersion());
@@ -291,12 +372,14 @@ public class ExternalReferenceService {
     private SchemaDto mapSchmToDto(Schm schm) {
         SchemaDto dto = new SchemaDto();
         dto.setId(schm.getSchmId());
+        dto.setTenantId(schm.getTenantId());
+        dto.setNmspcId(schm.getNmspcId());
         dto.setName(schm.getSchmName());
         dto.setDescription(schm.getSchmDesc());
         dto.setSchemaType(schm.getSchemaType());
         dto.setContentType(schm.getContentType());
         dto.setLockBy(schm.getLockBy());
-        dto.setGroup(schm.getGroup());
+        dto.setSchmGroup(schm.getSchmGroup());
         dto.setCreatedByUser(schm.getCreatedBy());
         dto.setCreateDateTime(schm.getCreatedDatetime());
         dto.setModifiedByUser(schm.getUpdatedBy());
