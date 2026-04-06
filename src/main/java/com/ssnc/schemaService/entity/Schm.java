@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Table;
 import lombok.Data;
+import lombok.ToString;
 import org.hibernate.annotations.*;
 
 import java.time.LocalDateTime;
@@ -70,16 +71,34 @@ public class Schm {
     @Column(name = "UPDATED_DATETIME")
     private LocalDateTime updatedDatetime;
 
+    /**
+     * ORM mapping relationship - DO NOT ACCESS directly.
+     * Accessing this field triggers lazy-loading and causes N+1 query problems.
+     * Use tenantId field instead for filtering/queries.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "TENANT_ID", insertable = false, updatable = false)
+    @ToString.Exclude
     private Tenant tenant;
 
+    /**
+     * ORM mapping relationship - DO NOT ACCESS directly.
+     * Accessing this field triggers lazy-loading and causes N+1 query problems.
+     * Use nmspcId field instead for filtering/queries.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "NMSPC_ID", insertable = false, updatable = false)
+    @ToString.Exclude
     private Nmspc nmspc;
 
+    /**
+     * ORM mapping relationship - DO NOT ACCESS directly.
+     * Accessing this field triggers lazy-loading and causes N+1 query problems.
+     * Fetch versions explicitly via SchmDataRepository when needed.
+     */
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.PERSIST)
     @JoinColumn(name = "SCHM_ID")
+    @ToString.Exclude
     private List<SchmData> versions = new ArrayList<>();
 
 }

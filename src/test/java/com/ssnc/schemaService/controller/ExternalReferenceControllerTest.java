@@ -91,8 +91,9 @@ class ExternalReferenceControllerTest {
 
     @Test
     void testGetExternalReferences_InvalidType() {
+        String errorMessage = String.format(ErrorMessages.EXTERNAL_REFERENCE_INVALID_TYPE, "InvalidType");
         when(externalReferenceService.getExternalReferences(testNamespace, "InvalidType"))
-                .thenThrow(new IllegalArgumentException("Invalid ExtRefType: InvalidType"));
+                .thenThrow(new IllegalArgumentException(errorMessage));
 
         ResponseEntity<?> response = externalReferenceController
                 .getExternalReferences(testNamespace, "InvalidType");
@@ -102,8 +103,8 @@ class ExternalReferenceControllerTest {
         assertTrue(response.getBody() instanceof ErrorResponse);
         ErrorResponse errorResponse = (ErrorResponse) response.getBody();
         assertEquals(400, errorResponse.getStatus());
-        assertEquals("Bad Request", errorResponse.getError());
-        assertEquals("Invalid ExtRefType: InvalidType", errorResponse.getMessage());
+        assertEquals(ErrorMessages.HTTP_BAD_REQUEST, errorResponse.getError());
+        assertEquals(errorMessage, errorResponse.getMessage());
         assertNotNull(errorResponse.getTimestamp());
         verify(externalReferenceService).getExternalReferences(testNamespace, "InvalidType");
     }
@@ -126,9 +127,10 @@ class ExternalReferenceControllerTest {
 
     @Test
     void testGetSchemasByExternalReference_InvalidType() {
+        String errorMessage = String.format(ErrorMessages.EXTERNAL_REFERENCE_INVALID_TYPE, "InvalidType");
         when(externalReferenceService.getSchemasByExternalReference(
                 testNamespace, "InvalidType", testExtRefId, testExtRefVersion))
-                .thenThrow(new IllegalArgumentException("Invalid ExtRefType: InvalidType"));
+                .thenThrow(new IllegalArgumentException(errorMessage));
 
         ResponseEntity<?> response = externalReferenceController
                 .getSchemasByExternalReference(testNamespace, "InvalidType", testExtRefId, testExtRefVersion);
@@ -138,8 +140,8 @@ class ExternalReferenceControllerTest {
         assertTrue(response.getBody() instanceof ErrorResponse);
         ErrorResponse errorResponse = (ErrorResponse) response.getBody();
         assertEquals(400, errorResponse.getStatus());
-        assertEquals("Bad Request", errorResponse.getError());
-        assertEquals("Invalid ExtRefType: InvalidType", errorResponse.getMessage());
+        assertEquals(ErrorMessages.HTTP_BAD_REQUEST, errorResponse.getError());
+        assertEquals(errorMessage, errorResponse.getMessage());
         assertNotNull(errorResponse.getTimestamp());
         verify(externalReferenceService).getSchemasByExternalReference(
                 testNamespace, "InvalidType", testExtRefId, testExtRefVersion);
@@ -192,9 +194,10 @@ class ExternalReferenceControllerTest {
         ExtRefWithSchemasRequest emptyRequest = new ExtRefWithSchemasRequest();
         emptyRequest.setSchemas(Arrays.asList());
 
+        String errorMessage = String.format(ErrorMessages.EXTERNAL_REFERENCE_INVALID_TYPE, "InvalidType");
         when(externalReferenceService.createOrUpdateExternalReference(
                 testNamespace, "InvalidType", "Test", testExtRefId, testExtRefVersion, emptyRequest))
-                .thenThrow(new IllegalArgumentException("Invalid ExtRefType: InvalidType"));
+                .thenThrow(new IllegalArgumentException(errorMessage));
 
         ResponseEntity<?> response = externalReferenceController
                 .createOrUpdateExternalReference(
@@ -205,8 +208,8 @@ class ExternalReferenceControllerTest {
         assertTrue(response.getBody() instanceof ErrorResponse);
         ErrorResponse errorResponse = (ErrorResponse) response.getBody();
         assertEquals(400, errorResponse.getStatus());
-        assertEquals("Bad Request", errorResponse.getError());
-        assertEquals("Invalid ExtRefType: InvalidType", errorResponse.getMessage());
+        assertEquals(ErrorMessages.HTTP_BAD_REQUEST, errorResponse.getError());
+        assertEquals(errorMessage, errorResponse.getMessage());
         assertNotNull(errorResponse.getTimestamp());
         verify(externalReferenceService).createOrUpdateExternalReference(
                 testNamespace, "InvalidType", "Test", testExtRefId, testExtRefVersion, emptyRequest);

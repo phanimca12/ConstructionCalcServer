@@ -2,6 +2,7 @@ package com.ssnc.schemaService.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -41,8 +42,14 @@ public class Nmspc {
     @Column(name = "UPDATED_DATETIME")
     private LocalDateTime updatedDatetime;
 
+    /**
+     * ORM mapping relationship - DO NOT ACCESS directly.
+     * Accessing this field triggers lazy-loading and causes N+1 query problems.
+     * Use tenantId field instead for filtering/queries.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "TENANT_ID", insertable = false, updatable = false)
+    @ToString.Exclude
     private Tenant tenant;
 
 }

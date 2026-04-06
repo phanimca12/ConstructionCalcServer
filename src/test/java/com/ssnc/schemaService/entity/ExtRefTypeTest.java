@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.entity;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -89,7 +90,7 @@ class ExtRefTypeTest {
                 IllegalArgumentException.class,
                 () -> ExtRefType.fromString("InvalidType")
         );
-        assertEquals("Invalid ExtRefType: InvalidType", exception.getMessage());
+        assertEquals(String.format(ErrorMessages.EXTERNAL_REFERENCE_INVALID_TYPE, "InvalidType"), exception.getMessage());
     }
 
     @Test
@@ -98,7 +99,7 @@ class ExtRefTypeTest {
                 IllegalArgumentException.class,
                 () -> ExtRefType.fromString("")
         );
-        assertEquals("Invalid ExtRefType: ", exception.getMessage());
+        assertEquals(String.format(ErrorMessages.EXTERNAL_REFERENCE_INVALID_TYPE, ""), exception.getMessage());
     }
 
     @Test
@@ -107,7 +108,7 @@ class ExtRefTypeTest {
                 IllegalArgumentException.class,
                 () -> ExtRefType.fromString("INVALID_TYPE")
         );
-        assertEquals("Invalid ExtRefType: INVALID_TYPE", exception.getMessage());
+        assertEquals(String.format(ErrorMessages.EXTERNAL_REFERENCE_INVALID_TYPE, "INVALID_TYPE"), exception.getMessage());
     }
 
     @Test

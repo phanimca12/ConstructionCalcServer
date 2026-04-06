@@ -3,6 +3,7 @@ package com.ssnc.schemaService.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
@@ -35,15 +36,33 @@ public class SchmExtRefXref {
     @Column(name = "CREATED_DATETIME", updatable = false)
     private LocalDateTime createdDatetime;
 
+    /**
+     * ORM mapping relationship - DO NOT ACCESS directly.
+     * Accessing this field triggers lazy-loading and causes N+1 query problems.
+     * Use tenantId field instead for filtering/queries.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "TENANT_ID", insertable = false, updatable = false)
+    @ToString.Exclude
     private Tenant tenant;
 
+    /**
+     * ORM mapping relationship - DO NOT ACCESS directly.
+     * Accessing this field triggers lazy-loading and causes N+1 query problems.
+     * Use schmId field instead for filtering/queries.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "SCHM_ID", insertable = false, updatable = false)
+    @ToString.Exclude
     private Schm schm;
 
+    /**
+     * ORM mapping relationship - DO NOT ACCESS directly.
+     * Accessing this field triggers lazy-loading and causes N+1 query problems.
+     * Use extRefId field instead for filtering/queries.
+     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "EXT_REF_ID", insertable = false, updatable = false)
+    @ToString.Exclude
     private ExtRef extRef;
 }

@@ -4,6 +4,7 @@ import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.dto.NameSpaceDto;
 import com.ssnc.schemaService.entity.Nmspc;
 import com.ssnc.schemaService.repo.NameSpaceRepository;
+import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -33,6 +35,9 @@ class NameSpaceServiceTest {
     private NameSpaceRepository nameSpaceRepository;
 
     @Mock
+    private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
+
+    @Mock
     private JwtClaimsContext jwtClaimsContext;
 
     @InjectMocks
@@ -41,17 +46,25 @@ class NameSpaceServiceTest {
     private String testNamespaceName;
     private String testUserId;
     private UUID testNmspcId;
+    private UUID testTenantId;
     private Nmspc testNmspc;
     private NameSpaceDto testNameSpaceDto;
+    private com.ssnc.schemaService.entity.Tenant testTenant;
 
     @BeforeEach
     void setUp() {
         testNamespaceName = "testNamespace";
         testUserId = "testUser";
         testNmspcId = UUID.randomUUID();
+        testTenantId = UUID.randomUUID();
+
+        testTenant = new com.ssnc.schemaService.entity.Tenant();
+        testTenant.setTenantId(testTenantId);
+        testTenant.setTenantName("client1Id");
 
         testNmspc = new Nmspc();
         testNmspc.setNmspcId(testNmspcId);
+        testNmspc.setTenantId(testTenantId);
         testNmspc.setNmspcName(testNamespaceName);
         testNmspc.setDescription("Test Namespace Description");
         testNmspc.setCreatedBy(testUserId);
@@ -67,6 +80,8 @@ class NameSpaceServiceTest {
 
         // Mock JwtClaimsContext to return test user
         when(jwtClaimsContext.getUserId()).thenReturn(testUserId);
+        // Mock TenantRepository
+        when(tenantRepository.findByTenantName(anyString())).thenReturn(Optional.of(testTenant));
     }
 
     @Test

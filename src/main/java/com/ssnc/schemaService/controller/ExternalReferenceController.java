@@ -1,5 +1,7 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.constants.ApiConstants;
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.ErrorResponse;
 import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.ExtRefResponse;
@@ -17,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/extRef/{nameSpace}")
+@RequestMapping(ApiConstants.PATH_EXT_REF_BASE)
 @Validated
 public class ExternalReferenceController {
 
@@ -34,8 +36,8 @@ public class ExternalReferenceController {
      */
     @GetMapping
     public ResponseEntity<?> getExternalReferences(
-            @PathVariable("nameSpace") @Size(max = 32, message = "Namespace must not exceed 32 characters") String nameSpace,
-            @RequestParam(required = false) @Size(max = 64, message = "Type must not exceed 64 characters") String type) {
+            @PathVariable(ApiConstants.PARAM_NAME_SPACE) @Size(max = 32, message = ErrorMessages.VALIDATION_NAMESPACE_MAX_LENGTH) String nameSpace,
+            @RequestParam(value = ApiConstants.QUERY_PARAM_TYPE, required = false) @Size(max = 64, message = ErrorMessages.VALIDATION_TYPE_MAX_LENGTH) String type) {
 
         try {
             List<ExtRefDto> extRefs = externalReferenceService.getExternalReferences(nameSpace, type);
@@ -43,7 +45,7 @@ public class ExternalReferenceController {
         } catch (IllegalArgumentException e) {
             ErrorResponse errorResponse = new ErrorResponse(
                     HttpStatus.BAD_REQUEST.value(),
-                    "Bad Request",
+                    ErrorMessages.HTTP_BAD_REQUEST,
                     e.getMessage()
             );
             return ResponseEntity.badRequest().body(errorResponse);
@@ -60,12 +62,12 @@ public class ExternalReferenceController {
      * @param extRefVersion - External reference version (max 64 chars)
      * @return List of schemas associated with the external reference or error response
      */
-    @GetMapping("/type/{extRefType}/id/{extRefId}/version/{extRefVersion}/schemas")
+    @GetMapping(ApiConstants.PATH_EXT_REF_BY_TYPE_ID_VERSION)
     public ResponseEntity<?> getSchemasByExternalReference(
-            @PathVariable("nameSpace") @Size(max = 32, message = "Namespace must not exceed 32 characters") String nameSpace,
-            @PathVariable("extRefType") @Size(max = 64, message = "External reference type must not exceed 64 characters") String extRefType,
-            @PathVariable("extRefId") @Size(max = 64, message = "External reference ID must not exceed 64 characters") String extRefId,
-            @PathVariable("extRefVersion") @Size(max = 64, message = "External reference version must not exceed 64 characters") String extRefVersion) {
+            @PathVariable(ApiConstants.PARAM_NAME_SPACE) @Size(max = 32, message = ErrorMessages.VALIDATION_NAMESPACE_MAX_LENGTH) String nameSpace,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_TYPE) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_TYPE_MAX_LENGTH) String extRefType,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_ID) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH) String extRefId,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_VERSION) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH) String extRefVersion) {
 
         try {
             List<SchemaDto> schemas = externalReferenceService.getSchemasByExternalReference(
@@ -74,7 +76,7 @@ public class ExternalReferenceController {
         } catch (IllegalArgumentException e) {
             ErrorResponse errorResponse = new ErrorResponse(
                     HttpStatus.BAD_REQUEST.value(),
-                    "Bad Request",
+                    ErrorMessages.HTTP_BAD_REQUEST,
                     e.getMessage()
             );
             return ResponseEntity.badRequest().body(errorResponse);
@@ -101,13 +103,13 @@ public class ExternalReferenceController {
      * @return Response containing the external reference, a message, and an update flag or error response
      * @throws IllegalArgumentException if trying to modify an existing version (400 Bad Request)
      */
-    @PutMapping("/type/{extRefType}/name/{extRefName}/id/{extRefId}/version/{extRefVersion}/schemas")
+    @PutMapping(ApiConstants.PATH_EXT_REF_CREATE)
     public ResponseEntity<?> createOrUpdateExternalReference(
-            @PathVariable("nameSpace") @Size(max = 32, message = "Namespace must not exceed 32 characters") String nameSpace,
-            @PathVariable("extRefType") @Size(max = 64, message = "External reference type must not exceed 64 characters") String extRefType,
-            @PathVariable("extRefName") @Size(max = 256, message = "External reference name must not exceed 256 characters") String extRefName,
-            @PathVariable("extRefId") @Size(max = 64, message = "External reference ID must not exceed 64 characters") String extRefId,
-            @PathVariable("extRefVersion") @Size(max = 64, message = "External reference version must not exceed 64 characters") String extRefVersion,
+            @PathVariable(ApiConstants.PARAM_NAME_SPACE) @Size(max = 32, message = ErrorMessages.VALIDATION_NAMESPACE_MAX_LENGTH) String nameSpace,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_TYPE) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_TYPE_MAX_LENGTH) String extRefType,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_NAME) @Size(max = 256, message = ErrorMessages.VALIDATION_EXT_REF_NAME_MAX_LENGTH) String extRefName,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_ID) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH) String extRefId,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_VERSION) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH) String extRefVersion,
             @RequestBody @Valid ExtRefWithSchemasRequest request) {
 
         try {
@@ -117,7 +119,7 @@ public class ExternalReferenceController {
         } catch (IllegalArgumentException e) {
             ErrorResponse errorResponse = new ErrorResponse(
                     HttpStatus.BAD_REQUEST.value(),
-                    "Bad Request",
+                    ErrorMessages.HTTP_BAD_REQUEST,
                     e.getMessage()
             );
             return ResponseEntity.badRequest().body(errorResponse);

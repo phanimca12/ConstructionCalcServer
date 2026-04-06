@@ -121,7 +121,9 @@ class SchemaServiceTest {
         // Mock JwtClaimsContext to return test user
         when(jwtClaimsContext.getUserId()).thenReturn(testUserId);
         when(tenantRepository.findByTenantName(anyString())).thenReturn(Optional.of(testTenant));
-        when(nameSpaceRepository.findByNmspcName(testNamespace)).thenReturn(Optional.of(testNmspc));
+        // SECURITY: Mock tenant-aware namespace lookup to ensure proper isolation
+        when(nameSpaceRepository.findByTenantIdAndNmspcName(any(UUID.class), eq(testNamespace)))
+                .thenReturn(Optional.of(testNmspc));
     }
 
     @Test

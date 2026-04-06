@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.constants.ApiConstants;
 import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.TenantDto;
 import com.ssnc.schemaService.entity.Tenant;
@@ -15,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/tenants")
+@RequestMapping(ApiConstants.PATH_TENANTS_BASE)
 public class TenantController {
 
     private static final Logger logger = LoggerFactory.getLogger(TenantController.class);
@@ -39,8 +40,8 @@ public class TenantController {
         }
     }
 
-    @GetMapping("/{tenantName}")
-    public TenantDto getTenantByName(@PathVariable String tenantName) {
+    @GetMapping(ApiConstants.PATH_TENANT_BY_NAME)
+    public TenantDto getTenantByName(@PathVariable(ApiConstants.PARAM_TENANT_NAME) String tenantName) {
         return tenantService.getTenantByName(tenantName);
     }
 

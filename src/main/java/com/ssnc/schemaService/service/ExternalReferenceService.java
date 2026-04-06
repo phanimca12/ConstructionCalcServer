@@ -61,10 +61,10 @@ public class ExternalReferenceService {
     public List<ExtRefDto> getExternalReferences(String nameSpace, String type) {
         // Defense in depth: Validate input lengths
         if (nameSpace != null && nameSpace.length() > 32) {
-            throw new IllegalArgumentException("Namespace must not exceed 32 characters");
+            throw new IllegalArgumentException(ErrorMessages.VALIDATION_NAMESPACE_MAX_LENGTH);
         }
         if (type != null && type.length() > 64) {
-            throw new IllegalArgumentException("Type must not exceed 64 characters");
+            throw new IllegalArgumentException(ErrorMessages.VALIDATION_TYPE_MAX_LENGTH);
         }
 
         namespaceFilterManager.enableIfPresent(nameSpace);
@@ -95,16 +95,16 @@ public class ExternalReferenceService {
 
         // Defense in depth: Validate input lengths
         if (nameSpace != null && nameSpace.length() > 32) {
-            throw new IllegalArgumentException("Namespace must not exceed 32 characters");
+            throw new IllegalArgumentException(ErrorMessages.VALIDATION_NAMESPACE_MAX_LENGTH);
         }
         if (extRefType != null && extRefType.length() > 64) {
-            throw new IllegalArgumentException("External reference type must not exceed 64 characters");
+            throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_TYPE_MAX_LENGTH);
         }
         if (extRefId != null && extRefId.length() > 64) {
-            throw new IllegalArgumentException("External reference ID must not exceed 64 characters");
+            throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH);
         }
         if (extRefVersion != null && extRefVersion.length() > 64) {
-            throw new IllegalArgumentException("External reference version must not exceed 64 characters");
+            throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH);
         }
 
         namespaceFilterManager.enableIfPresent(nameSpace);
@@ -156,19 +156,19 @@ public class ExternalReferenceService {
         // ===== INPUT VALIDATION - ALL DONE BEFORE ANY DATABASE OPERATIONS =====
         // Defense in depth: Validate input lengths to prevent database truncation errors
         if (nameSpace != null && nameSpace.length() > 32) {
-            throw new IllegalArgumentException("Namespace must not exceed 32 characters");
+            throw new IllegalArgumentException(ErrorMessages.VALIDATION_NAMESPACE_MAX_LENGTH);
         }
         if (extRefType != null && extRefType.length() > 64) {
-            throw new IllegalArgumentException("External reference type must not exceed 64 characters");
+            throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_TYPE_MAX_LENGTH);
         }
         if (extRefName != null && extRefName.length() > 256) {
-            throw new IllegalArgumentException("External reference name must not exceed 256 characters");
+            throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_NAME_MAX_LENGTH);
         }
         if (extRefId != null && extRefId.length() > 64) {
-            throw new IllegalArgumentException("External reference ID must not exceed 64 characters");
+            throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH);
         }
         if (extRefVersion != null && extRefVersion.length() > 64) {
-            throw new IllegalArgumentException("External reference version must not exceed 64 characters");
+            throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH);
         }
 
         // Defensive null check (should be caught by @Valid but defense in depth)
@@ -201,8 +201,7 @@ public class ExternalReferenceService {
         // Resolve tenant_id from tenant_name
         UUID tenantId = tenantRepository.findByTenantName(tenantName)
                 .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        String.format("Tenant not found: %s", tenantName)));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.TENANT_CONFIG_INVALID));
 
         // Check if external reference already exists by ID
         Optional<ExtRef> existingExtRef = extRefRepository.findById(extRefId);
@@ -311,11 +310,12 @@ public class ExternalReferenceService {
         } catch (DataIntegrityViolationException e) {
             // Check if this was our unique constraint violation
             String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
-            if (errorMsg.contains("uk_ext_ref_tenant_id_name_type_version") ||
-                errorMsg.contains("unique") && errorMsg.contains("ext_ref")) {
+            if (errorMsg.contains(ErrorMessages.DB_CONSTRAINT_UNIQUE_EXT_REF) ||
+                errorMsg.contains(ErrorMessages.DB_CONSTRAINT_KEYWORD_UNIQUE) &&
+                errorMsg.contains(ErrorMessages.DB_CONSTRAINT_KEYWORD_EXT_REF)) {
                 throw new IllegalArgumentException(String.format(
                         ErrorMessages.EXTERNAL_REFERENCE_DUPLICATE,
-                        extRefName, extRefType, extRefVersion, "another record"));
+                        extRefName, extRefType, extRefVersion, ErrorMessages.GENERIC_ANOTHER_RECORD));
             }
             // Re-throw if it's a different constraint or database error
             throw e;
