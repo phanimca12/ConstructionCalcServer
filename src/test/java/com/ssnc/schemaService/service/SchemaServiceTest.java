@@ -16,6 +16,7 @@ import com.ssnc.schemaService.repo.SchmExtRefXrefRepository;
 import com.ssnc.schemaService.repo.SchmFilterCriteria;
 import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.tenant.NamespaceFilterManager;
+import com.ssnc.schemaService.tenant.TenantContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -63,33 +65,54 @@ class SchemaServiceTest {
     @Mock
     private ExtRefRepository extRefRepository;
 
+    @Mock
+    private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
+
+    @Mock
+    private com.ssnc.schemaService.repo.NameSpaceRepository nameSpaceRepository;
+
     @InjectMocks
     private SchemaService schemaService;
 
     private String testNamespace;
     private String testUserId;
+    private UUID testTenantId;
+    private UUID testNmspcId;
     private SchemaDto testSchemaDto;
     private Schm testSchm;
     private UUID testSchmId;
+    private com.ssnc.schemaService.entity.Tenant testTenant;
+    private com.ssnc.schemaService.entity.Nmspc testNmspc;
 
     @BeforeEach
     void setUp() {
         testNamespace = "testNamespace";
         testUserId = "testUser";
         testSchmId = UUID.randomUUID();
+        testTenantId = UUID.randomUUID();
+        testNmspcId = UUID.randomUUID();
+
+        testTenant = new com.ssnc.schemaService.entity.Tenant();
+        testTenant.setTenantId(testTenantId);
+        testTenant.setTenantName("client1Id");
+
+        testNmspc = new com.ssnc.schemaService.entity.Nmspc();
+        testNmspc.setNmspcId(testNmspcId);
+        testNmspc.setNmspcName(testNamespace);
 
         testSchemaDto = new SchemaDto();
         testSchemaDto.setName("Test Schema");
         testSchemaDto.setDescription("Test Description");
         testSchemaDto.setSchemaType("FormData");
         testSchemaDto.setContentType("application/json");
-        testSchemaDto.setGroup("testGroup");
+        testSchemaDto.setSchmGroup("testGroup");
 
         testSchm = new Schm();
         testSchm.setSchmId(testSchmId);
+        testSchm.setTenantId(testTenantId);
+        testSchm.setNmspcId(testNmspcId);
         testSchm.setSchmName("Test Schema");
         testSchm.setSchmDesc("Test Description");
-        testSchm.setNamespace(testNamespace);
         testSchm.setCreatedBy(testUserId);
         testSchm.setUpdatedBy(testUserId);
         testSchm.setCreatedDatetime(LocalDateTime.now());
@@ -97,63 +120,79 @@ class SchemaServiceTest {
 
         // Mock JwtClaimsContext to return test user
         when(jwtClaimsContext.getUserId()).thenReturn(testUserId);
+        when(tenantRepository.findByTenantName(anyString())).thenReturn(Optional.of(testTenant));
+        // SECURITY: Mock tenant-aware namespace lookup to ensure proper isolation
+        when(nameSpaceRepository.findByTenantIdAndNmspcName(any(UUID.class), eq(testNamespace)))
+                .thenReturn(Optional.of(testNmspc));
     }
 
     @Test
     void testCreateSchema_SetsUserFromJwtContext() throws IOException {
-        when(schmRepository.findBySchmName(anyString())).thenReturn(Optional.empty());
-        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-        SchemaDto result = schemaService.createSchema(testNamespace, testSchemaDto, null);
+            when(schmRepository.findBySchmName(anyString())).thenReturn(Optional.empty());
+            when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
-        assertNotNull(result);
-        verify(jwtClaimsContext, atLeastOnce()).getUserId();
-        verify(schmRepository).save(argThat(schm ->
-                testUserId.equals(schm.getCreatedBy()) &&
-                testUserId.equals(schm.getUpdatedBy())
-        ));
+            SchemaDto result = schemaService.createSchema(testNamespace, testSchemaDto, null);
+
+            assertNotNull(result);
+            verify(jwtClaimsContext, atLeastOnce()).getUserId();
+            verify(schmRepository).save(argThat(schm ->
+                    testUserId.equals(schm.getCreatedBy()) &&
+                    testUserId.equals(schm.getUpdatedBy())
+            ));
+        }
     }
 
     @Test
     void testCreateSchema_WithContent_CreatesVersion() throws IOException {
-        String content = "test content";
-        when(schmRepository.findBySchmName(anyString())).thenReturn(Optional.empty());
-        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
-        when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
-                .thenReturn(Optional.empty());
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-        SchmData savedSchmData = new SchmData();
-        SchmDataId id = new SchmDataId();
-        id.setSchmId(testSchmId);
-        id.setSchmVersion(1);
-        savedSchmData.setId(id);
-        savedSchmData.setCreatedBy(testUserId);
-        savedSchmData.setUpdatedBy(testUserId);
-        savedSchmData.setSchmData(content);
-        savedSchmData.setIsDraft(true);
+            String content = "test content";
+            when(schmRepository.findBySchmName(anyString())).thenReturn(Optional.empty());
+            when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+            when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
+                    .thenReturn(Optional.empty());
 
-        when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+            SchmData savedSchmData = new SchmData();
+            SchmDataId id = new SchmDataId();
+            id.setSchmId(testSchmId);
+            id.setSchmVersion(1);
+            savedSchmData.setId(id);
+            savedSchmData.setCreatedBy(testUserId);
+            savedSchmData.setUpdatedBy(testUserId);
+            savedSchmData.setSchmData(content);
+            savedSchmData.setIsDraft(true);
 
-        SchemaDto result = schemaService.createSchema(testNamespace, testSchemaDto, content);
+            when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
 
-        assertNotNull(result);
-        verify(schmDataRepository).save(argThat(schmData ->
-                testUserId.equals(schmData.getCreatedBy()) &&
-                testUserId.equals(schmData.getUpdatedBy()) &&
-                content.equals(schmData.getSchmData()) &&
-                schmData.getIsDraft()
-        ));
+            SchemaDto result = schemaService.createSchema(testNamespace, testSchemaDto, content);
+
+            assertNotNull(result);
+            verify(schmDataRepository).save(argThat(schmData ->
+                    testUserId.equals(schmData.getCreatedBy()) &&
+                    testUserId.equals(schmData.getUpdatedBy()) &&
+                    content.equals(schmData.getSchmData()) &&
+                    schmData.getIsDraft()
+            ));
+        }
     }
 
     @Test
     void testCreateSchema_DuplicateName_ThrowsException() {
-        when(schmRepository.findBySchmName(anyString())).thenReturn(Optional.of(testSchm));
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-        assertThrows(IllegalArgumentException.class, () ->
-                schemaService.createSchema(testNamespace, testSchemaDto, null)
-        );
+            when(schmRepository.findBySchmName(anyString())).thenReturn(Optional.of(testSchm));
 
-        verify(schmRepository, never()).save(any(Schm.class));
+            assertThrows(IllegalArgumentException.class, () ->
+                    schemaService.createSchema(testNamespace, testSchemaDto, null)
+            );
+
+            verify(schmRepository, never()).save(any(Schm.class));
+        }
     }
 
     @Test
@@ -197,24 +236,28 @@ class SchemaServiceTest {
 
     @Test
     void testCreateSchema_NullJwtContext_UsesSystemUser() throws IOException {
-        when(jwtClaimsContext.getUserId()).thenReturn(null);
-        when(schmRepository.findBySchmName(anyString())).thenReturn(Optional.empty());
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-        Schm systemSchm = new Schm();
-        systemSchm.setSchmId(testSchmId);
-        systemSchm.setSchmName("Test Schema");
-        systemSchm.setCreatedBy(AppConstants.SYSTEM_USER);
-        systemSchm.setUpdatedBy(AppConstants.SYSTEM_USER);
+            when(jwtClaimsContext.getUserId()).thenReturn(null);
+            when(schmRepository.findBySchmName(anyString())).thenReturn(Optional.empty());
 
-        when(schmRepository.save(any(Schm.class))).thenReturn(systemSchm);
+            Schm systemSchm = new Schm();
+            systemSchm.setSchmId(testSchmId);
+            systemSchm.setSchmName("Test Schema");
+            systemSchm.setCreatedBy(AppConstants.SYSTEM_USER);
+            systemSchm.setUpdatedBy(AppConstants.SYSTEM_USER);
 
-        SchemaDto result = schemaService.createSchema(testNamespace, testSchemaDto, null);
+            when(schmRepository.save(any(Schm.class))).thenReturn(systemSchm);
 
-        assertNotNull(result);
-        verify(schmRepository).save(argThat(schm ->
-                AppConstants.SYSTEM_USER.equals(schm.getCreatedBy()) &&
-                AppConstants.SYSTEM_USER.equals(schm.getUpdatedBy())
-        ));
+            SchemaDto result = schemaService.createSchema(testNamespace, testSchemaDto, null);
+
+            assertNotNull(result);
+            verify(schmRepository).save(argThat(schm ->
+                    AppConstants.SYSTEM_USER.equals(schm.getCreatedBy()) &&
+                    AppConstants.SYSTEM_USER.equals(schm.getUpdatedBy())
+            ));
+        }
     }
 
     @Test
@@ -379,7 +422,7 @@ class SchemaServiceTest {
         // Mock external references exist
         SchmExtRefXref xref = new SchmExtRefXref();
         xref.setSchmId(testSchmId);
-        xref.setExtRefId(UUID.randomUUID());
+        xref.setExtRefId("EXT-REF-IN-USE");
         when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(Arrays.asList(xref));
 
         IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
@@ -855,8 +898,8 @@ class SchemaServiceTest {
 
     @Test
     void testGetExternalReferencesBySchemaId_Success() {
-        UUID extRefId1 = UUID.randomUUID();
-        UUID extRefId2 = UUID.randomUUID();
+        String extRefId1 = "EXT-REF-001";
+        String extRefId2 = "EXT-REF-002";
 
         // Mock schema exists
         when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
@@ -910,7 +953,7 @@ class SchemaServiceTest {
         verify(namespaceFilterManager).enableIfPresent(testNamespace);
         verify(schmRepository).findBySchmId(testSchmId);
         verify(schmExtRefXrefRepository).findBySchmId(testSchmId);
-        verify(extRefRepository).findAllById(anyList());
+        verify(extRefRepository).findAllById(anyIterable());
         verify(extRefRepository, never()).findById(any());
     }
 
@@ -931,7 +974,7 @@ class SchemaServiceTest {
     void testGetExternalReferencesBySchemaId_NoExternalReferences() {
         when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(Arrays.asList());
-        when(extRefRepository.findAllById(anyList())).thenReturn(Arrays.asList());
+        when(extRefRepository.findAllById(anyIterable())).thenReturn(Arrays.asList());
 
         List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId, PageRequest.of(0, 20)).getContent();
 
@@ -943,8 +986,8 @@ class SchemaServiceTest {
 
     @Test
     void testGetExternalReferencesBySchemaId_WithMissingExtRef() {
-        UUID extRefId1 = UUID.randomUUID();
-        UUID extRefId2 = UUID.randomUUID();
+        String extRefId1 = "EXT-REF-100";
+        String extRefId2 = "EXT-REF-200";
 
         when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
@@ -974,6 +1017,6 @@ class SchemaServiceTest {
         assertNotNull(result);
         assertEquals(1, result.size());
         assertEquals("API Reference", result.get(0).getExtRefName());
-        verify(extRefRepository).findAllById(anyList());
+        verify(extRefRepository).findAllById(anyIterable());
     }
 }

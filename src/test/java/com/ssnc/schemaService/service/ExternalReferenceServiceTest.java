@@ -49,33 +49,53 @@ class ExternalReferenceServiceTest {
     @Mock
     private JwtClaimsContext jwtClaimsContext;
 
+    @Mock
+    private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
+
+    @Mock
+    private com.ssnc.schemaService.repo.NameSpaceRepository nameSpaceRepository;
+
     @InjectMocks
     private ExternalReferenceService externalReferenceService;
 
     private String testNamespace;
-    private UUID testExtRefId;
+    private String testExtRefId;
     private UUID testSchmId;
+    private UUID testTenantId;
+    private UUID testNmspcId;
     private String testExtRefType;
     private String testExtRefVersion;
     private ExtRef testExtRef;
     private Schm testSchm;
     private SchmExtRefXref testXref;
+    private com.ssnc.schemaService.entity.Tenant testTenant;
+    private com.ssnc.schemaService.entity.Nmspc testNmspc;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
         testNamespace = "testNamespace";
-        testExtRefId = UUID.randomUUID();
+        testExtRefId = "TEST-EXT-REF-123";
         testSchmId = UUID.randomUUID();
+        testTenantId = UUID.randomUUID();
+        testNmspcId = UUID.randomUUID();
         testExtRefType = "Process";
         testExtRefVersion = "1.0.0";
+
+        testTenant = new com.ssnc.schemaService.entity.Tenant();
+        testTenant.setTenantId(testTenantId);
+        testTenant.setTenantName("client1Id");
+
+        testNmspc = new com.ssnc.schemaService.entity.Nmspc();
+        testNmspc.setNmspcId(testNmspcId);
+        testNmspc.setNmspcName(testNamespace);
 
         testExtRef = new ExtRef();
         testExtRef.setExtRefId(testExtRefId);
         testExtRef.setExtRefName("Test Process");
         testExtRef.setExtRefType(testExtRefType);
         testExtRef.setExtRefVersion(testExtRefVersion);
-        testExtRef.setTenantName("client1Id");
+        testExtRef.setTenantId(testTenantId);
         testExtRef.setCreatedBy("testUser");
         testExtRef.setUpdatedBy("testUser");
         testExtRef.setCreatedDatetime(LocalDateTime.now());
@@ -83,6 +103,8 @@ class ExternalReferenceServiceTest {
 
         testSchm = new Schm();
         testSchm.setSchmId(testSchmId);
+        testSchm.setTenantId(testTenantId);
+        testSchm.setNmspcId(testNmspcId);
         testSchm.setSchmName("Test Schema");
         testSchm.setSchmDesc("Test Description");
         testSchm.setSchemaType("JSON");
@@ -91,11 +113,14 @@ class ExternalReferenceServiceTest {
 
         testXref = new SchmExtRefXref();
         testXref.setXrefId(UUID.randomUUID());
+        testXref.setTenantId(testTenantId);
         testXref.setSchmId(testSchmId);
         testXref.setExtRefId(testExtRefId);
         testXref.setCreatedBy("testUser");
 
         when(jwtClaimsContext.getUserId()).thenReturn("testUser");
+        when(tenantRepository.findByTenantName("client1Id")).thenReturn(Optional.of(testTenant));
+        when(nameSpaceRepository.findByNmspcName(testNamespace)).thenReturn(Optional.of(testNmspc));
     }
 
     @Test
@@ -194,6 +219,8 @@ class ExternalReferenceServiceTest {
         assertNotNull(result);
         assertTrue(result.isEmpty());
         verify(namespaceFilterManager).enableIfPresent(testNamespace);
+        // PERFORMANCE: Verify no unnecessary database call when no schemas to fetch
+        verify(schmRepository, never()).findAllById(anyList());
     }
 
     @Test
@@ -303,11 +330,11 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
-            when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
+            when(schmExtRefXrefRepository.saveAll(anyList())).thenAnswer(i -> i.getArguments()[0]);
             // Mock schema validation with locking
             when(schmRepository.findWithLockBySchmId(schmId1)).thenReturn(Optional.of(schm1));
             when(schmRepository.findWithLockBySchmId(schmId2)).thenReturn(Optional.of(schm2));
@@ -326,7 +353,9 @@ class ExternalReferenceServiceTest {
             inOrder.verify(schmRepository).findWithLockBySchmId(schmId1);  // First (smaller UUID)
             inOrder.verify(schmRepository).findWithLockBySchmId(schmId2);  // Second (larger UUID)
 
-            verify(schmExtRefXrefRepository, times(2)).save(any(SchmExtRefXref.class));
+            // Verify batch save was called once with correct number of items
+            verify(schmExtRefXrefRepository, times(1)).saveAll(argThat(list ->
+                list instanceof java.util.Collection && ((java.util.Collection<?>)list).size() == 2));
         }
     }
 
@@ -359,6 +388,7 @@ class ExternalReferenceServiceTest {
             // SECURITY: Verify NO saves occurred when validation failed
             verify(extRefRepository, never()).save(any(ExtRef.class));
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
+            verify(schmExtRefXrefRepository, never()).saveAll(anyList());
         }
     }
 
@@ -374,13 +404,13 @@ class ExternalReferenceServiceTest {
                 emptyRequest.setSchemas(Arrays.asList());
 
                 ExtRef extRef = new ExtRef();
-                extRef.setExtRefId(UUID.randomUUID());
+                extRef.setExtRefId("TEST-" + type + "-ID");
                 extRef.setExtRefType(type);
                 extRef.setExtRefName("Test " + type);
 
-                when(extRefRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
+                when(extRefRepository.findById(any(String.class))).thenReturn(Optional.empty());
                 when(extRefRepository.save(any(ExtRef.class))).thenReturn(extRef);
-                when(schmExtRefXrefRepository.findByExtRefId(any(UUID.class))).thenReturn(Arrays.asList());
+                when(schmExtRefXrefRepository.findByExtRefId(any(String.class))).thenReturn(Arrays.asList());
                 doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
                 ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
@@ -416,7 +446,7 @@ class ExternalReferenceServiceTest {
 
         ExtRefDto dto = result.get(0);
         assertEquals(testExtRef.getExtRefId(), dto.getExtRefId());
-        assertEquals(testExtRef.getTenantName(), dto.getTenantName());
+        assertEquals(testExtRef.getTenantId(), dto.getTenantId());
         assertEquals(testExtRef.getExtRefName(), dto.getExtRefName());
         assertEquals(testExtRef.getExtRefType(), dto.getExtRefType());
         assertEquals(testExtRef.getExtRefVersion(), dto.getExtRefVersion());
@@ -458,6 +488,7 @@ class ExternalReferenceServiceTest {
             // SECURITY: Verify NO saves occurred when validation failed
             verify(extRefRepository, never()).save(any(ExtRef.class));
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
+            verify(schmExtRefXrefRepository, never()).saveAll(anyList());
         }
     }
 
@@ -480,7 +511,7 @@ class ExternalReferenceServiceTest {
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
-            when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
+            when(schmExtRefXrefRepository.saveAll(anyList())).thenAnswer(i -> i.getArguments()[0]);
             when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
@@ -534,6 +565,7 @@ class ExternalReferenceServiceTest {
             // Verify no save or delete operations were performed
             verify(extRefRepository, never()).save(any(ExtRef.class));
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
+            verify(schmExtRefXrefRepository, never()).saveAll(anyList());
             verify(schmExtRefXrefRepository, never()).deleteAll(anyList());
             verify(schmRepository, never()).findWithLockBySchmId(any(UUID.class));
         }
@@ -554,7 +586,7 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
-            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
                     .thenReturn(Optional.empty());
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -598,7 +630,7 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
-            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
                     .thenReturn(Optional.empty());
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId))
                     .thenReturn(Arrays.asList(existingXref));
@@ -617,8 +649,9 @@ class ExternalReferenceServiceTest {
 
             // Verify no save or delete operations were performed
             verify(extRefRepository, never()).save(any(ExtRef.class));
-            verify(schmExtRefXrefRepository, never()).deleteAll(anyList());
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
+            verify(schmExtRefXrefRepository, never()).saveAll(anyList());
+            verify(schmExtRefXrefRepository, never()).deleteAll(anyList());
         }
     }
 
@@ -651,6 +684,7 @@ class ExternalReferenceServiceTest {
             // No database writes should occur
             verify(extRefRepository, never()).save(any(ExtRef.class));
             verify(schmExtRefXrefRepository, never()).save(any());
+            verify(schmExtRefXrefRepository, never()).saveAll(anyList());
             verify(schmExtRefXrefRepository, never()).deleteAll(any());
             verify(schmRepository, never()).findWithLockBySchmId(any());
         }
@@ -714,7 +748,7 @@ class ExternalReferenceServiceTest {
 
             // External reference does NOT exist (creation scenario)
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
 
@@ -747,6 +781,7 @@ class ExternalReferenceServiceTest {
             // SECURITY FIX: Schema validation now happens BEFORE ExtRef save to prevent data corruption
             verify(extRefRepository, never()).save(any(ExtRef.class)); // No ExtRef saved if validation fails
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class)); // No xrefs saved
+            verify(schmExtRefXrefRepository, never()).saveAll(anyList()); // No batch saves
 
             // Validation happened in sorted order before any saves
             verify(schmRepository).findWithLockBySchmId(validSchmId); // First (passed)
@@ -762,10 +797,10 @@ class ExternalReferenceServiceTest {
         request.setSchemas(Arrays.asList());
 
         // Existing external reference with same name, type, version but DIFFERENT ID
-        UUID existingExtRefId = UUID.randomUUID();
+        String existingExtRefId = "EXISTING-EXT-REF-999";
         ExtRef existingExtRef = new ExtRef();
         existingExtRef.setExtRefId(existingExtRefId);
-        existingExtRef.setTenantName("client1Id");
+        existingExtRef.setTenantId(testTenantId);
         existingExtRef.setExtRefName("Test Process");
         existingExtRef.setExtRefType(testExtRefType);
         existingExtRef.setExtRefVersion(testExtRefVersion);
@@ -777,8 +812,8 @@ class ExternalReferenceServiceTest {
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
 
             // But a record EXISTS with same name/type/version and different ID
-            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(
-                    "Test Process", testExtRefType, testExtRefVersion))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
+                    testTenantId, "Test Process", testExtRefType, testExtRefVersion))
                     .thenReturn(Optional.of(existingExtRef));
 
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -799,6 +834,7 @@ class ExternalReferenceServiceTest {
             // Verify no save operations occurred
             verify(extRefRepository, never()).save(any(ExtRef.class));
             verify(schmExtRefXrefRepository, never()).save(any());
+            verify(schmExtRefXrefRepository, never()).saveAll(anyList());
             verify(schmExtRefXrefRepository, never()).deleteAll(any());
         }
     }
@@ -819,8 +855,8 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
-            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(
-                    "New Name", testExtRefType, "2.0.0"))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
+                    testTenantId, "New Name", testExtRefType, "2.0.0"))
                     .thenReturn(Optional.empty());
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -869,7 +905,7 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
@@ -893,6 +929,7 @@ class ExternalReferenceServiceTest {
             // SECURITY: No saves should occur because validation failed
             verify(extRefRepository, never()).save(any(ExtRef.class));
             verify(schmExtRefXrefRepository, never()).save(any(SchmExtRefXref.class));
+            verify(schmExtRefXrefRepository, never()).saveAll(anyList());
         }
     }
 
@@ -945,11 +982,11 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByExtRefNameAndExtRefTypeAndExtRefVersion(anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
-            when(schmExtRefXrefRepository.save(any(SchmExtRefXref.class))).thenAnswer(i -> i.getArguments()[0]);
+            when(schmExtRefXrefRepository.saveAll(anyList())).thenAnswer(i -> i.getArguments()[0]);
 
             // Mock the repository to return schemas - locks should be acquired in SORTED order (1, 2, 3)
             when(schmRepository.findWithLockBySchmId(uuid1)).thenReturn(Optional.of(schm1));
@@ -972,8 +1009,77 @@ class ExternalReferenceServiceTest {
             inOrder.verify(schmRepository).findWithLockBySchmId(uuid2); // SECOND
             inOrder.verify(schmRepository).findWithLockBySchmId(uuid3); // THIRD (largest UUID)
 
-            // Verify all schemas were saved
-            verify(schmExtRefXrefRepository, times(3)).save(any(SchmExtRefXref.class));
+            // Verify batch save was called once with correct number of items
+            verify(schmExtRefXrefRepository, times(1)).saveAll(argThat(list ->
+                list instanceof java.util.Collection && ((java.util.Collection<?>)list).size() == 3));
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_RaceCondition_HandlesUniqueConstraintViolation() {
+        // RACE CONDITION: Test that DataIntegrityViolationException is caught and converted
+        // to a clean IllegalArgumentException with proper error message
+        // Scenario: Between check and insert, another request creates the same record
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+        request.setSchemas(Arrays.asList());
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            // Check passes (no duplicate found)
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
+                    any(UUID.class), anyString(), anyString(), anyString()))
+                    .thenReturn(Optional.empty());
+
+            // But save fails with DataIntegrityViolationException (race condition - another request created it)
+            when(extRefRepository.save(any(ExtRef.class)))
+                    .thenThrow(new org.springframework.dao.DataIntegrityViolationException(
+                            "Unique constraint violation: uk_ext_ref_tenant_id_name_type_version"));
+
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            // Execute - should catch DataIntegrityViolationException and throw clean IllegalArgumentException
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    externalReferenceService.createOrUpdateExternalReference(
+                            testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request)
+            );
+
+            // Verify clean error message (not database stack trace)
+            assertTrue(exception.getMessage().contains("already exists"));
+            assertTrue(exception.getMessage().contains("Test Process"));
+            assertTrue(exception.getMessage().contains(testExtRefType));
+            assertTrue(exception.getMessage().contains(testExtRefVersion));
+        }
+    }
+
+    @Test
+    void testCreateOrUpdateExternalReference_RaceCondition_RethrowsNonUniqueConstraintError() {
+        // Test that non-unique-constraint DataIntegrityViolationExceptions are re-thrown
+        // Only unique constraint violations should be caught and converted
+        ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
+        request.setSchemas(Arrays.asList());
+
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
+                    any(UUID.class), anyString(), anyString(), anyString()))
+                    .thenReturn(Optional.empty());
+
+            // Save fails with DataIntegrityViolationException for a DIFFERENT constraint (e.g., foreign key)
+            when(extRefRepository.save(any(ExtRef.class)))
+                    .thenThrow(new org.springframework.dao.DataIntegrityViolationException(
+                            "Foreign key constraint violation: fk_tenant_id"));
+
+            doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
+
+            // Execute - should re-throw the DataIntegrityViolationException (not convert to IllegalArgumentException)
+            assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () ->
+                    externalReferenceService.createOrUpdateExternalReference(
+                            testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request)
+            );
         }
     }
 }

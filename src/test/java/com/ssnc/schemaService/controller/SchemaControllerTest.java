@@ -457,8 +457,8 @@ class SchemaControllerTest {
     @Test
     void testGetSchemaExternalReferences_Success() {
         Pageable pageable = PageRequest.of(0, 20);
-        UUID extRefId1 = UUID.randomUUID();
-        UUID extRefId2 = UUID.randomUUID();
+        String extRefId1 = "REF-123456";
+        String extRefId2 = "REF-789012";
 
         ExtRefDto extRef1 = new ExtRefDto();
         extRef1.setExtRefId(extRefId1);

@@ -20,24 +20,24 @@ public interface SchmExtRefXrefRepository extends JpaRepository<SchmExtRefXref, 
     /**
      * Find cross-references by external reference ID
      */
-    List<SchmExtRefXref> findByExtRefId(UUID extRefId);
+    List<SchmExtRefXref> findByExtRefId(String extRefId);
 
     /**
      * Find schemas by external reference details
      * Uses JPA method naming to navigate through the extRef relationship
      */
     List<SchmExtRefXref> findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
-            String extRefType, UUID extRefId, String extRefVersion);
+            String extRefType, String extRefId, String extRefVersion);
 
     /**
      * Check if cross-reference exists
      */
-    boolean existsBySchmIdAndExtRefId(UUID schmId, UUID extRefId);
+    boolean existsBySchmIdAndExtRefId(UUID schmId, String extRefId);
 
     /**
      * Delete cross-reference by schema ID and external reference ID
      */
     @Modifying
     @Transactional
-    void deleteBySchmIdAndExtRefId(UUID schmId, UUID extRefId);
+    void deleteBySchmIdAndExtRefId(UUID schmId, String extRefId);
 }

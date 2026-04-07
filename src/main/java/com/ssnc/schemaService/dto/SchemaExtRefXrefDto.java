@@ -8,9 +8,9 @@ import java.util.UUID;
 @Data
 public class SchemaExtRefXrefDto {
     private UUID xrefId;
-    private String tenantName;
+    private UUID tenantId;
     private UUID schmId;
-    private UUID extRefId;
+    private String extRefId;
     private LocalDateTime createdDatetime;
     private String createdBy;
 

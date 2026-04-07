@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Table;
 import lombok.Data;
+import lombok.ToString;
 import org.hibernate.annotations.*;
 
 import java.time.LocalDateTime;
@@ -15,11 +16,11 @@ import java.util.UUID;
 @Table(name = "SCHM", schema = "SCHMDB")
 @FilterDef(
         name = "namespaceFilter",
-        parameters = @ParamDef(name = "namespace", type = String.class)
+        parameters = @ParamDef(name = "namespaceId", type = UUID.class)
 )
 @Filter(
         name = "namespaceFilter",
-        condition = "NMSPC_NAME = :namespace"
+        condition = "NMSPC_ID = :namespaceId"
 )
 @Data
 public class Schm {
@@ -29,15 +30,11 @@ public class Schm {
     @Column(name = "SCHM_ID", nullable = false)
     private UUID schmId;
 
-    /**
-     * Hibernate 6 tenant discriminator column
-     */
-    @TenantId
-    @Column(name = "TENANT_NAME", nullable = false, updatable = false)
-    private String tenantName;
+    @Column(name = "TENANT_ID", nullable = false, updatable = false)
+    private UUID tenantId;
 
-    @Column(name = "NMSPC_NAME", nullable = false)
-    private String namespace;
+    @Column(name = "NMSPC_ID", nullable = false)
+    private UUID nmspcId;
 
     @Column(name = "SCHM_NAME", length = 256)
     private String schmName;
@@ -45,37 +42,63 @@ public class Schm {
     @Column(name = "SCHM_DESC", length = 4000)
     private String schmDesc;
 
-    @CreationTimestamp
-    @Column(name = "CREATED_DATETIME", updatable = false)
-    private LocalDateTime createdDatetime;
-
-    @Column(name = "CREATED_BY", length = 256)
-    private String createdBy;
-
-    @UpdateTimestamp
-    @Column(name = "UPDATED_DATETIME")
-    private LocalDateTime updatedDatetime;
-
-    @Column(name = "UPDATED_BY", length = 256)
-    private String updatedBy;
-
-    @Column(name = "LOCK_BY", length = 256)
-    private String lockBy;
-
-    @Column(name = "\"GROUP\"", length = 256)
-    private String group;
-
     @Column(name = "SCHM_TYPE", length = 64)
     private String schemaType;
 
     @Column(name = "CONTENT_TYPE", length = 128)
     private String contentType;
 
+    @Column(name = "SCHM_GROUP", length = 256)
+    private String schmGroup;
+
     @Column(name = "PUBLISH_VERSION")
     private Integer publishVersion;
 
-    @OneToMany( fetch = FetchType.LAZY , cascade = CascadeType.PERSIST)
-     @JoinColumn(name = "SCHM_ID")
+    @Column(name = "LOCK_BY", length = 256)
+    private String lockBy;
+
+    @Column(name = "CREATED_BY", length = 256)
+    private String createdBy;
+
+    @Column(name = "UPDATED_BY", length = 256)
+    private String updatedBy;
+
+    @CreationTimestamp
+    @Column(name = "CREATED_DATETIME", updatable = false)
+    private LocalDateTime createdDatetime;
+
+    @UpdateTimestamp
+    @Column(name = "UPDATED_DATETIME")
+    private LocalDateTime updatedDatetime;
+
+    /**
+     * ORM mapping relationship - DO NOT ACCESS directly.
+     * Accessing this field triggers lazy-loading and causes N+1 query problems.
+     * Use tenantId field instead for filtering/queries.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "TENANT_ID", insertable = false, updatable = false)
+    @ToString.Exclude
+    private Tenant tenant;
+
+    /**
+     * ORM mapping relationship - DO NOT ACCESS directly.
+     * Accessing this field triggers lazy-loading and causes N+1 query problems.
+     * Use nmspcId field instead for filtering/queries.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "NMSPC_ID", insertable = false, updatable = false)
+    @ToString.Exclude
+    private Nmspc nmspc;
+
+    /**
+     * ORM mapping relationship - DO NOT ACCESS directly.
+     * Accessing this field triggers lazy-loading and causes N+1 query problems.
+     * Fetch versions explicitly via SchmDataRepository when needed.
+     */
+    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.PERSIST)
+    @JoinColumn(name = "SCHM_ID")
+    @ToString.Exclude
     private List<SchmData> versions = new ArrayList<>();
 
 }

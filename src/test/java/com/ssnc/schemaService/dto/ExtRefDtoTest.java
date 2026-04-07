@@ -11,13 +11,15 @@ import static org.junit.jupiter.api.Assertions.*;
 class ExtRefDtoTest {
 
     private ExtRefDto extRefDto;
-    private UUID testExtRefId;
+    private String testExtRefId;
+    private UUID testTenantId;
     private LocalDateTime testDateTime;
 
     @BeforeEach
     void setUp() {
         extRefDto = new ExtRefDto();
-        testExtRefId = UUID.randomUUID();
+        testExtRefId = "550e8400-e29b-41d4-a716-446655440000";
+        testTenantId = UUID.randomUUID();
         testDateTime = LocalDateTime.now();
     }
 
@@ -28,9 +30,9 @@ class ExtRefDtoTest {
     }
 
     @Test
-    void testTenantName() {
-        extRefDto.setTenantName("client1Id");
-        assertEquals("client1Id", extRefDto.getTenantName());
+    void testTenantId() {
+        extRefDto.setTenantId(testTenantId);
+        assertEquals(testTenantId, extRefDto.getTenantId());
     }
 
     @Test
@@ -77,12 +79,13 @@ class ExtRefDtoTest {
 
     @Test
     void testAllFields() {
-        UUID extRefId = UUID.randomUUID();
+        String extRefId = "1234567890";
+        UUID tenantId = UUID.randomUUID();
         LocalDateTime createdDateTime = LocalDateTime.now();
         LocalDateTime updatedDateTime = LocalDateTime.now().plusMinutes(5);
 
         extRefDto.setExtRefId(extRefId);
-        extRefDto.setTenantName("client1Id");
+        extRefDto.setTenantId(tenantId);
         extRefDto.setExtRefName("Complete Process");
         extRefDto.setExtRefType("Automation");
         extRefDto.setExtRefVersion("2.0.0");
@@ -92,7 +95,7 @@ class ExtRefDtoTest {
         extRefDto.setUpdatedBy("user2");
 
         assertEquals(extRefId, extRefDto.getExtRefId());
-        assertEquals("client1Id", extRefDto.getTenantName());
+        assertEquals(tenantId, extRefDto.getTenantId());
         assertEquals("Complete Process", extRefDto.getExtRefName());
         assertEquals("Automation", extRefDto.getExtRefType());
         assertEquals("2.0.0", extRefDto.getExtRefVersion());
@@ -105,7 +108,7 @@ class ExtRefDtoTest {
     @Test
     void testNullValues() {
         assertNull(extRefDto.getExtRefId());
-        assertNull(extRefDto.getTenantName());
+        assertNull(extRefDto.getTenantId());
         assertNull(extRefDto.getExtRefName());
         assertNull(extRefDto.getExtRefType());
         assertNull(extRefDto.getExtRefVersion());

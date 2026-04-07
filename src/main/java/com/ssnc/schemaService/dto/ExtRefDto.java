@@ -7,8 +7,8 @@ import java.util.UUID;
 
 @Data
 public class ExtRefDto {
-    private UUID extRefId;
-    private String tenantName;
+    private String extRefId;
+    private UUID tenantId;
     private String extRefName;
     private String extRefType;
     private String extRefVersion;

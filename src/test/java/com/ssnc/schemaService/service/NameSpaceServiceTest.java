@@ -4,6 +4,7 @@ import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.dto.NameSpaceDto;
 import com.ssnc.schemaService.entity.Nmspc;
 import com.ssnc.schemaService.repo.NameSpaceRepository;
+import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -19,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -32,6 +35,9 @@ class NameSpaceServiceTest {
     private NameSpaceRepository nameSpaceRepository;
 
     @Mock
+    private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
+
+    @Mock
     private JwtClaimsContext jwtClaimsContext;
 
     @InjectMocks
@@ -39,15 +45,26 @@ class NameSpaceServiceTest {
 
     private String testNamespaceName;
     private String testUserId;
+    private UUID testNmspcId;
+    private UUID testTenantId;
     private Nmspc testNmspc;
     private NameSpaceDto testNameSpaceDto;
+    private com.ssnc.schemaService.entity.Tenant testTenant;
 
     @BeforeEach
     void setUp() {
         testNamespaceName = "testNamespace";
         testUserId = "testUser";
+        testNmspcId = UUID.randomUUID();
+        testTenantId = UUID.randomUUID();
+
+        testTenant = new com.ssnc.schemaService.entity.Tenant();
+        testTenant.setTenantId(testTenantId);
+        testTenant.setTenantName("client1Id");
 
         testNmspc = new Nmspc();
+        testNmspc.setNmspcId(testNmspcId);
+        testNmspc.setTenantId(testTenantId);
         testNmspc.setNmspcName(testNamespaceName);
         testNmspc.setDescription("Test Namespace Description");
         testNmspc.setCreatedBy(testUserId);
@@ -63,6 +80,8 @@ class NameSpaceServiceTest {
 
         // Mock JwtClaimsContext to return test user
         when(jwtClaimsContext.getUserId()).thenReturn(testUserId);
+        // Mock TenantRepository
+        when(tenantRepository.findByTenantName(anyString())).thenReturn(Optional.of(testTenant));
     }
 
     @Test
@@ -129,7 +148,7 @@ class NameSpaceServiceTest {
 
     @Test
     void testGetNameSpaceByName_Success() {
-        when(nameSpaceRepository.findBynmspcName(testNamespaceName)).thenReturn(Optional.of(testNmspc));
+        when(nameSpaceRepository.findByNmspcName(testNamespaceName)).thenReturn(Optional.of(testNmspc));
 
         NameSpaceDto result = nameSpaceService.getNameSpaceByName(testNamespaceName);
 
@@ -138,23 +157,24 @@ class NameSpaceServiceTest {
         assertEquals("Test Namespace Description", result.getDescription());
         assertEquals(testUserId, result.getCreatedByUser());
         assertEquals(testUserId, result.getModifiedByUser());
-        verify(nameSpaceRepository).findBynmspcName(testNamespaceName);
+        verify(nameSpaceRepository).findByNmspcName(testNamespaceName);
     }
 
     @Test
     void testGetNameSpaceByName_NotFound_ThrowsException() {
-        when(nameSpaceRepository.findBynmspcName(testNamespaceName)).thenReturn(Optional.empty());
+        when(nameSpaceRepository.findByNmspcName(testNamespaceName)).thenReturn(Optional.empty());
 
         assertThrows(EntityNotFoundException.class, () ->
                 nameSpaceService.getNameSpaceByName(testNamespaceName)
         );
 
-        verify(nameSpaceRepository).findBynmspcName(testNamespaceName);
+        verify(nameSpaceRepository).findByNmspcName(testNamespaceName);
     }
 
     @Test
     void testGetAllNameSpaces_Success() {
         Nmspc namespace2 = new Nmspc();
+        namespace2.setNmspcId(UUID.randomUUID());
         namespace2.setNmspcName("namespace2");
         namespace2.setDescription("Second namespace");
         namespace2.setCreatedBy("user2");
@@ -185,7 +205,9 @@ class NameSpaceServiceTest {
 
     @Test
     void testMapToNameSpaceDto_AllFieldsPopulated() {
+        UUID mappedNmspcId = UUID.randomUUID();
         Nmspc nmspc = new Nmspc();
+        nmspc.setNmspcId(mappedNmspcId);
         nmspc.setNmspcName("mappedNamespace");
         nmspc.setDescription("Mapped Description");
         nmspc.setCreatedBy("mappedUser");
@@ -193,12 +215,12 @@ class NameSpaceServiceTest {
         nmspc.setCreatedDatetime(LocalDateTime.now());
         nmspc.setUpdatedDatetime(LocalDateTime.now());
 
-        when(nameSpaceRepository.findBynmspcName("mappedNamespace")).thenReturn(Optional.of(nmspc));
+        when(nameSpaceRepository.findByNmspcName("mappedNamespace")).thenReturn(Optional.of(nmspc));
 
         NameSpaceDto result = nameSpaceService.getNameSpaceByName("mappedNamespace");
 
         assertNotNull(result);
-        assertEquals("mappedNamespace", result.getId());
+        assertEquals(mappedNmspcId, result.getNmspcId());
         assertEquals("mappedNamespace", result.getName());
         assertEquals("Mapped Description", result.getDescription());
         assertEquals("mappedUser", result.getCreatedByUser());

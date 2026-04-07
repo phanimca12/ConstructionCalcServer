@@ -1,5 +1,8 @@
 package com.ssnc.schemaService.dto;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;
@@ -9,15 +12,17 @@ import java.util.UUID;
 public class ExtRefWithSchemasRequest {
     /**
      * List of schema references. Can be empty but not null.
-     * Validation is performed at service layer.
      */
+    @NotNull(message = ErrorMessages.VALIDATION_SCHEMAS_FIELD_REQUIRED)
+    @Valid
     private List<SchemaReference> schemas;
 
     @Data
     public static class SchemaReference {
         /**
-         * Schema ID. Validation is performed at service layer.
+         * Schema ID is required for each schema reference
          */
+        @NotNull(message = ErrorMessages.VALIDATION_SCHM_ID_REQUIRED)
         private UUID schmId;
 
         private String schmName;

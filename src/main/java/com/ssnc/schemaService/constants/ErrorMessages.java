@@ -30,20 +30,38 @@ public final class ErrorMessages {
     public static final String EXTERNAL_REFERENCE_CREATED_SUCCESS = "External reference created successfully.";
     public static final String EXTERNAL_REFERENCE_IMMUTABLE = "External reference with ID %s and version '%s' already exists and is immutable. Cannot modify name, type, or schema associations for an existing version. Create a new version if changes are needed.";
     public static final String EXTERNAL_REFERENCE_VERSION_IMMUTABLE = "External reference version '%s' for ID %s is immutable. Existing schemas: %s. Requested schemas: %s. Create a new version if different schema associations are needed.";
+    public static final String EXTERNAL_REFERENCE_INVALID_TYPE = "Invalid ExtRefType: %s";
 
     // External reference validation messages
     public static final String EXTERNAL_REFERENCE_REQUEST_BODY_NULL = "Request body cannot be null";
     public static final String EXTERNAL_REFERENCE_SCHEMA_LIST_NULL = "Schema list cannot be null. Use empty list if no schemas to associate.";
     public static final String EXTERNAL_REFERENCE_SCHEMA_ID_NULL = "Schema ID cannot be null";
 
+    // Field length validation messages
+    public static final String VALIDATION_NAMESPACE_MAX_LENGTH = "Namespace must not exceed 32 characters";
+    public static final String VALIDATION_TYPE_MAX_LENGTH = "Type must not exceed 64 characters";
+    public static final String VALIDATION_EXT_REF_TYPE_MAX_LENGTH = "External reference type must not exceed 64 characters";
+    public static final String VALIDATION_EXT_REF_ID_MAX_LENGTH = "External reference ID must not exceed 64 characters";
+    public static final String VALIDATION_EXT_REF_NAME_MAX_LENGTH = "External reference name must not exceed 256 characters";
+    public static final String VALIDATION_EXT_REF_VERSION_MAX_LENGTH = "External reference version must not exceed 64 characters";
+
+    // Field required validation messages
+    public static final String VALIDATION_SCHEMAS_FIELD_REQUIRED = "schemas field is required";
+    public static final String VALIDATION_SCHM_ID_REQUIRED = "schmId is required for each schema reference";
+
+    // HTTP status messages
+    public static final String HTTP_BAD_REQUEST = "Bad Request";
+
     // Tenant related messages
     public static final String TENANT_NOT_FOUND = "Tenant not found";
+    public static final String TENANT_NOT_FOUND_FORMAT = "Tenant not found: %s";
     public static final String TENANT_ALREADY_ONBOARDED = "Tenant already onboarded: %s";
     public static final String JWT_CONTEXT_NOT_POPULATED = "JWT claims context is not populated. Cannot create tenants.";
     public static final String NO_TENANT_IN_JWT = "No tenant found in JWT context";
     public static final String TENANT_ONBOARDING_SUCCESS = "Successfully created tenant: %s";
     public static final String TENANT_ONBOARDING_PREPARING = "Preparing to create new tenant: %s";
     public static final String TENANT_CREATION_FAILED = "Failed to create Tenant, Please contact support";
+    public static final String TENANT_CONFIG_INVALID = "Invalid tenant configuration";
 
     // Namespace related messages
     public static final String NAMESPACE_NOT_FOUND = "Namespace not found";
@@ -53,4 +71,12 @@ public final class ErrorMessages {
 
     // Sync messages
     public static final String ERROR_SYNCING_TENANTS = "Error syncing tenants from JWT claims context: {}";
+
+    // Database constraint names
+    public static final String DB_CONSTRAINT_UNIQUE_EXT_REF = "uk_ext_ref_tenant_id_name_type_version";
+    public static final String DB_CONSTRAINT_KEYWORD_UNIQUE = "unique";
+    public static final String DB_CONSTRAINT_KEYWORD_EXT_REF = "ext_ref";
+
+    // Generic messages
+    public static final String GENERIC_ANOTHER_RECORD = "another record";
 }

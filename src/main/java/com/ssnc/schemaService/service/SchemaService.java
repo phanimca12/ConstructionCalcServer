@@ -59,6 +59,12 @@ public class SchemaService {
     @Autowired
     private ExtRefRepository extRefRepository;
 
+    @Autowired
+    private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
+
+    @Autowired
+    private com.ssnc.schemaService.repo.NameSpaceRepository nameSpaceRepository;
+
     /**
      * Get schemas with optional filtering, sorting, and pagination
      *
@@ -181,9 +187,23 @@ public class SchemaService {
 
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
                 ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+        String tenantName = TenantContext.getTenantName();
+
+        // Resolve tenant_id and nmspc_id
+        UUID tenantId = tenantRepository.findByTenantName(tenantName)
+                .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        String.format("Tenant not found: %s", tenantName)));
+
+        // SECURITY: Use tenant-aware namespace lookup to ensure proper isolation
+        UUID nmspcId = nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace)
+                .map(com.ssnc.schemaService.entity.Nmspc::getNmspcId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        String.format("Namespace not found: %s for tenant: %s", namespace, tenantName)));
 
         Schm schema = mapToSchmEntity(schemaDto);
-        schema.setNamespace(namespace);
+        schema.setTenantId(tenantId);
+        schema.setNmspcId(nmspcId);
         schema.setCreatedBy(userName);
         schema.setUpdatedBy(userName);
         Schm saved = schmRepository.save(schema);
@@ -279,7 +299,7 @@ public class SchemaService {
         existing.setSchmDesc(schemaDto.getDescription());
         existing.setSchemaType(schemaDto.getSchemaType());
         existing.setContentType(schemaDto.getContentType());
-        existing.setGroup(schemaDto.getGroup());
+        existing.setSchmGroup(schemaDto.getSchmGroup());
         existing.setLockBy(schemaDto.getLockBy());
         existing.setUpdatedBy(userName);
 
@@ -532,7 +552,7 @@ public class SchemaService {
         List<SchmExtRefXref> xrefs = schmExtRefXrefRepository.findBySchmId(schmId);
 
         // Batch fetch all external references (fix N+1 query problem)
-        List<UUID> extRefIds = xrefs.stream()
+        List<String> extRefIds = xrefs.stream()
                 .map(SchmExtRefXref::getExtRefId)
                 .collect(Collectors.toList());
 
@@ -569,7 +589,7 @@ public class SchemaService {
     private ExtRefDto mapExtRefToDto(ExtRef extRef) {
         ExtRefDto dto = new ExtRefDto();
         dto.setExtRefId(extRef.getExtRefId());
-        dto.setTenantName(extRef.getTenantName());
+        dto.setTenantId(extRef.getTenantId());
         dto.setExtRefName(extRef.getExtRefName());
         dto.setExtRefType(extRef.getExtRefType());
         dto.setExtRefVersion(extRef.getExtRefVersion());
@@ -611,12 +631,14 @@ public class SchemaService {
     private SchemaDto mapToSchemaResponse(Schm schm) {
         SchemaDto response = new SchemaDto();
         response.setId(schm.getSchmId());
+        response.setTenantId(schm.getTenantId());
+        response.setNmspcId(schm.getNmspcId());
         response.setName(schm.getSchmName());
         response.setDescription(schm.getSchmDesc());
         response.setSchemaType(schm.getSchemaType());
         response.setContentType(schm.getContentType());
         response.setLockBy(schm.getLockBy());
-        response.setGroup(schm.getGroup());
+        response.setSchmGroup(schm.getSchmGroup());
         response.setCreatedByUser(schm.getCreatedBy());
         response.setCreateDateTime(schm.getCreatedDatetime());
         response.setModifiedByUser(schm.getUpdatedBy());
@@ -655,12 +677,14 @@ public class SchemaService {
     private Schm mapToSchmEntity(SchemaDto response) {
         Schm schm = new Schm();
         schm.setSchmId(response.getId());
+        schm.setTenantId(response.getTenantId());
+        schm.setNmspcId(response.getNmspcId());
         schm.setSchmName(response.getName());
         schm.setSchmDesc(response.getDescription());
         schm.setSchemaType(response.getSchemaType());
         schm.setContentType(response.getContentType());
         schm.setLockBy(response.getLockBy());
-        schm.setGroup(response.getGroup());
+        schm.setSchmGroup(response.getSchmGroup());
         schm.setCreatedDatetime(response.getCreateDateTime());
         schm.setUpdatedDatetime(response.getModifiedDateTime());
         return schm;

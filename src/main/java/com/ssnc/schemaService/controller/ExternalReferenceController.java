@@ -1,21 +1,26 @@
 package com.ssnc.schemaService.controller;
 
+import com.ssnc.schemaService.constants.ApiConstants;
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.ErrorResponse;
 import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.service.ExternalReferenceService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
-@RequestMapping("/extRef/{nameSpace}")
+@RequestMapping(ApiConstants.PATH_EXT_REF_BASE)
+@Validated
 public class ExternalReferenceController {
 
     @Autowired
@@ -31,8 +36,8 @@ public class ExternalReferenceController {
      */
     @GetMapping
     public ResponseEntity<?> getExternalReferences(
-            @PathVariable("nameSpace") String nameSpace,
-            @RequestParam(required = false) String type) {
+            @PathVariable(ApiConstants.PARAM_NAME_SPACE) @Size(max = 32, message = ErrorMessages.VALIDATION_NAMESPACE_MAX_LENGTH) String nameSpace,
+            @RequestParam(value = ApiConstants.QUERY_PARAM_TYPE, required = false) @Size(max = 64, message = ErrorMessages.VALIDATION_TYPE_MAX_LENGTH) String type) {
 
         try {
             List<ExtRefDto> extRefs = externalReferenceService.getExternalReferences(nameSpace, type);
@@ -40,7 +45,7 @@ public class ExternalReferenceController {
         } catch (IllegalArgumentException e) {
             ErrorResponse errorResponse = new ErrorResponse(
                     HttpStatus.BAD_REQUEST.value(),
-                    "Bad Request",
+                    ErrorMessages.HTTP_BAD_REQUEST,
                     e.getMessage()
             );
             return ResponseEntity.badRequest().body(errorResponse);
@@ -53,16 +58,16 @@ public class ExternalReferenceController {
      *
      * @param nameSpace - Namespace filter
      * @param extRefType - External reference type (Process, Automation, PresentationFlow, Sampling, UXBuilder)
-     * @param extRefId - External reference ID (UUID)
-     * @param extRefVersion - External reference version
+     * @param extRefId - External reference ID (supports both GUID and integer values, max 64 chars)
+     * @param extRefVersion - External reference version (max 64 chars)
      * @return List of schemas associated with the external reference or error response
      */
-    @GetMapping("/type/{extRefType}/id/{extRefId}/version/{extRefVersion}/schemas")
+    @GetMapping(ApiConstants.PATH_EXT_REF_BY_TYPE_ID_VERSION)
     public ResponseEntity<?> getSchemasByExternalReference(
-            @PathVariable("nameSpace") String nameSpace,
-            @PathVariable("extRefType") String extRefType,
-            @PathVariable("extRefId") UUID extRefId,
-            @PathVariable("extRefVersion") String extRefVersion) {
+            @PathVariable(ApiConstants.PARAM_NAME_SPACE) @Size(max = 32, message = ErrorMessages.VALIDATION_NAMESPACE_MAX_LENGTH) String nameSpace,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_TYPE) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_TYPE_MAX_LENGTH) String extRefType,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_ID) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH) String extRefId,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_VERSION) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH) String extRefVersion) {
 
         try {
             List<SchemaDto> schemas = externalReferenceService.getSchemasByExternalReference(
@@ -71,7 +76,7 @@ public class ExternalReferenceController {
         } catch (IllegalArgumentException e) {
             ErrorResponse errorResponse = new ErrorResponse(
                     HttpStatus.BAD_REQUEST.value(),
-                    "Bad Request",
+                    ErrorMessages.HTTP_BAD_REQUEST,
                     e.getMessage()
             );
             return ResponseEntity.badRequest().body(errorResponse);
@@ -89,23 +94,23 @@ public class ExternalReferenceController {
      * This endpoint is idempotent - if the exact same data is sent multiple times, it will only
      * create once and return a success message for subsequent identical requests.
      *
-     * @param nameSpace - Namespace filter
-     * @param extRefType - External reference type (Process, Automation, PresentationFlow, Sampling, UXBuilder)
-     * @param extRefName - External reference name
-     * @param extRefId - External reference ID (UUID)
-     * @param extRefVersion - External reference version
+     * @param nameSpace - Namespace filter (max 32 chars)
+     * @param extRefType - External reference type (Process, Automation, PresentationFlow, Sampling, UXBuilder, max 64 chars)
+     * @param extRefName - External reference name (max 256 chars)
+     * @param extRefId - External reference ID (supports both GUID and integer values, max 64 chars)
+     * @param extRefVersion - External reference version (max 64 chars)
      * @param request - REQUIRED request body containing list of schemas to associate (can be empty array)
      * @return Response containing the external reference, a message, and an update flag or error response
      * @throws IllegalArgumentException if trying to modify an existing version (400 Bad Request)
      */
-    @PutMapping("/type/{extRefType}/name/{extRefName}/id/{extRefId}/version/{extRefVersion}/schemas")
+    @PutMapping(ApiConstants.PATH_EXT_REF_CREATE)
     public ResponseEntity<?> createOrUpdateExternalReference(
-            @PathVariable("nameSpace") String nameSpace,
-            @PathVariable("extRefType") String extRefType,
-            @PathVariable("extRefName") String extRefName,
-            @PathVariable("extRefId") UUID extRefId,
-            @PathVariable("extRefVersion") String extRefVersion,
-            @RequestBody ExtRefWithSchemasRequest request) {
+            @PathVariable(ApiConstants.PARAM_NAME_SPACE) @Size(max = 32, message = ErrorMessages.VALIDATION_NAMESPACE_MAX_LENGTH) String nameSpace,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_TYPE) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_TYPE_MAX_LENGTH) String extRefType,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_NAME) @Size(max = 256, message = ErrorMessages.VALIDATION_EXT_REF_NAME_MAX_LENGTH) String extRefName,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_ID) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH) String extRefId,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_VERSION) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH) String extRefVersion,
+            @RequestBody @Valid ExtRefWithSchemasRequest request) {
 
         try {
             ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
@@ -114,7 +119,7 @@ public class ExternalReferenceController {
         } catch (IllegalArgumentException e) {
             ErrorResponse errorResponse = new ErrorResponse(
                     HttpStatus.BAD_REQUEST.value(),
-                    "Bad Request",
+                    ErrorMessages.HTTP_BAD_REQUEST,
                     e.getMessage()
             );
             return ResponseEntity.badRequest().body(errorResponse);

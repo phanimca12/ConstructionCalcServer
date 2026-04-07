@@ -74,7 +74,7 @@ public interface SchmRepository extends JpaRepository<Schm, UUID>, JpaSpecificat
     /**
      * Find schemas by type and group
      */
-    List<Schm> findBySchemaTypeAndGroup(String schemaType, String group);
+    List<Schm> findBySchemaTypeAndSchmGroup(String schemaType, String schmGroup);
 
     /**
      * Find schemas by type
@@ -84,7 +84,7 @@ public interface SchmRepository extends JpaRepository<Schm, UUID>, JpaSpecificat
     /**
      * Find schemas by group
      */
-    List<Schm> findByGroup(String group);
+    List<Schm> findBySchmGroup(String schmGroup);
 
     /**
      * Get schema by ID
