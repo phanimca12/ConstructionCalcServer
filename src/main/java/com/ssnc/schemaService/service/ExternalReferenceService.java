@@ -304,15 +304,15 @@ public class ExternalReferenceService {
         extRef.setUpdatedBy(currentUser);
 
         // RACE CONDITION HANDLING: Wrap save in try-catch to handle concurrent duplicate creation
-        // Between our check (line 217) and save, another request may create same record
+        // Between our uniqueness check above and save below, another request may create same record
         try {
             extRef = extRefRepository.save(extRef);
         } catch (DataIntegrityViolationException e) {
             // Check if this was our unique constraint violation
             String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
-            if (errorMsg.contains(ErrorMessages.DB_CONSTRAINT_UNIQUE_EXT_REF) ||
-                errorMsg.contains(ErrorMessages.DB_CONSTRAINT_KEYWORD_UNIQUE) &&
-                errorMsg.contains(ErrorMessages.DB_CONSTRAINT_KEYWORD_EXT_REF)) {
+            if ((errorMsg.contains(ErrorMessages.DB_CONSTRAINT_UNIQUE_EXT_REF) )||
+                    (errorMsg.contains(ErrorMessages.DB_CONSTRAINT_KEYWORD_UNIQUE) &&
+                errorMsg.contains(ErrorMessages.DB_CONSTRAINT_KEYWORD_EXT_REF))) {
                 throw new IllegalArgumentException(String.format(
                         ErrorMessages.EXTERNAL_REFERENCE_DUPLICATE,
                         extRefName, extRefType, extRefVersion, ErrorMessages.GENERIC_ANOTHER_RECORD));
