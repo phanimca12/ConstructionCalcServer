@@ -446,7 +446,6 @@ class ExternalReferenceServiceTest {
 
         ExtRefDto dto = result.get(0);
         assertEquals(testExtRef.getExtRefId(), dto.getExtRefId());
-        assertEquals(testExtRef.getTenantId(), dto.getTenantId());
         assertEquals(testExtRef.getExtRefName(), dto.getExtRefName());
         assertEquals(testExtRef.getExtRefType(), dto.getExtRefType());
         assertEquals(testExtRef.getExtRefVersion(), dto.getExtRefVersion());

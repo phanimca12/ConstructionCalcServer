@@ -92,7 +92,7 @@ public class NameSpaceService {
 
             if (isUniqueConstraintViolation) {
                 // Concurrent creation - another thread created it; re-fetch
-                logger.debug(ErrorMessages.NAMESPACE_CONCURRENT_CREATION, namespace, tenantId);
+                logger.debug(ErrorMessages.NAMESPACE_CONCURRENT_CREATION);
                 UUID nmspcId = nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace)
                         .map(Nmspc::getNmspcId)
                         .orElseThrow(() -> new IllegalStateException(ErrorMessages.NAMESPACE_RACE_CONDITION_UNRESOLVED));
@@ -102,8 +102,7 @@ public class NameSpaceService {
             }
 
             // Different constraint violation (e.g., foreign key, not null) - throw generic error
-            logger.error(ErrorMessages.NAMESPACE_CONSTRAINT_ERROR_LOG,
-                    namespace, tenantId, e.getMessage(), e);
+            logger.error(ErrorMessages.NAMESPACE_CONSTRAINT_ERROR_LOG, e);
             throw new IllegalStateException(ErrorMessages.NAMESPACE_CONSTRAINT_VIOLATION, e);
         }
         // Note: Other DataAccessExceptions (connection timeout, deadlock, etc.) are not caught
@@ -121,7 +120,7 @@ public class NameSpaceService {
         newNmspc.setUpdatedBy(userName);
 
         Nmspc saved = nameSpaceRepository.save(newNmspc);
-        logger.info(ErrorMessages.NAMESPACE_CREATED, namespace, tenantId);
+        logger.info(ErrorMessages.NAMESPACE_CREATED);
         return saved.getNmspcId();
         // Note: DataAccessExceptions from save() are allowed to bubble up naturally
         // This preserves exception types (connection timeout, deadlock, etc.) for proper handling

@@ -81,11 +81,11 @@ public class TenantService {
 
             if (isUniqueConstraintViolation) {
                 // Concurrent creation - another thread created it; cache and continue
-                logger.debug(ErrorMessages.TENANT_CONCURRENT_CREATION, tenantName);
+                logger.debug(ErrorMessages.TENANT_CONCURRENT_CREATION);
                 tenantExistsCache.put(tenantName, true);
             } else {
                 // Different constraint violation (e.g., foreign key, not null) - re-throw with context
-                logger.error(ErrorMessages.TENANT_CONSTRAINT_ERROR_LOG, tenantName, e.getMessage(), e);
+                logger.error(ErrorMessages.TENANT_CONSTRAINT_ERROR_LOG, e);
                 // Re-throw the original exception to preserve the specific constraint violation type
                 // This allows callers to handle different constraint violations appropriately
                 throw e;
@@ -99,7 +99,7 @@ public class TenantService {
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
                 ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
-        logger.debug(ErrorMessages.TENANT_ONBOARDING_PREPARING, tenantName);
+        logger.debug(ErrorMessages.TENANT_ONBOARDING_PREPARING);
 
         Tenant newTenant = new Tenant();
         newTenant.setTenantName(tenantName);
@@ -107,7 +107,7 @@ public class TenantService {
         newTenant.setUpdatedBy(userName);
 
         Tenant savedTenant = tenantRepository.save(newTenant);
-        logger.info(ErrorMessages.TENANT_ONBOARDING_SUCCESS, tenantName);
+        logger.info(ErrorMessages.TENANT_ONBOARDING_SUCCESS);
         return savedTenant;
         // Note: DataAccessExceptions from save() are allowed to bubble up naturally
         // This preserves exception types (connection timeout, deadlock, etc.) for proper handling

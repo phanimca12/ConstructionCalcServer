@@ -58,14 +58,14 @@ public final class ErrorMessages {
     public static final String TENANT_ALREADY_ONBOARDED = "Tenant already onboarded: %s";
     public static final String JWT_CONTEXT_NOT_POPULATED = "JWT claims context is not populated. Cannot create tenants.";
     public static final String NO_TENANT_IN_JWT = "No tenant found in JWT context";
-    public static final String TENANT_ONBOARDING_SUCCESS = "Successfully created tenant: %s";
-    public static final String TENANT_ONBOARDING_PREPARING = "Preparing to create new tenant: %s";
+    public static final String TENANT_ONBOARDING_SUCCESS = "Successfully created tenant";
+    public static final String TENANT_ONBOARDING_PREPARING = "Preparing to create new tenant";
     public static final String TENANT_CREATION_FAILED = "Failed to create Tenant, Please contact support";
     public static final String TENANT_CONFIG_INVALID = "Invalid tenant configuration";
-    public static final String TENANT_CONCURRENT_CREATION = "Tenant already exists (concurrent creation): {}";
-    public static final String TENANT_CONSTRAINT_ERROR_LOG = "Database constraint violation while creating tenant '{}': {}";
+    public static final String TENANT_CONCURRENT_CREATION = "Tenant already exists (concurrent creation)";
+    public static final String TENANT_CONSTRAINT_ERROR_LOG = "Database constraint violation while creating tenant";
     public static final String TENANT_CONSTRAINT_VIOLATION = "Tenant creation failed due to constraint violation. Please contact support.";
-    public static final String TENANT_ENSURE_FAILED_LOG = "Failed to ensure tenant '{}' exists: {}";
+    public static final String TENANT_ENSURE_FAILED_LOG = "Failed to ensure tenant exists";
     public static final String TENANT_NAME_UNAVAILABLE = "Tenant name is not available in JWT context";
 
     // Namespace related messages
@@ -75,10 +75,10 @@ public final class ErrorMessages {
     public static final String NAMESPACE_OPERATION_FAILED = "Namespace operation failed. Please contact support.";
     public static final String NAMESPACE_RACE_CONDITION_UNRESOLVED = "Namespace creation race condition unresolved. Please contact support.";
     public static final String NAMESPACE_CONSTRAINT_VIOLATION = "Namespace creation failed due to constraint violation. Please contact support.";
-    public static final String NAMESPACE_CONCURRENT_CREATION = "Namespace already exists (concurrent creation): {} for tenant: {}";
-    public static final String NAMESPACE_CREATED = "Created new namespace: {} for tenant: {}";
-    public static final String NAMESPACE_CONSTRAINT_ERROR_LOG = "Database constraint violation while creating namespace '{}' for tenant '{}': {}";
-    public static final String NAMESPACE_ENSURE_FAILED_LOG = "Failed to ensure namespace '{}' exists for tenant '{}': {}";
+    public static final String NAMESPACE_CONCURRENT_CREATION = "Namespace already exists (concurrent creation)";
+    public static final String NAMESPACE_CREATED = "Created new namespace";
+    public static final String NAMESPACE_CONSTRAINT_ERROR_LOG = "Database constraint violation while creating namespace";
+    public static final String NAMESPACE_ENSURE_FAILED_LOG = "Failed to ensure namespace exists";
 
     // JWT context messages
     public static final String JWT_CONTEXT_NOT_FOUND = "Context not Found";
@@ -93,4 +93,7 @@ public final class ErrorMessages {
 
     // Generic messages
     public static final String GENERIC_ANOTHER_RECORD = "another record";
+
+    // Pagination validation messages
+    public static final String INVALID_PAGINATION_OFFSET = "Invalid pagination offset: %d. Must be between 0 and %d";
 }

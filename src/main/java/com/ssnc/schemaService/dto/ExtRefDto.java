@@ -8,7 +8,6 @@ import java.util.UUID;
 @Data
 public class ExtRefDto {
     private String extRefId;
-    private UUID tenantId;
     private String extRefName;
     private String extRefType;
     private String extRefVersion;

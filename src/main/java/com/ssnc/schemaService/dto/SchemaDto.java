@@ -8,8 +8,6 @@ import java.util.UUID;
 @Data
 public class SchemaDto {
     private UUID id;
-    private UUID tenantId;
-    private UUID nmspcId;
     private String name;
     private String description;
     private String schemaType;
