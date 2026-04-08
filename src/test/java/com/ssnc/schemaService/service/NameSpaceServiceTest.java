@@ -233,8 +233,13 @@ class NameSpaceServiceTest {
                 .thenReturn(Optional.of(testNmspc)); // Second call after race condition
 
         when(jwtClaimsContext.getUserId()).thenReturn(testUserId);
+
+        // Create a proper SQLException with SQLState for unique constraint violation
+        java.sql.SQLException sqlException = new java.sql.SQLException(
+                "duplicate key value violates unique constraint \"nmspc_name\"",
+                "23505");
         when(nameSpaceRepository.save(any(Nmspc.class)))
-                .thenThrow(new DataIntegrityViolationException("Duplicate key"));
+                .thenThrow(new DataIntegrityViolationException("Duplicate key", sqlException));
 
         // Act
         UUID result = nameSpaceService.ensureNamespaceExists(testTenantId, testNamespaceName);

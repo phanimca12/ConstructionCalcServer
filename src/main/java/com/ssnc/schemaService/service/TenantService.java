@@ -15,7 +15,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -44,6 +49,7 @@ public class TenantService {
      *
      * @param tenantName - The tenant name to ensure exists
      */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public void ensureTenantExists(String tenantName) {
         // Check cache first to avoid DB query on every request
         Boolean cached = tenantExistsCache.getIfPresent(tenantName);
@@ -59,40 +65,75 @@ public class TenantService {
                 createTenantInternal(tenantName);
             }
 
-            // Cache the tenant existence (only after successful DB operation)
-            tenantExistsCache.put(tenantName, true);
+            // Cache ONLY after successful transaction commit
+            registerCacheUpdate(tenantName);
 
         } catch (DataIntegrityViolationException e) {
             // Check if this was the expected unique constraint violation (concurrent creation)
-            // vs. other constraint violations (e.g., foreign key, not null)
-            String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
-            String rootCauseMsg = e.getRootCause() != null && e.getRootCause().getMessage() != null
-                    ? e.getRootCause().getMessage().toLowerCase() : "";
-
-            boolean isUniqueConstraintViolation =
-                    errorMsg.contains(AppConstants.DB_KEYWORD_UNIQUE) ||
-                    errorMsg.contains(AppConstants.DB_KEYWORD_DUPLICATE) ||
-                    errorMsg.contains(AppConstants.DB_KEYWORD_TENANT_NAME) ||
-                    errorMsg.contains(AppConstants.DB_KEYWORD_TENANT) ||
-                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_UNIQUE) ||
-                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_DUPLICATE) ||
-                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_TENANT_NAME) ||
-                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_TENANT);
-
-            if (isUniqueConstraintViolation) {
+            // vs. other constraint violations using JDBC SQLState codes
+            if (isUniqueConstraintViolation(e)) {
                 // Concurrent creation - another thread created it; cache and continue
                 logger.debug(ErrorMessages.TENANT_CONCURRENT_CREATION);
-                tenantExistsCache.put(tenantName, true);
+                registerCacheUpdate(tenantName);
             } else {
                 // Different constraint violation (e.g., foreign key, not null) - re-throw with context
                 logger.error(ErrorMessages.TENANT_CONSTRAINT_ERROR_LOG, e);
-                // Re-throw the original exception to preserve the specific constraint violation type
-                // This allows callers to handle different constraint violations appropriately
                 throw e;
             }
         }
         // Note: Other DataAccessExceptions (connection timeout, deadlock, etc.) are not caught
         // They will bubble up to allow retry logic or proper error handling at higher levels
+    }
+
+    /**
+     * Checks if a DataIntegrityViolationException is a unique constraint violation
+     * using JDBC SQLState codes (database-agnostic).
+     *
+     * @param e - The exception to check
+     * @return true if it's a unique constraint violation on tenant_name
+     */
+    private boolean isUniqueConstraintViolation(DataIntegrityViolationException e) {
+        Throwable rootCause = e.getRootCause();
+
+        if (rootCause instanceof SQLException) {
+            SQLException sqlEx = (SQLException) rootCause;
+            String sqlState = sqlEx.getSQLState();
+
+            // Standard SQLState codes for unique constraint violations:
+            // 23505 - PostgreSQL unique_violation
+            // 23000 - MySQL/MariaDB integrity_constraint_violation
+            // 23505 - H2 unique_violation
+            if ("23505".equals(sqlState) || "23000".equals(sqlState)) {
+                // Verify it's specifically the tenant_name constraint
+                String message = sqlEx.getMessage();
+                return message != null &&
+                       (message.toLowerCase().contains("tenant_name") ||
+                        message.toLowerCase().contains("tenant"));
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Registers a cache update to happen only after the current transaction commits.
+     * This prevents cache poisoning if the transaction rolls back.
+     *
+     * @param tenantName - The tenant name to cache
+     */
+    private void registerCacheUpdate(String tenantName) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    tenantExistsCache.put(tenantName, true);
+                    logger.debug("Cached tenant existence after commit");
+                }
+            });
+        } else {
+            // No active transaction - cache immediately (e.g., in tests)
+            tenantExistsCache.put(tenantName, true);
+        }
     }
 
     private Tenant createTenantInternal(String tenantName) {

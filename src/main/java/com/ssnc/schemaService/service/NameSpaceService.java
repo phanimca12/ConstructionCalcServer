@@ -15,7 +15,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,9 +31,16 @@ public class NameSpaceService {
 
     private static final Logger logger = LoggerFactory.getLogger(NameSpaceService.class);
 
+    /**
+     * Composite cache key for namespace lookups.
+     * Using a record ensures type safety and eliminates cache key collision
+     * issues that could occur with string concatenation if namespace contains separators.
+     */
+    private record NamespaceCacheKey(UUID tenantId, String namespace) {}
+
     // Cache namespace IDs to avoid DB queries on every request
-    // Key format: "tenantId:namespaceName" for tenant-aware caching
-    private final Cache<String, UUID> namespaceIdCache = Caffeine.newBuilder()
+    // Uses composite key for tenant-aware caching without collision risk
+    private final Cache<NamespaceCacheKey, UUID> namespaceIdCache = Caffeine.newBuilder()
             .expireAfterWrite(AppConstants.CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES)
             .maximumSize(AppConstants.CACHE_MAX_SIZE)
             .build();
@@ -48,8 +60,9 @@ public class NameSpaceService {
      * @param namespace - The namespace name
      * @return The namespace ID
      */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public UUID ensureNamespaceExists(UUID tenantId, String namespace) {
-        String cacheKey = tenantId + AppConstants.CACHE_KEY_SEPARATOR + namespace;
+        NamespaceCacheKey cacheKey = new NamespaceCacheKey(tenantId, namespace);
 
         // Check cache first to avoid DB query on every request
         UUID cachedId = namespaceIdCache.getIfPresent(cacheKey);
@@ -60,44 +73,28 @@ public class NameSpaceService {
         try {
             Optional<Nmspc> existing = nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace);
 
+            UUID nmspcId;
             if (existing.isPresent()) {
-                UUID nmspcId = existing.get().getNmspcId();
-                // Cache the namespace ID after successful lookup
-                namespaceIdCache.put(cacheKey, nmspcId);
-                return nmspcId;
+                nmspcId = existing.get().getNmspcId();
+            } else {
+                // Create new namespace
+                nmspcId = createNamespaceInternal(tenantId, namespace);
             }
 
-            // Create new namespace
-            UUID nmspcId = createNamespaceInternal(tenantId, namespace);
-            // Cache the namespace ID after successful creation
-            namespaceIdCache.put(cacheKey, nmspcId);
+            // Cache ONLY after successful transaction commit
+            registerCacheUpdate(cacheKey, nmspcId);
             return nmspcId;
 
         } catch (DataIntegrityViolationException e) {
-            // Check if this was the expected unique constraint violation (concurrent creation)
-            // vs. other constraint violations (e.g., foreign key, not null)
-            String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
-            String rootCauseMsg = e.getRootCause() != null && e.getRootCause().getMessage() != null
-                    ? e.getRootCause().getMessage().toLowerCase() : "";
-
-            boolean isUniqueConstraintViolation =
-                    errorMsg.contains(AppConstants.DB_KEYWORD_UNIQUE) ||
-                    errorMsg.contains(AppConstants.DB_KEYWORD_DUPLICATE) ||
-                    errorMsg.contains(AppConstants.DB_KEYWORD_NMSPC_NAME) ||
-                    errorMsg.contains(AppConstants.DB_KEYWORD_NAMESPACE) ||
-                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_UNIQUE) ||
-                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_DUPLICATE) ||
-                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_NMSPC_NAME) ||
-                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_NAMESPACE);
-
-            if (isUniqueConstraintViolation) {
+            // Check if this was the expected unique constraint violation using JDBC SQLState codes
+            if (isUniqueConstraintViolation(e)) {
                 // Concurrent creation - another thread created it; re-fetch
                 logger.debug(ErrorMessages.NAMESPACE_CONCURRENT_CREATION);
                 UUID nmspcId = nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace)
                         .map(Nmspc::getNmspcId)
                         .orElseThrow(() -> new IllegalStateException(ErrorMessages.NAMESPACE_RACE_CONDITION_UNRESOLVED));
-                // Cache the namespace ID after successful resolution
-                namespaceIdCache.put(cacheKey, nmspcId);
+                // Cache after successful resolution
+                registerCacheUpdate(cacheKey, nmspcId);
                 return nmspcId;
             }
 
@@ -107,6 +104,58 @@ public class NameSpaceService {
         }
         // Note: Other DataAccessExceptions (connection timeout, deadlock, etc.) are not caught
         // They will bubble up to allow retry logic or proper error handling at higher levels
+    }
+
+    /**
+     * Checks if a DataIntegrityViolationException is a unique constraint violation
+     * using JDBC SQLState codes (database-agnostic).
+     *
+     * @param e - The exception to check
+     * @return true if it's a unique constraint violation on namespace
+     */
+    private boolean isUniqueConstraintViolation(DataIntegrityViolationException e) {
+        Throwable rootCause = e.getRootCause();
+
+        if (rootCause instanceof SQLException) {
+            SQLException sqlEx = (SQLException) rootCause;
+            String sqlState = sqlEx.getSQLState();
+
+            // Standard SQLState codes for unique constraint violations:
+            // 23505 - PostgreSQL unique_violation
+            // 23000 - MySQL/MariaDB integrity_constraint_violation
+            // 23505 - H2 unique_violation
+            if ("23505".equals(sqlState) || "23000".equals(sqlState)) {
+                // Verify it's specifically the namespace constraint
+                String message = sqlEx.getMessage();
+                return message != null &&
+                       (message.toLowerCase().contains("nmspc_name") ||
+                        message.toLowerCase().contains("namespace"));
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Registers a cache update to happen only after the current transaction commits.
+     * This prevents cache poisoning if the transaction rolls back.
+     *
+     * @param cacheKey - The composite cache key
+     * @param nmspcId - The namespace ID to cache
+     */
+    private void registerCacheUpdate(NamespaceCacheKey cacheKey, UUID nmspcId) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    namespaceIdCache.put(cacheKey, nmspcId);
+                    logger.debug("Cached namespace ID after commit");
+                }
+            });
+        } else {
+            // No active transaction - cache immediately (e.g., in tests)
+            namespaceIdCache.put(cacheKey, nmspcId);
+        }
     }
 
     private UUID createNamespaceInternal(UUID tenantId, String namespace) {

@@ -86,46 +86,46 @@ class JwtTenantFilterTest {
     }
 
     @Test
-    void testDoFilterInternal_NullJwtClaimsContext_ThrowsException() throws ServletException, IOException {
+    void testDoFilterInternal_NullJwtClaimsContext_SendsErrorResponse() throws ServletException, IOException {
         // Arrange
         jwtTenantFilter.jwtClaimsContext = null;
 
-        // Act & Assert
-        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
-                jwtTenantFilter.doFilterInternal(request, response, filterChain)
-        );
+        // Act
+        jwtTenantFilter.doFilterInternal(request, response, filterChain);
 
-        assertEquals(ErrorMessages.TENANT_NAME_UNAVAILABLE, exception.getMessage());
+        // Assert
+        assertEquals(401, response.getStatus());
+        assertTrue(response.getContentAsString().contains(ErrorMessages.TENANT_NAME_UNAVAILABLE));
         verify(filterChain, never()).doFilter(any(), any());
         verify(tenantService, never()).ensureTenantExists(any());
     }
 
     @Test
-    void testDoFilterInternal_NullTenantName_ThrowsException() throws ServletException, IOException {
+    void testDoFilterInternal_NullTenantName_SendsErrorResponse() throws ServletException, IOException {
         // Arrange
         when(jwtClaimsContext.getTenant()).thenReturn(null);
 
-        // Act & Assert
-        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
-                jwtTenantFilter.doFilterInternal(request, response, filterChain)
-        );
+        // Act
+        jwtTenantFilter.doFilterInternal(request, response, filterChain);
 
-        assertEquals(ErrorMessages.TENANT_NAME_UNAVAILABLE, exception.getMessage());
+        // Assert
+        assertEquals(401, response.getStatus());
+        assertTrue(response.getContentAsString().contains(ErrorMessages.TENANT_NAME_UNAVAILABLE));
         verify(filterChain, never()).doFilter(any(), any());
         verify(tenantService, never()).ensureTenantExists(any());
     }
 
     @Test
-    void testDoFilterInternal_EmptyTenantName_ThrowsException() throws ServletException, IOException {
+    void testDoFilterInternal_EmptyTenantName_SendsErrorResponse() throws ServletException, IOException {
         // Arrange
         when(jwtClaimsContext.getTenant()).thenReturn("");
 
-        // Act & Assert
-        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
-                jwtTenantFilter.doFilterInternal(request, response, filterChain)
-        );
+        // Act
+        jwtTenantFilter.doFilterInternal(request, response, filterChain);
 
-        assertEquals(ErrorMessages.TENANT_NAME_UNAVAILABLE, exception.getMessage());
+        // Assert
+        assertEquals(401, response.getStatus());
+        assertTrue(response.getContentAsString().contains(ErrorMessages.TENANT_NAME_UNAVAILABLE));
         verify(filterChain, never()).doFilter(any(), any());
         verify(tenantService, never()).ensureTenantExists(any());
     }
@@ -144,16 +144,14 @@ class JwtTenantFilterTest {
     }
 
     @Test
-    void testDoFilterInternal_TenantContextClearedAfterException() throws ServletException, IOException {
+    void testDoFilterInternal_TenantContextClearedAfterError() throws ServletException, IOException {
         // Arrange
         when(jwtClaimsContext.getTenant()).thenReturn(null);
 
-        // Act & Assert
-        assertThrows(IllegalStateException.class, () ->
-                jwtTenantFilter.doFilterInternal(request, response, filterChain)
-        );
+        // Act
+        jwtTenantFilter.doFilterInternal(request, response, filterChain);
 
-        // TenantContext should be cleared even after exception
+        // Assert - TenantContext should be cleared even after error
         assertNull(TenantContext.getTenantName());
     }
 
