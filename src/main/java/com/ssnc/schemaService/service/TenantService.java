@@ -28,8 +28,8 @@ public class TenantService {
     // Cache tenant existence to avoid DB queries on every request
     // TTL of 10 minutes balances freshness with performance
     private final Cache<String, Boolean> tenantExistsCache = Caffeine.newBuilder()
-            .expireAfterWrite(10, TimeUnit.MINUTES)
-            .maximumSize(1000)
+            .expireAfterWrite(AppConstants.CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES)
+            .maximumSize(AppConstants.CACHE_MAX_SIZE)
             .build();
 
     @Autowired
@@ -63,14 +63,36 @@ public class TenantService {
             tenantExistsCache.put(tenantName, true);
 
         } catch (DataIntegrityViolationException e) {
-            // Another thread created it concurrently; cache and continue
-            logger.debug("Tenant already exists (concurrent creation): {}", tenantName);
-            tenantExistsCache.put(tenantName, true);
-        } catch (DataAccessException e) {
-            // DB connectivity or other data access issues
-            logger.error("Failed to ensure tenant '{}' exists: {}", tenantName, e.getMessage(), e);
-            throw new IllegalStateException("Tenant operation failed: " + e.getMessage(), e);
+            // Check if this was the expected unique constraint violation (concurrent creation)
+            // vs. other constraint violations (e.g., foreign key, not null)
+            String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            String rootCauseMsg = e.getRootCause() != null && e.getRootCause().getMessage() != null
+                    ? e.getRootCause().getMessage().toLowerCase() : "";
+
+            boolean isUniqueConstraintViolation =
+                    errorMsg.contains(AppConstants.DB_KEYWORD_UNIQUE) ||
+                    errorMsg.contains(AppConstants.DB_KEYWORD_DUPLICATE) ||
+                    errorMsg.contains(AppConstants.DB_KEYWORD_TENANT_NAME) ||
+                    errorMsg.contains(AppConstants.DB_KEYWORD_TENANT) ||
+                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_UNIQUE) ||
+                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_DUPLICATE) ||
+                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_TENANT_NAME) ||
+                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_TENANT);
+
+            if (isUniqueConstraintViolation) {
+                // Concurrent creation - another thread created it; cache and continue
+                logger.debug(ErrorMessages.TENANT_CONCURRENT_CREATION, tenantName);
+                tenantExistsCache.put(tenantName, true);
+            } else {
+                // Different constraint violation (e.g., foreign key, not null) - re-throw with context
+                logger.error(ErrorMessages.TENANT_CONSTRAINT_ERROR_LOG, tenantName, e.getMessage(), e);
+                // Re-throw the original exception to preserve the specific constraint violation type
+                // This allows callers to handle different constraint violations appropriately
+                throw e;
+            }
         }
+        // Note: Other DataAccessExceptions (connection timeout, deadlock, etc.) are not caught
+        // They will bubble up to allow retry logic or proper error handling at higher levels
     }
 
     private Tenant createTenantInternal(String tenantName) {
@@ -84,14 +106,11 @@ public class TenantService {
         newTenant.setCreatedBy(userName);
         newTenant.setUpdatedBy(userName);
 
-        try {
-            Tenant savedTenant = tenantRepository.save(newTenant);
-            logger.info(ErrorMessages.TENANT_ONBOARDING_SUCCESS, tenantName);
-            return savedTenant;
-        } catch (DataAccessException e) {
-            logger.error("Failed to create tenant '{}': {}", tenantName, e.getMessage(), e);
-            throw new IllegalStateException("Tenant creation failed: " + e.getMessage(), e);
-        }
+        Tenant savedTenant = tenantRepository.save(newTenant);
+        logger.info(ErrorMessages.TENANT_ONBOARDING_SUCCESS, tenantName);
+        return savedTenant;
+        // Note: DataAccessExceptions from save() are allowed to bubble up naturally
+        // This preserves exception types (connection timeout, deadlock, etc.) for proper handling
     }
 
     public TenantDto getTenantByName(String name) {

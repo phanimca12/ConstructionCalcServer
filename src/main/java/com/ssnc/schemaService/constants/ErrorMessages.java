@@ -62,9 +62,23 @@ public final class ErrorMessages {
     public static final String TENANT_ONBOARDING_PREPARING = "Preparing to create new tenant: %s";
     public static final String TENANT_CREATION_FAILED = "Failed to create Tenant, Please contact support";
     public static final String TENANT_CONFIG_INVALID = "Invalid tenant configuration";
+    public static final String TENANT_CONCURRENT_CREATION = "Tenant already exists (concurrent creation): {}";
+    public static final String TENANT_CONSTRAINT_ERROR_LOG = "Database constraint violation while creating tenant '{}': {}";
+    public static final String TENANT_CONSTRAINT_VIOLATION = "Tenant creation failed due to constraint violation. Please contact support.";
+    public static final String TENANT_ENSURE_FAILED_LOG = "Failed to ensure tenant '{}' exists: {}";
+    public static final String TENANT_NAME_UNAVAILABLE = "Tenant name is not available in JWT context";
 
     // Namespace related messages
     public static final String NAMESPACE_NOT_FOUND = "Namespace not found";
+    public static final String NAMESPACE_NOT_FOUND_FORMAT = "Namespace not found: %s for tenant: %s";
+    public static final String NAMESPACE_CREATION_FAILED = "Namespace creation failed. Please contact support.";
+    public static final String NAMESPACE_OPERATION_FAILED = "Namespace operation failed. Please contact support.";
+    public static final String NAMESPACE_RACE_CONDITION_UNRESOLVED = "Namespace creation race condition unresolved. Please contact support.";
+    public static final String NAMESPACE_CONSTRAINT_VIOLATION = "Namespace creation failed due to constraint violation. Please contact support.";
+    public static final String NAMESPACE_CONCURRENT_CREATION = "Namespace already exists (concurrent creation): {} for tenant: {}";
+    public static final String NAMESPACE_CREATED = "Created new namespace: {} for tenant: {}";
+    public static final String NAMESPACE_CONSTRAINT_ERROR_LOG = "Database constraint violation while creating namespace '{}' for tenant '{}': {}";
+    public static final String NAMESPACE_ENSURE_FAILED_LOG = "Failed to ensure namespace '{}' exists for tenant '{}': {}";
 
     // JWT context messages
     public static final String JWT_CONTEXT_NOT_FOUND = "Context not Found";

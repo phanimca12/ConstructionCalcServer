@@ -1,5 +1,7 @@
 package com.ssnc.schemaService.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.NameSpaceDto;
@@ -17,11 +19,19 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class NameSpaceService {
 
     private static final Logger logger = LoggerFactory.getLogger(NameSpaceService.class);
+
+    // Cache namespace IDs to avoid DB queries on every request
+    // Key format: "tenantId:namespaceName" for tenant-aware caching
+    private final Cache<String, UUID> namespaceIdCache = Caffeine.newBuilder()
+            .expireAfterWrite(AppConstants.CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES)
+            .maximumSize(AppConstants.CACHE_MAX_SIZE)
+            .build();
 
     @Autowired
     NameSpaceRepository nameSpaceRepository;
@@ -32,58 +42,89 @@ public class NameSpaceService {
     /**
      * Ensures a namespace exists for the given tenant, creating it if necessary.
      * Used by filters and services to auto-create namespaces.
-     * Includes race condition handling.
+     * Includes caching and race condition handling.
      *
      * @param tenantId - The tenant ID
      * @param namespace - The namespace name
      * @return The namespace ID
      */
     public UUID ensureNamespaceExists(UUID tenantId, String namespace) {
+        String cacheKey = tenantId + AppConstants.CACHE_KEY_SEPARATOR + namespace;
+
+        // Check cache first to avoid DB query on every request
+        UUID cachedId = namespaceIdCache.getIfPresent(cacheKey);
+        if (cachedId != null) {
+            return cachedId;
+        }
+
         try {
             Optional<Nmspc> existing = nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace);
 
             if (existing.isPresent()) {
-                return existing.get().getNmspcId();
+                UUID nmspcId = existing.get().getNmspcId();
+                // Cache the namespace ID after successful lookup
+                namespaceIdCache.put(cacheKey, nmspcId);
+                return nmspcId;
             }
 
             // Create new namespace
-            return createNamespaceInternal(tenantId, namespace);
+            UUID nmspcId = createNamespaceInternal(tenantId, namespace);
+            // Cache the namespace ID after successful creation
+            namespaceIdCache.put(cacheKey, nmspcId);
+            return nmspcId;
 
         } catch (DataIntegrityViolationException e) {
-            // Another thread created it concurrently; re-fetch
-            logger.debug("Namespace already exists (concurrent creation): {} for tenant: {}", namespace, tenantId);
-            return nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace)
-                    .map(Nmspc::getNmspcId)
-                    .orElseThrow(() -> new IllegalStateException(
-                            String.format("Namespace creation race condition unresolved: %s", namespace)));
-        } catch (DataAccessException e) {
-            // DB connectivity or other data access issues
-            logger.error("Failed to ensure namespace '{}' exists for tenant '{}': {}",
+            // Check if this was the expected unique constraint violation (concurrent creation)
+            // vs. other constraint violations (e.g., foreign key, not null)
+            String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            String rootCauseMsg = e.getRootCause() != null && e.getRootCause().getMessage() != null
+                    ? e.getRootCause().getMessage().toLowerCase() : "";
+
+            boolean isUniqueConstraintViolation =
+                    errorMsg.contains(AppConstants.DB_KEYWORD_UNIQUE) ||
+                    errorMsg.contains(AppConstants.DB_KEYWORD_DUPLICATE) ||
+                    errorMsg.contains(AppConstants.DB_KEYWORD_NMSPC_NAME) ||
+                    errorMsg.contains(AppConstants.DB_KEYWORD_NAMESPACE) ||
+                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_UNIQUE) ||
+                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_DUPLICATE) ||
+                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_NMSPC_NAME) ||
+                    rootCauseMsg.contains(AppConstants.DB_KEYWORD_NAMESPACE);
+
+            if (isUniqueConstraintViolation) {
+                // Concurrent creation - another thread created it; re-fetch
+                logger.debug(ErrorMessages.NAMESPACE_CONCURRENT_CREATION, namespace, tenantId);
+                UUID nmspcId = nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace)
+                        .map(Nmspc::getNmspcId)
+                        .orElseThrow(() -> new IllegalStateException(ErrorMessages.NAMESPACE_RACE_CONDITION_UNRESOLVED));
+                // Cache the namespace ID after successful resolution
+                namespaceIdCache.put(cacheKey, nmspcId);
+                return nmspcId;
+            }
+
+            // Different constraint violation (e.g., foreign key, not null) - throw generic error
+            logger.error(ErrorMessages.NAMESPACE_CONSTRAINT_ERROR_LOG,
                     namespace, tenantId, e.getMessage(), e);
-            throw new IllegalStateException("Namespace operation failed: " + e.getMessage(), e);
+            throw new IllegalStateException(ErrorMessages.NAMESPACE_CONSTRAINT_VIOLATION, e);
         }
+        // Note: Other DataAccessExceptions (connection timeout, deadlock, etc.) are not caught
+        // They will bubble up to allow retry logic or proper error handling at higher levels
     }
 
     private UUID createNamespaceInternal(UUID tenantId, String namespace) {
-        try {
-            String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
-                    ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
-            Nmspc newNmspc = new Nmspc();
-            newNmspc.setTenantId(tenantId);
-            newNmspc.setNmspcName(namespace);
-            newNmspc.setCreatedBy(userName);
-            newNmspc.setUpdatedBy(userName);
+        Nmspc newNmspc = new Nmspc();
+        newNmspc.setTenantId(tenantId);
+        newNmspc.setNmspcName(namespace);
+        newNmspc.setCreatedBy(userName);
+        newNmspc.setUpdatedBy(userName);
 
-            Nmspc saved = nameSpaceRepository.save(newNmspc);
-            logger.info("Created new namespace: {} for tenant: {}", namespace, tenantId);
-            return saved.getNmspcId();
-
-        } catch (DataAccessException e) {
-            logger.error("Failed to create namespace '{}' for tenant '{}': {}",
-                    namespace, tenantId, e.getMessage(), e);
-            throw new IllegalStateException("Namespace creation failed: " + e.getMessage(), e);
-        }
+        Nmspc saved = nameSpaceRepository.save(newNmspc);
+        logger.info(ErrorMessages.NAMESPACE_CREATED, namespace, tenantId);
+        return saved.getNmspcId();
+        // Note: DataAccessExceptions from save() are allowed to bubble up naturally
+        // This preserves exception types (connection timeout, deadlock, etc.) for proper handling
     }
 
     private NameSpaceDto mapToNameSpaceDto(Nmspc nmspc) {

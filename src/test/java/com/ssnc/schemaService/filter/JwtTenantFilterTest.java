@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.filter;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.service.TenantService;
 import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
@@ -94,7 +95,7 @@ class JwtTenantFilterTest {
                 jwtTenantFilter.doFilterInternal(request, response, filterChain)
         );
 
-        assertEquals("Tenant name is not available in JWT context", exception.getMessage());
+        assertEquals(ErrorMessages.TENANT_NAME_UNAVAILABLE, exception.getMessage());
         verify(filterChain, never()).doFilter(any(), any());
         verify(tenantService, never()).ensureTenantExists(any());
     }
@@ -109,7 +110,7 @@ class JwtTenantFilterTest {
                 jwtTenantFilter.doFilterInternal(request, response, filterChain)
         );
 
-        assertEquals("Tenant name is not available in JWT context", exception.getMessage());
+        assertEquals(ErrorMessages.TENANT_NAME_UNAVAILABLE, exception.getMessage());
         verify(filterChain, never()).doFilter(any(), any());
         verify(tenantService, never()).ensureTenantExists(any());
     }
@@ -124,7 +125,7 @@ class JwtTenantFilterTest {
                 jwtTenantFilter.doFilterInternal(request, response, filterChain)
         );
 
-        assertEquals("Tenant name is not available in JWT context", exception.getMessage());
+        assertEquals(ErrorMessages.TENANT_NAME_UNAVAILABLE, exception.getMessage());
         verify(filterChain, never()).doFilter(any(), any());
         verify(tenantService, never()).ensureTenantExists(any());
     }

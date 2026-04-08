@@ -109,19 +109,19 @@ class NamespaceFilterManagerTest {
     }
 
     @Test
-    void testEnableIfPresent_CacheHit_NoDuplicateServiceCall() {
+    void testEnableIfPresent_MultipleCalls_DelegatesToService() {
         // Arrange
         when(tenantRepository.findByTenantName(testTenantName)).thenReturn(Optional.of(testTenant));
         when(nameSpaceService.ensureNamespaceExists(testTenantId, testNamespace)).thenReturn(testNmspcId);
 
-        // Act - First call to populate cache
+        // Act - First call
         namespaceFilterManager.enableIfPresent(testNamespace);
 
-        // Act - Second call should use cache
+        // Act - Second call
         namespaceFilterManager.enableIfPresent(testNamespace);
 
-        // Assert - Service called only once (cache hit on second call)
-        verify(nameSpaceService, times(1)).ensureNamespaceExists(testTenantId, testNamespace);
+        // Assert - Service called each time (caching is service layer responsibility)
+        verify(nameSpaceService, times(2)).ensureNamespaceExists(testTenantId, testNamespace);
         verify(filter, times(2)).setParameter("namespaceId", testNmspcId);
     }
 

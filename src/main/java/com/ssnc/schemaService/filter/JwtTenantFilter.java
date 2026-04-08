@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.filter;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.service.TenantService;
 import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
@@ -34,7 +35,7 @@ public class JwtTenantFilter extends OncePerRequestFilter {
             String tenantName = (jwtClaimsContext != null) ? jwtClaimsContext.getTenant() : null;
 
             if (tenantName == null || tenantName.isEmpty()) {
-                throw new IllegalStateException("Tenant name is not available in JWT context");
+                throw new IllegalStateException(ErrorMessages.TENANT_NAME_UNAVAILABLE);
             }
 
             // Ensure tenant exists in DB, create if not
