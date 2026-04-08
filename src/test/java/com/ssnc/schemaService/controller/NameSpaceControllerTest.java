@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class NameSpaceControllerTest {
@@ -41,36 +40,6 @@ class NameSpaceControllerTest {
         testNameSpaceDto.setCreateDateTime(LocalDateTime.now());
         testNameSpaceDto.setModifiedByUser("testUser");
         testNameSpaceDto.setModifiedDateTime(LocalDateTime.now());
-    }
-
-    @Test
-    void testCreateNamespace_Success() {
-        when(nameSpaceService.createNameSpace(any(NameSpaceDto.class)))
-                .thenReturn(testNameSpaceDto);
-
-        NameSpaceDto result = nameSpaceController.createNamespace(testNameSpaceDto);
-
-        assertNotNull(result);
-        assertEquals("testNamespace", result.getName());
-        assertEquals("Test Namespace Description", result.getDescription());
-        verify(nameSpaceService, times(1)).createNameSpace(testNameSpaceDto);
-    }
-
-    @Test
-    void testCreateNamespace_WithNullDescription() {
-        NameSpaceDto dtoWithoutDesc = new NameSpaceDto();
-        dtoWithoutDesc.setName("namespace2");
-        dtoWithoutDesc.setDescription(null);
-
-        when(nameSpaceService.createNameSpace(any(NameSpaceDto.class)))
-                .thenReturn(dtoWithoutDesc);
-
-        NameSpaceDto result = nameSpaceController.createNamespace(dtoWithoutDesc);
-
-        assertNotNull(result);
-        assertEquals("namespace2", result.getName());
-        assertNull(result.getDescription());
-        verify(nameSpaceService).createNameSpace(dtoWithoutDesc);
     }
 
     @Test

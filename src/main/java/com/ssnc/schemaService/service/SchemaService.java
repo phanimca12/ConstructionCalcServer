@@ -21,6 +21,7 @@ import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -63,7 +64,7 @@ public class SchemaService {
     private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
 
     @Autowired
-    private com.ssnc.schemaService.repo.NameSpaceRepository nameSpaceRepository;
+    private NameSpaceService nameSpaceService;
 
     /**
      * Get schemas with optional filtering, sorting, and pagination
@@ -196,10 +197,8 @@ public class SchemaService {
                         String.format("Tenant not found: %s", tenantName)));
 
         // SECURITY: Use tenant-aware namespace lookup to ensure proper isolation
-        UUID nmspcId = nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace)
-                .map(com.ssnc.schemaService.entity.Nmspc::getNmspcId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        String.format("Namespace not found: %s for tenant: %s", namespace, tenantName)));
+        // Auto-create namespace if it doesn't exist
+        UUID nmspcId = nameSpaceService.ensureNamespaceExists(tenantId, namespace);
 
         Schm schema = mapToSchmEntity(schemaDto);
         schema.setTenantId(tenantId);

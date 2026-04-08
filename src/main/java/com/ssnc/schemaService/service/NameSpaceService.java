@@ -5,50 +5,85 @@ import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.NameSpaceDto;
 import com.ssnc.schemaService.entity.Nmspc;
 import com.ssnc.schemaService.repo.NameSpaceRepository;
-import com.ssnc.schemaService.repo.TenantRepository;
-import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class NameSpaceService {
 
+    private static final Logger logger = LoggerFactory.getLogger(NameSpaceService.class);
+
     @Autowired
     NameSpaceRepository nameSpaceRepository;
 
     @Autowired
-    private TenantRepository tenantRepository;
-
-    @Autowired
     private JwtClaimsContext jwtClaimsContext;
 
-    public NameSpaceDto createNameSpace(NameSpaceDto nameSpaceDto) {
-        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
-                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+    /**
+     * Ensures a namespace exists for the given tenant, creating it if necessary.
+     * Used by filters and services to auto-create namespaces.
+     * Includes race condition handling.
+     *
+     * @param tenantId - The tenant ID
+     * @param namespace - The namespace name
+     * @return The namespace ID
+     */
+    public UUID ensureNamespaceExists(UUID tenantId, String namespace) {
+        try {
+            Optional<Nmspc> existing = nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace);
 
-        String tenantName = TenantContext.getTenantName();
+            if (existing.isPresent()) {
+                return existing.get().getNmspcId();
+            }
 
-        // Resolve tenant_id from tenant_name
-        UUID tenantId = tenantRepository.findByTenantName(tenantName)
-                .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        String.format("Tenant not found: %s", tenantName)));
+            // Create new namespace
+            return createNamespaceInternal(tenantId, namespace);
 
-        Nmspc nmspc = new Nmspc();
-        nmspc.setTenantId(tenantId);
-        nmspc.setNmspcName(nameSpaceDto.getName());
-        nmspc.setDescription(nameSpaceDto.getDescription());
-        nmspc.setCreatedBy(userName);
-        nmspc.setUpdatedBy(userName);
+        } catch (DataIntegrityViolationException e) {
+            // Another thread created it concurrently; re-fetch
+            logger.debug("Namespace already exists (concurrent creation): {} for tenant: {}", namespace, tenantId);
+            return nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace)
+                    .map(Nmspc::getNmspcId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            String.format("Namespace creation race condition unresolved: %s", namespace)));
+        } catch (DataAccessException e) {
+            // DB connectivity or other data access issues
+            logger.error("Failed to ensure namespace '{}' exists for tenant '{}': {}",
+                    namespace, tenantId, e.getMessage(), e);
+            throw new IllegalStateException("Namespace operation failed: " + e.getMessage(), e);
+        }
+    }
 
-        Nmspc savedNmspc = nameSpaceRepository.save(nmspc);
+    private UUID createNamespaceInternal(UUID tenantId, String namespace) {
+        try {
+            String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                    ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
-        return mapToNameSpaceDto(savedNmspc);
+            Nmspc newNmspc = new Nmspc();
+            newNmspc.setTenantId(tenantId);
+            newNmspc.setNmspcName(namespace);
+            newNmspc.setCreatedBy(userName);
+            newNmspc.setUpdatedBy(userName);
+
+            Nmspc saved = nameSpaceRepository.save(newNmspc);
+            logger.info("Created new namespace: {} for tenant: {}", namespace, tenantId);
+            return saved.getNmspcId();
+
+        } catch (DataAccessException e) {
+            logger.error("Failed to create namespace '{}' for tenant '{}': {}",
+                    namespace, tenantId, e.getMessage(), e);
+            throw new IllegalStateException("Namespace creation failed: " + e.getMessage(), e);
+        }
     }
 
     private NameSpaceDto mapToNameSpaceDto(Nmspc nmspc) {

@@ -1,18 +1,14 @@
 package com.ssnc.schemaService.service;
 
-import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.dto.NameSpaceDto;
 import com.ssnc.schemaService.entity.Nmspc;
 import com.ssnc.schemaService.repo.NameSpaceRepository;
-import com.ssnc.schemaService.tenant.TenantContext;
-import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -24,7 +20,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,12 +29,6 @@ class NameSpaceServiceTest {
     @Mock
     private NameSpaceRepository nameSpaceRepository;
 
-    @Mock
-    private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
-
-    @Mock
-    private JwtClaimsContext jwtClaimsContext;
-
     @InjectMocks
     private NameSpaceService nameSpaceService;
 
@@ -48,8 +37,6 @@ class NameSpaceServiceTest {
     private UUID testNmspcId;
     private UUID testTenantId;
     private Nmspc testNmspc;
-    private NameSpaceDto testNameSpaceDto;
-    private com.ssnc.schemaService.entity.Tenant testTenant;
 
     @BeforeEach
     void setUp() {
@@ -57,10 +44,6 @@ class NameSpaceServiceTest {
         testUserId = "testUser";
         testNmspcId = UUID.randomUUID();
         testTenantId = UUID.randomUUID();
-
-        testTenant = new com.ssnc.schemaService.entity.Tenant();
-        testTenant.setTenantId(testTenantId);
-        testTenant.setTenantName("client1Id");
 
         testNmspc = new Nmspc();
         testNmspc.setNmspcId(testNmspcId);
@@ -71,79 +54,6 @@ class NameSpaceServiceTest {
         testNmspc.setUpdatedBy(testUserId);
         testNmspc.setCreatedDatetime(LocalDateTime.now());
         testNmspc.setUpdatedDatetime(LocalDateTime.now());
-
-        testNameSpaceDto = new NameSpaceDto();
-        testNameSpaceDto.setName(testNamespaceName);
-        testNameSpaceDto.setDescription("Test Namespace Description");
-        testNameSpaceDto.setCreatedByUser(testUserId);
-        testNameSpaceDto.setModifiedByUser(testUserId);
-
-        // Mock JwtClaimsContext to return test user
-        when(jwtClaimsContext.getUserId()).thenReturn(testUserId);
-        // Mock TenantRepository
-        when(tenantRepository.findByTenantName(anyString())).thenReturn(Optional.of(testTenant));
-    }
-
-    @Test
-    void testCreateNameSpace_SetsUserFromJwtContext() {
-        when(nameSpaceRepository.save(any(Nmspc.class))).thenReturn(testNmspc);
-
-        NameSpaceDto result = nameSpaceService.createNameSpace(testNameSpaceDto);
-
-        assertNotNull(result);
-        assertEquals(testNamespaceName, result.getName());
-        assertEquals("Test Namespace Description", result.getDescription());
-        verify(jwtClaimsContext, atLeastOnce()).getUserId();
-        verify(nameSpaceRepository).save(argThat(nmspc ->
-                testUserId.equals(nmspc.getCreatedBy()) &&
-                testUserId.equals(nmspc.getUpdatedBy()) &&
-                testNamespaceName.equals(nmspc.getNmspcName())
-        ));
-    }
-
-    @Test
-    void testCreateNameSpace_NullJwtContext_UsesSystemUser() {
-        when(jwtClaimsContext.getUserId()).thenReturn(null);
-        when(nameSpaceRepository.save(any(Nmspc.class))).thenReturn(testNmspc);
-
-        NameSpaceDto result = nameSpaceService.createNameSpace(testNameSpaceDto);
-
-        assertNotNull(result);
-        verify(nameSpaceRepository).save(argThat(nmspc ->
-                AppConstants.SYSTEM_USER.equals(nmspc.getCreatedBy()) &&
-                AppConstants.SYSTEM_USER.equals(nmspc.getUpdatedBy())
-        ));
-    }
-
-    @Test
-    void testCreateNameSpace_WithNullDescription() {
-        testNameSpaceDto.setDescription(null);
-        testNmspc.setDescription(null);
-
-        when(nameSpaceRepository.save(any(Nmspc.class))).thenReturn(testNmspc);
-
-        NameSpaceDto result = nameSpaceService.createNameSpace(testNameSpaceDto);
-
-        assertNotNull(result);
-        assertNull(result.getDescription());
-        verify(nameSpaceRepository).save(argThat(nmspc ->
-                nmspc.getDescription() == null &&
-                testUserId.equals(nmspc.getCreatedBy())
-        ));
-    }
-
-    @Test
-    void testCreateNameSpace_WithEmptyDescription() {
-        testNameSpaceDto.setDescription("");
-        testNmspc.setDescription("");
-
-        when(nameSpaceRepository.save(any(Nmspc.class))).thenReturn(testNmspc);
-
-        NameSpaceDto result = nameSpaceService.createNameSpace(testNameSpaceDto);
-
-        assertNotNull(result);
-        assertEquals("", result.getDescription());
-        verify(nameSpaceRepository).save(any(Nmspc.class));
     }
 
     @Test

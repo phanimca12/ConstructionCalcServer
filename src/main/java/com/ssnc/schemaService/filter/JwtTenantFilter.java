@@ -1,6 +1,6 @@
 package com.ssnc.schemaService.filter;
 
-import com.ssnc.schemaService.constants.AppConstants;
+import com.ssnc.schemaService.service.TenantService;
 import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.servlet.FilterChain;
@@ -15,8 +15,12 @@ import java.io.IOException;
 
 @Component
 public class JwtTenantFilter extends OncePerRequestFilter {
+
     @Autowired
     JwtClaimsContext jwtClaimsContext;
+
+    @Autowired
+    TenantService tenantService;
 
     @Override
     protected void doFilterInternal(
@@ -26,9 +30,17 @@ public class JwtTenantFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         try {
-            String tenantName = (jwtClaimsContext!=null && jwtClaimsContext.getTenant() != null)
-                    ? jwtClaimsContext.getTenant()
-                    : AppConstants.DEFAULT_TENANT_ID;
+            // Get tenant from JWT context (call once for performance)
+            String tenantName = (jwtClaimsContext != null) ? jwtClaimsContext.getTenant() : null;
+
+            if (tenantName == null || tenantName.isEmpty()) {
+                throw new IllegalStateException("Tenant name is not available in JWT context");
+            }
+
+            // Ensure tenant exists in DB, create if not
+            // Delegates to TenantService for proper business logic and caching
+            tenantService.ensureTenantExists(tenantName);
+
             TenantContext.setTenantName(tenantName);
             filterChain.doFilter(request, response);
 
