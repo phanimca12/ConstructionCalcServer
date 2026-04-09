@@ -34,8 +34,6 @@ public final class ErrorMessages {
 
     // External reference validation messages
     public static final String EXTERNAL_REFERENCE_REQUEST_BODY_NULL = "Request body cannot be null";
-    public static final String EXTERNAL_REFERENCE_SCHEMA_LIST_NULL = "Schema list cannot be null. Use empty list if no schemas to associate.";
-    public static final String EXTERNAL_REFERENCE_SCHEMA_ID_NULL = "Schema ID cannot be null";
 
     // Field length validation messages
     public static final String VALIDATION_NAMESPACE_MAX_LENGTH = "Namespace must not exceed 32 characters";
@@ -54,23 +52,26 @@ public final class ErrorMessages {
 
     // Tenant related messages
     public static final String TENANT_NOT_FOUND = "Tenant not found";
-    public static final String TENANT_NOT_FOUND_FORMAT = "Tenant not found: %s";
-    public static final String TENANT_ALREADY_ONBOARDED = "Tenant already onboarded: %s";
-    public static final String JWT_CONTEXT_NOT_POPULATED = "JWT claims context is not populated. Cannot create tenants.";
-    public static final String NO_TENANT_IN_JWT = "No tenant found in JWT context";
-    public static final String TENANT_ONBOARDING_SUCCESS = "Successfully created tenant: %s";
-    public static final String TENANT_ONBOARDING_PREPARING = "Preparing to create new tenant: %s";
-    public static final String TENANT_CREATION_FAILED = "Failed to create Tenant, Please contact support";
+    public static final String TENANT_ONBOARDING_SUCCESS = "Successfully created tenant";
+    public static final String TENANT_ONBOARDING_PREPARING = "Preparing to create new tenant";
     public static final String TENANT_CONFIG_INVALID = "Invalid tenant configuration";
+    public static final String TENANT_CONCURRENT_CREATION = "Tenant already exists (concurrent creation)";
+    public static final String TENANT_CONSTRAINT_ERROR_LOG = "Database constraint violation while creating tenant";
+    public static final String TENANT_NAME_UNAVAILABLE = "Tenant name is not available in JWT context";
+
+    // Tenant filter messages
+    public static final String TENANT_FILTER_DB_CONSTRAINT_ERROR = "Database constraint violation in tenant filter";
+    public static final String TENANT_FILTER_DB_ACCESS_ERROR = "Database access error in tenant filter";
+    public static final String TENANT_FILTER_CONSTRAINT_RESPONSE = "Tenant constraint violation";
+    public static final String TENANT_FILTER_UNAVAILABLE_RESPONSE = "Service temporarily unavailable";
 
     // Namespace related messages
     public static final String NAMESPACE_NOT_FOUND = "Namespace not found";
-
-    // JWT context messages
-    public static final String JWT_CONTEXT_NOT_FOUND = "Context not Found";
-
-    // Sync messages
-    public static final String ERROR_SYNCING_TENANTS = "Error syncing tenants from JWT claims context: {}";
+    public static final String NAMESPACE_RACE_CONDITION_UNRESOLVED = "Namespace creation race condition unresolved. Please contact support.";
+    public static final String NAMESPACE_CONSTRAINT_VIOLATION = "Namespace creation failed due to constraint violation. Please contact support.";
+    public static final String NAMESPACE_CONCURRENT_CREATION = "Namespace already exists (concurrent creation)";
+    public static final String NAMESPACE_CREATED = "Created new namespace";
+    public static final String NAMESPACE_CONSTRAINT_ERROR_LOG = "Database constraint violation while creating namespace";
 
     // Database constraint names
     public static final String DB_CONSTRAINT_UNIQUE_EXT_REF = "uk_ext_ref_tenant_id_name_type_version";
@@ -79,4 +80,7 @@ public final class ErrorMessages {
 
     // Generic messages
     public static final String GENERIC_ANOTHER_RECORD = "another record";
+
+    // Pagination validation messages
+    public static final String INVALID_PAGINATION_OFFSET = "Invalid pagination offset: %d. Must be between 0 and %d";
 }

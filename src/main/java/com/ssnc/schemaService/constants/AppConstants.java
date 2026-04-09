@@ -45,4 +45,31 @@ public final class AppConstants {
      * Schema type constants
      */
     public static final String SCHEMA_TYPE_FORM_DATA = "FormData";
+
+    /**
+     * Database constraint detection keywords
+     */
+    public static final String DB_KEYWORD_UNIQUE = "unique";
+    public static final String DB_KEYWORD_DUPLICATE = "duplicate";
+    public static final String DB_KEYWORD_TENANT_NAME = "tenant_name";
+    public static final String DB_KEYWORD_TENANT = "tenant";
+    public static final String DB_KEYWORD_NMSPC_NAME = "nmspc_name";
+    public static final String DB_KEYWORD_NAMESPACE = "namespace";
+
+    /**
+     * Cache configuration constants
+     */
+    public static final int CACHE_EXPIRE_MINUTES = 10;
+    public static final int CACHE_MAX_SIZE = 1000;
+
+    /**
+     * Cache key separators
+     */
+    public static final String CACHE_KEY_SEPARATOR = ":";
+
+    /**
+     * Hibernate filter constants
+     */
+    public static final String FILTER_NAMESPACE = "namespaceFilter";
+    public static final String FILTER_PARAM_NAMESPACE_ID = "namespaceId";
 }

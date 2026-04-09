@@ -1,36 +1,26 @@
 package com.ssnc.schemaService.controller;
 
-import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.TenantDto;
-import com.ssnc.schemaService.entity.Tenant;
 import com.ssnc.schemaService.service.TenantService;
-import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class TenantControllerTest {
 
     @Mock
     private TenantService tenantService;
-
-    @Mock
-    private JwtClaimsContext jwtClaimsContext;
 
     @InjectMocks
     private TenantController tenantController;
@@ -41,44 +31,12 @@ class TenantControllerTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
-        // Mock JwtClaimsContext
-        when(jwtClaimsContext.getUserId()).thenReturn("testUser");
-        when(jwtClaimsContext.getTenant()).thenReturn("testTenant");
-        when(jwtClaimsContext.getClients()).thenReturn(java.util.Collections.singletonList("client1"));
-        when(jwtClaimsContext.isPopulated()).thenReturn(true);
-
         testTenantDto = new TenantDto();
         testTenantDto.setName("testTenant");
         testTenantDto.setCreatedByUser("testUser");
         testTenantDto.setCreateDateTime(LocalDateTime.now());
         testTenantDto.setModifiedByUser("testUser");
         testTenantDto.setModifiedDateTime(LocalDateTime.now());
-    }
-
-    @Test
-    void testCreateTenant_Success() throws Exception {
-        when(jwtClaimsContext.getTenant()).thenReturn("client1");
-        when(tenantService.createTenantsFromContext()).thenReturn(new ArrayList<>());
-
-        ResponseEntity<?> result = tenantController.createTenant();
-
-        assertNotNull(result);
-        assertEquals(HttpStatus.CREATED, result.getStatusCode());
-        verify(tenantService, times(1)).createTenantsFromContext();
-    }
-
-    @Test
-    void testCreateTenant_WithException() throws Exception {
-        when(jwtClaimsContext.getTenant()).thenReturn("client1");
-        when(tenantService.createTenantsFromContext())
-                .thenThrow(new RuntimeException("Database error"));
-
-        ResponseEntity<?> result = tenantController.createTenant();
-
-        assertNotNull(result);
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getStatusCode());
-        assertEquals(ErrorMessages.TENANT_CREATION_FAILED, result.getBody());
-        verify(tenantService, times(1)).createTenantsFromContext();
     }
 
     @Test

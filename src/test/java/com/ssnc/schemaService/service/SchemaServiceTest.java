@@ -69,7 +69,7 @@ class SchemaServiceTest {
     private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
 
     @Mock
-    private com.ssnc.schemaService.repo.NameSpaceRepository nameSpaceRepository;
+    private NameSpaceService nameSpaceService;
 
     @InjectMocks
     private SchemaService schemaService;
@@ -82,7 +82,6 @@ class SchemaServiceTest {
     private Schm testSchm;
     private UUID testSchmId;
     private com.ssnc.schemaService.entity.Tenant testTenant;
-    private com.ssnc.schemaService.entity.Nmspc testNmspc;
 
     @BeforeEach
     void setUp() {
@@ -95,10 +94,6 @@ class SchemaServiceTest {
         testTenant = new com.ssnc.schemaService.entity.Tenant();
         testTenant.setTenantId(testTenantId);
         testTenant.setTenantName("client1Id");
-
-        testNmspc = new com.ssnc.schemaService.entity.Nmspc();
-        testNmspc.setNmspcId(testNmspcId);
-        testNmspc.setNmspcName(testNamespace);
 
         testSchemaDto = new SchemaDto();
         testSchemaDto.setName("Test Schema");
@@ -121,9 +116,9 @@ class SchemaServiceTest {
         // Mock JwtClaimsContext to return test user
         when(jwtClaimsContext.getUserId()).thenReturn(testUserId);
         when(tenantRepository.findByTenantName(anyString())).thenReturn(Optional.of(testTenant));
-        // SECURITY: Mock tenant-aware namespace lookup to ensure proper isolation
-        when(nameSpaceRepository.findByTenantIdAndNmspcName(any(UUID.class), eq(testNamespace)))
-                .thenReturn(Optional.of(testNmspc));
+        // Mock namespace service to return namespace ID
+        when(nameSpaceService.ensureNamespaceExists(any(UUID.class), eq(testNamespace)))
+                .thenReturn(testNmspcId);
     }
 
     @Test

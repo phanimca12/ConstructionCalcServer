@@ -21,6 +21,7 @@ import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -63,7 +64,7 @@ public class SchemaService {
     private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
 
     @Autowired
-    private com.ssnc.schemaService.repo.NameSpaceRepository nameSpaceRepository;
+    private NameSpaceService nameSpaceService;
 
     /**
      * Get schemas with optional filtering, sorting, and pagination
@@ -108,7 +109,7 @@ public class SchemaService {
         long offset = pageable.getOffset();
         if (offset < 0 || offset > Integer.MAX_VALUE) {
             throw new IllegalArgumentException(
-                    String.format("Invalid pagination offset: %d. Must be between 0 and %d",
+                    String.format(ErrorMessages.INVALID_PAGINATION_OFFSET,
                             offset, Integer.MAX_VALUE));
         }
         int start = (int) offset;
@@ -192,14 +193,11 @@ public class SchemaService {
         // Resolve tenant_id and nmspc_id
         UUID tenantId = tenantRepository.findByTenantName(tenantName)
                 .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        String.format("Tenant not found: %s", tenantName)));
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.TENANT_CONFIG_INVALID));
 
         // SECURITY: Use tenant-aware namespace lookup to ensure proper isolation
-        UUID nmspcId = nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace)
-                .map(com.ssnc.schemaService.entity.Nmspc::getNmspcId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        String.format("Namespace not found: %s for tenant: %s", namespace, tenantName)));
+        // Auto-create namespace if it doesn't exist
+        UUID nmspcId = nameSpaceService.ensureNamespaceExists(tenantId, namespace);
 
         Schm schema = mapToSchmEntity(schemaDto);
         schema.setTenantId(tenantId);
@@ -257,7 +255,7 @@ public class SchemaService {
         long offset = pageable.getOffset();
         if (offset < 0 || offset > Integer.MAX_VALUE) {
             throw new IllegalArgumentException(
-                    String.format("Invalid pagination offset: %d. Must be between 0 and %d",
+                    String.format(ErrorMessages.INVALID_PAGINATION_OFFSET,
                             offset, Integer.MAX_VALUE));
         }
         int start = (int) offset;
@@ -568,7 +566,7 @@ public class SchemaService {
         long offset = pageable.getOffset();
         if (offset < 0 || offset > Integer.MAX_VALUE) {
             throw new IllegalArgumentException(
-                    String.format("Invalid pagination offset: %d. Must be between 0 and %d",
+                    String.format(ErrorMessages.INVALID_PAGINATION_OFFSET,
                             offset, Integer.MAX_VALUE));
         }
         int start = (int) offset;
@@ -589,7 +587,6 @@ public class SchemaService {
     private ExtRefDto mapExtRefToDto(ExtRef extRef) {
         ExtRefDto dto = new ExtRefDto();
         dto.setExtRefId(extRef.getExtRefId());
-        dto.setTenantId(extRef.getTenantId());
         dto.setExtRefName(extRef.getExtRefName());
         dto.setExtRefType(extRef.getExtRefType());
         dto.setExtRefVersion(extRef.getExtRefVersion());
@@ -631,8 +628,6 @@ public class SchemaService {
     private SchemaDto mapToSchemaResponse(Schm schm) {
         SchemaDto response = new SchemaDto();
         response.setId(schm.getSchmId());
-        response.setTenantId(schm.getTenantId());
-        response.setNmspcId(schm.getNmspcId());
         response.setName(schm.getSchmName());
         response.setDescription(schm.getSchmDesc());
         response.setSchemaType(schm.getSchemaType());
@@ -677,8 +672,6 @@ public class SchemaService {
     private Schm mapToSchmEntity(SchemaDto response) {
         Schm schm = new Schm();
         schm.setSchmId(response.getId());
-        schm.setTenantId(response.getTenantId());
-        schm.setNmspcId(response.getNmspcId());
         schm.setSchmName(response.getName());
         schm.setSchmDesc(response.getDescription());
         schm.setSchemaType(response.getSchemaType());

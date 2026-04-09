@@ -1,10 +1,8 @@
 package com.ssnc.schemaService.service;
 
-import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.dto.TenantDto;
 import com.ssnc.schemaService.entity.Tenant;
 import com.ssnc.schemaService.repo.TenantRepository;
-import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +19,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,16 +28,12 @@ class TenantServiceTest {
     @Mock
     private TenantRepository tenantRepository;
 
-    @Mock
-    private JwtClaimsContext jwtClaimsContext;
-
     @InjectMocks
     private TenantService tenantService;
 
     private String testTenantName;
     private String testUserId;
     private Tenant testTenant;
-    private TenantDto testTenantDto;
 
     @BeforeEach
     void setUp() {
@@ -53,123 +46,6 @@ class TenantServiceTest {
         testTenant.setUpdatedBy(testUserId);
         testTenant.setCreatedDatetime(LocalDateTime.now());
         testTenant.setUpdatedDatetime(LocalDateTime.now());
-
-        testTenantDto = new TenantDto();
-        testTenantDto.setName(testTenantName);
-        testTenantDto.setCreatedByUser(testUserId);
-        testTenantDto.setModifiedByUser(testUserId);
-
-        // Mock JwtClaimsContext to return test user
-        when(jwtClaimsContext.getUserId()).thenReturn(testUserId);
-        when(jwtClaimsContext.getTenant()).thenReturn(testTenantName);
-        when(jwtClaimsContext.isPopulated()).thenReturn(true);
-    }
-
-    @Test
-    void testCreateTenantsFromContext_Success() throws Exception {
-        when(tenantRepository.findByTenantName(testTenantName)).thenReturn(Optional.empty());
-        when(tenantRepository.save(any(Tenant.class))).thenReturn(testTenant);
-
-        List<Tenant> result = tenantService.createTenantsFromContext();
-
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals(testTenantName, result.get(0).getTenantName());
-        verify(jwtClaimsContext, atLeastOnce()).getUserId();
-        verify(tenantRepository).save(argThat(tenant ->
-                testUserId.equals(tenant.getCreatedBy()) &&
-                testUserId.equals(tenant.getUpdatedBy()) &&
-                testTenantName.equals(tenant.getTenantName())
-        ));
-    }
-
-    @Test
-    void testCreateTenantsFromContext_TenantAlreadyExists() throws Exception {
-        when(tenantRepository.findByTenantName(testTenantName)).thenReturn(Optional.of(testTenant));
-
-        List<Tenant> result = tenantService.createTenantsFromContext();
-
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
-        verify(tenantRepository, never()).save(any(Tenant.class));
-    }
-
-    @Test
-    void testCreateTenantsFromContext_NullTenantName() throws Exception {
-        when(jwtClaimsContext.getTenant()).thenReturn(null);
-
-        List<Tenant> result = tenantService.createTenantsFromContext();
-
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
-        verify(tenantRepository, never()).save(any(Tenant.class));
-    }
-
-    @Test
-    void testCreateTenantsFromContext_EmptyTenantName() throws Exception {
-        when(jwtClaimsContext.getTenant()).thenReturn("");
-
-        List<Tenant> result = tenantService.createTenantsFromContext();
-
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
-        verify(tenantRepository, never()).save(any(Tenant.class));
-    }
-
-    @Test
-    void testCreateTenantsFromContext_NullUserId_UsesSystem() throws Exception {
-        when(jwtClaimsContext.getUserId()).thenReturn(null);
-        when(tenantRepository.findByTenantName(testTenantName)).thenReturn(Optional.empty());
-        when(tenantRepository.save(any(Tenant.class))).thenReturn(testTenant);
-
-        List<Tenant> result = tenantService.createTenantsFromContext();
-
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        verify(tenantRepository).save(argThat(tenant ->
-                AppConstants.SYSTEM_USER.equals(tenant.getCreatedBy()) &&
-                AppConstants.SYSTEM_USER.equals(tenant.getUpdatedBy())
-        ));
-    }
-
-    @Test
-    void testCreateTenantsFromContext_JwtContextNotPopulated_ThrowsException() {
-        when(jwtClaimsContext.isPopulated()).thenReturn(false);
-
-        assertThrows(IllegalStateException.class, () ->
-                tenantService.createTenantsFromContext()
-        );
-
-        verify(tenantRepository, never()).save(any(Tenant.class));
-    }
-
-    @Test
-    void testCreateTenant_SetsUserFromJwtContext() {
-        when(tenantRepository.save(any(Tenant.class))).thenReturn(testTenant);
-
-        TenantDto result = tenantService.createTenant(testTenantDto);
-
-        assertNotNull(result);
-        assertEquals(testTenantName, result.getName());
-        verify(jwtClaimsContext, atLeastOnce()).getUserId();
-        verify(tenantRepository).save(argThat(tenant ->
-                testUserId.equals(tenant.getCreatedBy()) &&
-                testUserId.equals(tenant.getUpdatedBy())
-        ));
-    }
-
-    @Test
-    void testCreateTenant_NullJwtContext_UsesSystemUser() {
-        when(jwtClaimsContext.getUserId()).thenReturn(null);
-        when(tenantRepository.save(any(Tenant.class))).thenReturn(testTenant);
-
-        TenantDto result = tenantService.createTenant(testTenantDto);
-
-        assertNotNull(result);
-        verify(tenantRepository).save(argThat(tenant ->
-                AppConstants.SYSTEM_USER.equals(tenant.getCreatedBy()) &&
-                AppConstants.SYSTEM_USER.equals(tenant.getUpdatedBy())
-        ));
     }
 
     @Test

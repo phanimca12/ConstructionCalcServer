@@ -1,7 +1,9 @@
 package com.ssnc.schemaService.tenant;
 
-import com.ssnc.schemaService.entity.Nmspc;
-import com.ssnc.schemaService.repo.NameSpaceRepository;
+import com.ssnc.schemaService.constants.AppConstants;
+import com.ssnc.schemaService.constants.ErrorMessages;
+import com.ssnc.schemaService.repo.TenantRepository;
+import com.ssnc.schemaService.service.NameSpaceService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.hibernate.Session;
@@ -17,25 +19,36 @@ public class NamespaceFilterManager {
     @PersistenceContext
     private EntityManager entityManager;
 
-    private final NameSpaceRepository nameSpaceRepository;
+    private final TenantRepository tenantRepository;
+    private final NameSpaceService nameSpaceService;
 
     @Autowired
-    public NamespaceFilterManager(@Lazy NameSpaceRepository nameSpaceRepository) {
-        this.nameSpaceRepository = nameSpaceRepository;
+    public NamespaceFilterManager(
+            @Lazy TenantRepository tenantRepository,
+            @Lazy NameSpaceService nameSpaceService) {
+        this.tenantRepository = tenantRepository;
+        this.nameSpaceService = nameSpaceService;
     }
 
     public void enableIfPresent(String ns) {
         if (ns != null) {
-            // Resolve namespace name to UUID
-            UUID nmspcId = nameSpaceRepository.findByNmspcName(ns)
-                    .map(Nmspc::getNmspcId)
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            String.format("Namespace not found: %s", ns)));
+            // Get tenant ID from context
+            String tenantName = TenantContext.getTenantName();
+            UUID tenantId = resolveTenantId(tenantName);
+
+            // Ensure namespace exists and get its ID (caching handled by service)
+            UUID nmspcId = nameSpaceService.ensureNamespaceExists(tenantId, ns);
 
             // Enable filter with UUID directly
             entityManager.unwrap(Session.class)
-                         .enableFilter("namespaceFilter")
-                         .setParameter("namespaceId", nmspcId);
+                         .enableFilter(AppConstants.FILTER_NAMESPACE)
+                         .setParameter(AppConstants.FILTER_PARAM_NAMESPACE_ID, nmspcId);
         }
+    }
+
+    private UUID resolveTenantId(String tenantName) {
+        return tenantRepository.findByTenantName(tenantName)
+                .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.TENANT_NOT_FOUND));
     }
 }

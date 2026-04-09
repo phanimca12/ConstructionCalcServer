@@ -349,7 +349,6 @@ public class ExternalReferenceService {
     private ExtRefDto mapToDto(ExtRef extRef) {
         ExtRefDto dto = new ExtRefDto();
         dto.setExtRefId(extRef.getExtRefId());
-        dto.setTenantId(extRef.getTenantId());
         dto.setExtRefName(extRef.getExtRefName());
         dto.setExtRefType(extRef.getExtRefType());
         dto.setExtRefVersion(extRef.getExtRefVersion());
@@ -366,8 +365,6 @@ public class ExternalReferenceService {
     private SchemaDto mapSchmToDto(Schm schm) {
         SchemaDto dto = new SchemaDto();
         dto.setId(schm.getSchmId());
-        dto.setTenantId(schm.getTenantId());
-        dto.setNmspcId(schm.getNmspcId());
         dto.setName(schm.getSchmName());
         dto.setDescription(schm.getSchmDesc());
         dto.setSchemaType(schm.getSchemaType());
