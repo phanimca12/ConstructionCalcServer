@@ -7,6 +7,7 @@ import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.NameSpaceDto;
 import com.ssnc.schemaService.entity.Nmspc;
 import com.ssnc.schemaService.repo.NameSpaceRepository;
+import com.ssnc.schemaService.util.DatabaseExceptionUtils;
 import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
@@ -20,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -87,7 +87,7 @@ public class NameSpaceService {
 
         } catch (DataIntegrityViolationException e) {
             // Check if this was the expected unique constraint violation using JDBC SQLState codes
-            if (isUniqueConstraintViolation(e)) {
+            if (DatabaseExceptionUtils.isUniqueConstraintViolation(e, "nmspc")) {
                 // Concurrent creation - another thread created it; re-fetch
                 logger.debug(ErrorMessages.NAMESPACE_CONCURRENT_CREATION);
                 UUID nmspcId = nameSpaceRepository.findByTenantIdAndNmspcName(tenantId, namespace)
@@ -106,35 +106,6 @@ public class NameSpaceService {
         // They will bubble up to allow retry logic or proper error handling at higher levels
     }
 
-    /**
-     * Checks if a DataIntegrityViolationException is a unique constraint violation
-     * using JDBC SQLState codes (database-agnostic).
-     *
-     * @param e - The exception to check
-     * @return true if it's a unique constraint violation on namespace
-     */
-    private boolean isUniqueConstraintViolation(DataIntegrityViolationException e) {
-        Throwable rootCause = e.getRootCause();
-
-        if (rootCause instanceof SQLException) {
-            SQLException sqlEx = (SQLException) rootCause;
-            String sqlState = sqlEx.getSQLState();
-
-            // Standard SQLState codes for unique constraint violations:
-            // 23505 - PostgreSQL unique_violation
-            // 23000 - MySQL/MariaDB integrity_constraint_violation
-            // 23505 - H2 unique_violation
-            if ("23505".equals(sqlState) || "23000".equals(sqlState)) {
-                // Verify it's specifically the namespace constraint
-                String message = sqlEx.getMessage();
-                return message != null &&
-                       (message.toLowerCase().contains("nmspc_name") ||
-                        message.toLowerCase().contains("namespace"));
-            }
-        }
-
-        return false;
-    }
 
     /**
      * Registers a cache update to happen only after the current transaction commits.

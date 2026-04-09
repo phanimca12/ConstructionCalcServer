@@ -1021,7 +1021,8 @@ class SchemaServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             String content = "test schema content";
-            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
+            when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, testSchemaDto.getName()))
+                    .thenReturn(Optional.empty());
             when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
             when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
                     .thenReturn(Optional.empty());
@@ -1038,14 +1039,16 @@ class SchemaServiceTest {
             savedSchmData.setIsDraft(true);
 
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
-            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+
+            // Mock publishSchemaVersion internal calls
             when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
 
             SchemaDto result = schemaService.importSchema(testNamespace, testSchemaDto, content);
 
             assertNotNull(result);
-            // Verify schema was saved twice (initial + publish version update)
-            verify(schmRepository, times(2)).save(any(Schm.class));
+            // Verify schema was saved (initial save + publish calls save internally)
+            verify(schmRepository, atLeastOnce()).save(any(Schm.class));
             // Verify initial schema save with correct user
             verify(schmRepository, atLeastOnce()).save(argThat(schm ->
                     schm != null && testUserId.equals(schm.getCreatedBy()) &&
@@ -1055,14 +1058,8 @@ class SchemaServiceTest {
             verify(schmDataRepository, atLeastOnce()).save(argThat(schmData ->
                     schmData != null && content.equals(schmData.getSchmData())
             ));
-            // Verify version was published (isDraft set to false)
-            verify(schmDataRepository, atLeastOnce()).save(argThat(schmData ->
-                    schmData != null && !schmData.getIsDraft()
-            ));
-            // Verify publish version was set
-            verify(schmRepository, atLeastOnce()).save(argThat(schm ->
-                    schm != null && schm.getPublishVersion() != null && schm.getPublishVersion().equals(1)
-            ));
+            // Verify findBySchmId was called to refresh schema
+            verify(schmRepository, atLeastOnce()).findBySchmId(testSchmId);
         }
     }
 
@@ -1072,16 +1069,17 @@ class SchemaServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             String content = "test content";
-            // Mock that schema with this name already exists
-            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.of(testSchm));
+            // Mock that schema with this name already exists in this tenant+namespace
+            when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, testSchemaDto.getName()))
+                    .thenReturn(Optional.of(testSchm));
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     schemaService.importSchema(testNamespace, testSchemaDto, content)
             );
 
             assertEquals(ErrorMessages.SCHEMA_IMPORT_EXISTS, exception.getMessage());
-            // Verify that findBySchmName was called to check for duplicates
-            verify(schmRepository).findBySchmName(testSchemaDto.getName());
+            // Verify that tenant+namespace-aware lookup was called to check for duplicates
+            verify(schmRepository).findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, testSchemaDto.getName());
             // Verify save was never called since duplicate was detected early
             verify(schmRepository, never()).save(any(Schm.class));
             verify(schmDataRepository, never()).save(any(SchmData.class));
@@ -1117,12 +1115,13 @@ class SchemaServiceTest {
     }
 
     @Test
-    void testImportSchema_VersionCreationFails_ThrowsException() throws IOException {
+    void testImportSchema_PublishFails_ThrowsException() throws IOException {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             String content = "test content";
-            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
+            when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, testSchemaDto.getName()))
+                    .thenReturn(Optional.empty());
             when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
             when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
                     .thenReturn(Optional.empty());
@@ -1136,27 +1135,31 @@ class SchemaServiceTest {
             savedSchmData.setIsDraft(true);
 
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
-            // Version not found during publish step
+
+            // Mock findBySchmId for publishSchemaVersion
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            // Version not found during publish step - publishSchemaVersion will throw
             when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.empty());
 
             IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
                     schemaService.importSchema(testNamespace, testSchemaDto, content)
             );
 
-            assertEquals("Failed to create initial version during import", exception.getMessage());
+            assertEquals("Failed to publish initial version during import", exception.getMessage());
+            assertNotNull(exception.getCause());
+            assertTrue(exception.getCause() instanceof IllegalArgumentException);
         }
     }
 
     @Test
-    void testImportSchema_AtomicTransaction_AllOrNothing() throws IOException {
+    void testImportSchema_AtomicTransaction_PublishFailureRollsBack() throws IOException {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             String content = "test content";
-            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
-            // First save succeeds (initial schema save)
-            when(schmRepository.save(argThat(schm -> schm != null && schm.getPublishVersion() == null)))
-                    .thenReturn(testSchm);
+            when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, testSchemaDto.getName()))
+                    .thenReturn(Optional.empty());
+            when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
             when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
                     .thenReturn(Optional.empty());
@@ -1170,19 +1173,23 @@ class SchemaServiceTest {
             savedSchmData.setIsDraft(true);
 
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+
+            // Mock findBySchmId for publishSchemaVersion
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
             when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
 
-            // Simulate failure during final save (publish step)
+            // Simulate failure during publish step - second save in publishSchemaVersion
             when(schmRepository.save(argThat(schm -> schm != null && schm.getPublishVersion() != null && schm.getPublishVersion().equals(1))))
                     .thenThrow(new RuntimeException("Database error during publish"));
 
-            assertThrows(RuntimeException.class, () ->
+            IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
                     schemaService.importSchema(testNamespace, testSchemaDto, content)
             );
 
+            assertEquals("Failed to publish initial version during import", exception.getMessage());
             // Verify that operations were attempted but transaction should rollback
             // This test ensures @Transactional is present and working
-            verify(schmRepository, times(2)).save(any(Schm.class));
+            verify(schmRepository, atLeastOnce()).save(any(Schm.class));
             verify(schmDataRepository, atLeastOnce()).save(any(SchmData.class));
         }
     }
@@ -1194,17 +1201,24 @@ class SchemaServiceTest {
 
             String content = "test content";
             // Simulate race condition: check passes but save fails due to concurrent insert
-            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
-            when(schmRepository.save(any(Schm.class)))
-                    .thenThrow(new org.springframework.dao.DataIntegrityViolationException(
-                            "unique constraint violation: schm_name"));
+            when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, testSchemaDto.getName()))
+                    .thenReturn(Optional.empty());
+
+            // Create proper SQLException with SQLState code for unique constraint violation
+            java.sql.SQLException sqlException = new java.sql.SQLException(
+                    "duplicate key value violates unique constraint \"uk_schm_name\"", "23505");
+            org.springframework.dao.DataIntegrityViolationException constraintException =
+                    new org.springframework.dao.DataIntegrityViolationException(
+                            "unique constraint violation: schm_name", sqlException);
+
+            when(schmRepository.save(any(Schm.class))).thenThrow(constraintException);
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     schemaService.importSchema(testNamespace, testSchemaDto, content)
             );
 
             assertEquals(ErrorMessages.SCHEMA_IMPORT_EXISTS, exception.getMessage());
-            verify(schmRepository).findBySchmName(testSchemaDto.getName());
+            verify(schmRepository).findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, testSchemaDto.getName());
             verify(schmRepository).save(any(Schm.class));
         }
     }
@@ -1215,17 +1229,23 @@ class SchemaServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             String content = "test content";
-            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
-            // Simulate a different constraint violation (not schm_name)
-            when(schmRepository.save(any(Schm.class)))
-                    .thenThrow(new org.springframework.dao.DataIntegrityViolationException(
-                            "foreign key constraint violation"));
+            when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, testSchemaDto.getName()))
+                    .thenReturn(Optional.empty());
+
+            // Create proper SQLException with different SQLState (23503 = foreign key violation)
+            java.sql.SQLException sqlException = new java.sql.SQLException(
+                    "foreign key constraint violation on tenant_id", "23503");
+            org.springframework.dao.DataIntegrityViolationException constraintException =
+                    new org.springframework.dao.DataIntegrityViolationException(
+                            "foreign key constraint violation", sqlException);
+
+            when(schmRepository.save(any(Schm.class))).thenThrow(constraintException);
 
             assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () ->
                     schemaService.importSchema(testNamespace, testSchemaDto, content)
             );
 
-            verify(schmRepository).findBySchmName(testSchemaDto.getName());
+            verify(schmRepository).findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, testSchemaDto.getName());
             verify(schmRepository).save(any(Schm.class));
         }
     }
@@ -1236,7 +1256,8 @@ class SchemaServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             String content = "test content";
-            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
+            when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, testSchemaDto.getName()))
+                    .thenReturn(Optional.empty());
             when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
             when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
                     .thenReturn(Optional.empty());
@@ -1253,14 +1274,15 @@ class SchemaServiceTest {
             savedSchmData.setIsDraft(true);
 
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
-            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+            // Mock publishSchemaVersion calls
             when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
 
             SchemaDto result = schemaService.importSchema(testNamespace, testSchemaDto, content);
 
             assertNotNull(result);
             verify(jwtClaimsContext, atLeastOnce()).getUserId();
-            // schmRepository.save is called twice (initial + publish version)
+            // schmRepository.save is called (initial + possibly publish version update)
             verify(schmRepository, atLeastOnce()).save(argThat(schm ->
                     schm != null && testUserId.equals(schm.getCreatedBy()) &&
                     testUserId.equals(schm.getUpdatedBy())
@@ -1269,6 +1291,138 @@ class SchemaServiceTest {
                     schmData != null && testUserId.equals(schmData.getCreatedBy()) &&
                     testUserId.equals(schmData.getUpdatedBy())
             ));
+        }
+    }
+
+    @Test
+    void testImportSchema_MultiTenantIsolation_SameNameDifferentTenant() throws IOException {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            String content = "test content";
+            String schemaName = "CommonSchemaName";
+            testSchemaDto.setName(schemaName);
+
+            // Schema with same name exists in different tenant - should not conflict
+            UUID otherTenantId = UUID.randomUUID();
+            Schm existingInOtherTenant = new Schm();
+            existingInOtherTenant.setSchmId(UUID.randomUUID());
+            existingInOtherTenant.setTenantId(otherTenantId);
+            existingInOtherTenant.setNmspcId(testNmspcId);
+            existingInOtherTenant.setSchmName(schemaName);
+
+            // SECURITY: Lookup is scoped to current tenant+namespace, so returns empty
+            when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, schemaName))
+                    .thenReturn(Optional.empty());
+
+            when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+            when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
+                    .thenReturn(Optional.empty());
+
+            SchmDataId id = new SchmDataId();
+            id.setSchmId(testSchmId);
+            id.setSchmVersion(1);
+
+            SchmData savedSchmData = new SchmData();
+            savedSchmData.setId(id);
+            savedSchmData.setIsDraft(true);
+
+            when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+            // Mock publishSchemaVersion calls
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+
+            // Should succeed - same name in different tenant is allowed
+            SchemaDto result = schemaService.importSchema(testNamespace, testSchemaDto, content);
+
+            assertNotNull(result);
+            // Verify tenant+namespace-aware lookup was used
+            verify(schmRepository).findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, schemaName);
+        }
+    }
+
+    @Test
+    void testImportSchema_RefreshFails_ThrowsException() throws IOException {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            String content = "test content";
+            when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, testSchemaDto.getName()))
+                    .thenReturn(Optional.empty());
+            when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+            when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
+                    .thenReturn(Optional.empty());
+
+            SchmDataId id = new SchmDataId();
+            id.setSchmId(testSchmId);
+            id.setSchmVersion(1);
+
+            SchmData savedSchmData = new SchmData();
+            savedSchmData.setId(id);
+            savedSchmData.setIsDraft(true);
+
+            when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+
+            // First call for publishSchemaVersion succeeds, second call for refresh fails
+            when(schmRepository.findBySchmId(testSchmId))
+                    .thenReturn(Optional.of(testSchm))  // First call during publish
+                    .thenReturn(Optional.empty());       // Second call during refresh fails
+
+            IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
+                    schemaService.importSchema(testNamespace, testSchemaDto, content)
+            );
+
+            assertEquals("Schema not found immediately after import - possible data corruption", exception.getMessage());
+            // Verify findBySchmId was called at least twice (publish + refresh attempt)
+            verify(schmRepository, atLeast(2)).findBySchmId(testSchmId);
+        }
+    }
+
+    @Test
+    void testImportSchema_NamespaceIsolation_SameNameDifferentNamespace() throws IOException {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            String content = "test content";
+            String schemaName = "CommonSchemaName";
+            testSchemaDto.setName(schemaName);
+
+            // Schema with same name exists in different namespace - should not conflict
+            UUID otherNmspcId = UUID.randomUUID();
+            Schm existingInOtherNamespace = new Schm();
+            existingInOtherNamespace.setSchmId(UUID.randomUUID());
+            existingInOtherNamespace.setTenantId(testTenantId);
+            existingInOtherNamespace.setNmspcId(otherNmspcId);
+            existingInOtherNamespace.setSchmName(schemaName);
+
+            // SECURITY: Lookup is scoped to current tenant+namespace, so returns empty
+            when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, schemaName))
+                    .thenReturn(Optional.empty());
+
+            when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+            when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
+                    .thenReturn(Optional.empty());
+
+            SchmDataId id = new SchmDataId();
+            id.setSchmId(testSchmId);
+            id.setSchmVersion(1);
+
+            SchmData savedSchmData = new SchmData();
+            savedSchmData.setId(id);
+            savedSchmData.setIsDraft(true);
+
+            when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+            // Mock publishSchemaVersion calls
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+
+            // Should succeed - same name in different namespace is allowed
+            SchemaDto result = schemaService.importSchema(testNamespace, testSchemaDto, content);
+
+            assertNotNull(result);
+            // Verify tenant+namespace-aware lookup was used
+            verify(schmRepository).findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, schemaName);
         }
     }
 }

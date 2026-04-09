@@ -100,4 +100,10 @@ public interface SchmRepository extends JpaRepository<Schm, UUID>, JpaSpecificat
     Optional<Schm> findWithLockBySchmId(UUID schmId);
 
     Optional<Schm> findBySchmName(String name);
+
+    /**
+     * Find schema by tenant, namespace, and name.
+     * SECURITY: Ensures proper multi-tenant isolation by scoping lookup to tenant and namespace.
+     */
+    Optional<Schm> findByTenantIdAndNmspcIdAndSchmName(UUID tenantId, UUID nmspcId, String schmName);
 }
