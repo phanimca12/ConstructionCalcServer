@@ -503,4 +503,74 @@ class SchemaControllerTest {
         assertEquals(0, response.getBody().size());
         verify(schemaService).getExternalReferencesBySchemaId(testNamespace, testSchemaId, pageable);
     }
+
+    @Test
+    void testImportSchema_Success() throws IOException {
+        String content = "test schema content";
+        when(schemaService.importSchema(eq(testNamespace), any(SchemaDto.class), eq(content)))
+                .thenReturn(testSchemaDto);
+
+        ResponseEntity<?> response = schemaController.importSchema(
+                testNamespace, testSchemaDto, content);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(testSchemaDto, response.getBody());
+        verify(schemaService).importSchema(testNamespace, testSchemaDto, content);
+    }
+
+    @Test
+    void testImportSchema_DuplicateName_ReturnsBadRequest() throws IOException {
+        String content = "test schema content";
+        when(schemaService.importSchema(eq(testNamespace), any(SchemaDto.class), eq(content)))
+                .thenThrow(new IllegalArgumentException(ErrorMessages.SCHEMA_IMPORT_EXISTS));
+
+        ResponseEntity<?> response = schemaController.importSchema(
+                testNamespace, testSchemaDto, content);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals(ErrorMessages.SCHEMA_IMPORT_EXISTS, response.getBody());
+        verify(schemaService).importSchema(testNamespace, testSchemaDto, content);
+    }
+
+    @Test
+    void testImportSchema_MissingContent_ReturnsBadRequest() throws IOException {
+        String content = "test content";
+        when(schemaService.importSchema(eq(testNamespace), any(SchemaDto.class), eq(content)))
+                .thenThrow(new IllegalArgumentException("Content is required for schema import"));
+
+        ResponseEntity<?> response = schemaController.importSchema(
+                testNamespace, testSchemaDto, content);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Content is required for schema import", response.getBody());
+        verify(schemaService).importSchema(testNamespace, testSchemaDto, content);
+    }
+
+    @Test
+    void testImportSchema_StateException_ReturnsConflict() throws IOException {
+        String content = "test schema content";
+        when(schemaService.importSchema(eq(testNamespace), any(SchemaDto.class), eq(content)))
+                .thenThrow(new IllegalStateException("Failed to create initial version during import"));
+
+        ResponseEntity<?> response = schemaController.importSchema(
+                testNamespace, testSchemaDto, content);
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertEquals("Failed to create initial version during import", response.getBody());
+        verify(schemaService).importSchema(testNamespace, testSchemaDto, content);
+    }
+
+    @Test
+    void testImportSchema_IOException_ReturnsInternalServerError() throws IOException {
+        String content = "test schema content";
+        when(schemaService.importSchema(eq(testNamespace), any(SchemaDto.class), eq(content)))
+                .thenThrow(new IOException("Test IO exception"));
+
+        ResponseEntity<?> response = schemaController.importSchema(
+                testNamespace, testSchemaDto, content);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+        assertEquals(ErrorMessages.SCHEMA_CREATION_FAILED, response.getBody());
+        verify(schemaService).importSchema(testNamespace, testSchemaDto, content);
+    }
 }

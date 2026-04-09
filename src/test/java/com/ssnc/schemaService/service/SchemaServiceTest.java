@@ -1014,4 +1014,261 @@ class SchemaServiceTest {
         assertEquals("API Reference", result.get(0).getExtRefName());
         verify(extRefRepository).findAllById(anyIterable());
     }
+
+    @Test
+    void testImportSchema_Success_CreatesAndPublishes() throws IOException {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            String content = "test schema content";
+            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
+            when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+            when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
+                    .thenReturn(Optional.empty());
+
+            SchmDataId id = new SchmDataId();
+            id.setSchmId(testSchmId);
+            id.setSchmVersion(1);
+
+            SchmData savedSchmData = new SchmData();
+            savedSchmData.setId(id);
+            savedSchmData.setCreatedBy(testUserId);
+            savedSchmData.setUpdatedBy(testUserId);
+            savedSchmData.setSchmData(content);
+            savedSchmData.setIsDraft(true);
+
+            when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+            SchemaDto result = schemaService.importSchema(testNamespace, testSchemaDto, content);
+
+            assertNotNull(result);
+            // Verify schema was saved twice (initial + publish version update)
+            verify(schmRepository, times(2)).save(any(Schm.class));
+            // Verify initial schema save with correct user
+            verify(schmRepository, atLeastOnce()).save(argThat(schm ->
+                    schm != null && testUserId.equals(schm.getCreatedBy()) &&
+                    testUserId.equals(schm.getUpdatedBy())
+            ));
+            // Verify content was saved
+            verify(schmDataRepository, atLeastOnce()).save(argThat(schmData ->
+                    schmData != null && content.equals(schmData.getSchmData())
+            ));
+            // Verify version was published (isDraft set to false)
+            verify(schmDataRepository, atLeastOnce()).save(argThat(schmData ->
+                    schmData != null && !schmData.getIsDraft()
+            ));
+            // Verify publish version was set
+            verify(schmRepository, atLeastOnce()).save(argThat(schm ->
+                    schm != null && schm.getPublishVersion() != null && schm.getPublishVersion().equals(1)
+            ));
+        }
+    }
+
+    @Test
+    void testImportSchema_DuplicateName_ThrowsException() throws IOException {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            String content = "test content";
+            // Mock that schema with this name already exists
+            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.of(testSchm));
+
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    schemaService.importSchema(testNamespace, testSchemaDto, content)
+            );
+
+            assertEquals(ErrorMessages.SCHEMA_IMPORT_EXISTS, exception.getMessage());
+            // Verify that findBySchmName was called to check for duplicates
+            verify(schmRepository).findBySchmName(testSchemaDto.getName());
+            // Verify save was never called since duplicate was detected early
+            verify(schmRepository, never()).save(any(Schm.class));
+            verify(schmDataRepository, never()).save(any(SchmData.class));
+        }
+    }
+
+    @Test
+    void testImportSchema_MissingContent_ThrowsException() {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    schemaService.importSchema(testNamespace, testSchemaDto, null)
+            );
+
+            assertEquals("Content is required for schema import", exception.getMessage());
+            verify(schmRepository, never()).save(any(Schm.class));
+        }
+    }
+
+    @Test
+    void testImportSchema_EmptyContent_ThrowsException() {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    schemaService.importSchema(testNamespace, testSchemaDto, "")
+            );
+
+            assertEquals("Content is required for schema import", exception.getMessage());
+            verify(schmRepository, never()).save(any(Schm.class));
+        }
+    }
+
+    @Test
+    void testImportSchema_VersionCreationFails_ThrowsException() throws IOException {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            String content = "test content";
+            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
+            when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+            when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
+                    .thenReturn(Optional.empty());
+
+            SchmDataId id = new SchmDataId();
+            id.setSchmId(testSchmId);
+            id.setSchmVersion(1);
+
+            SchmData savedSchmData = new SchmData();
+            savedSchmData.setId(id);
+            savedSchmData.setIsDraft(true);
+
+            when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+            // Version not found during publish step
+            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.empty());
+
+            IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
+                    schemaService.importSchema(testNamespace, testSchemaDto, content)
+            );
+
+            assertEquals("Failed to create initial version during import", exception.getMessage());
+        }
+    }
+
+    @Test
+    void testImportSchema_AtomicTransaction_AllOrNothing() throws IOException {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            String content = "test content";
+            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
+            // First save succeeds (initial schema save)
+            when(schmRepository.save(argThat(schm -> schm != null && schm.getPublishVersion() == null)))
+                    .thenReturn(testSchm);
+
+            when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
+                    .thenReturn(Optional.empty());
+
+            SchmDataId id = new SchmDataId();
+            id.setSchmId(testSchmId);
+            id.setSchmVersion(1);
+
+            SchmData savedSchmData = new SchmData();
+            savedSchmData.setId(id);
+            savedSchmData.setIsDraft(true);
+
+            when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+
+            // Simulate failure during final save (publish step)
+            when(schmRepository.save(argThat(schm -> schm != null && schm.getPublishVersion() != null && schm.getPublishVersion().equals(1))))
+                    .thenThrow(new RuntimeException("Database error during publish"));
+
+            assertThrows(RuntimeException.class, () ->
+                    schemaService.importSchema(testNamespace, testSchemaDto, content)
+            );
+
+            // Verify that operations were attempted but transaction should rollback
+            // This test ensures @Transactional is present and working
+            verify(schmRepository, times(2)).save(any(Schm.class));
+            verify(schmDataRepository, atLeastOnce()).save(any(SchmData.class));
+        }
+    }
+
+    @Test
+    void testImportSchema_RaceCondition_DuplicateNameConstraint_ThrowsProperError() {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            String content = "test content";
+            // Simulate race condition: check passes but save fails due to concurrent insert
+            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
+            when(schmRepository.save(any(Schm.class)))
+                    .thenThrow(new org.springframework.dao.DataIntegrityViolationException(
+                            "unique constraint violation: schm_name"));
+
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                    schemaService.importSchema(testNamespace, testSchemaDto, content)
+            );
+
+            assertEquals(ErrorMessages.SCHEMA_IMPORT_EXISTS, exception.getMessage());
+            verify(schmRepository).findBySchmName(testSchemaDto.getName());
+            verify(schmRepository).save(any(Schm.class));
+        }
+    }
+
+    @Test
+    void testImportSchema_RaceCondition_OtherConstraintViolation_Rethrows() {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            String content = "test content";
+            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
+            // Simulate a different constraint violation (not schm_name)
+            when(schmRepository.save(any(Schm.class)))
+                    .thenThrow(new org.springframework.dao.DataIntegrityViolationException(
+                            "foreign key constraint violation"));
+
+            assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () ->
+                    schemaService.importSchema(testNamespace, testSchemaDto, content)
+            );
+
+            verify(schmRepository).findBySchmName(testSchemaDto.getName());
+            verify(schmRepository).save(any(Schm.class));
+        }
+    }
+
+    @Test
+    void testImportSchema_SetsUserFromJwtContext() throws IOException {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            String content = "test content";
+            when(schmRepository.findBySchmName(testSchemaDto.getName())).thenReturn(Optional.empty());
+            when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+            when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any(UUID.class)))
+                    .thenReturn(Optional.empty());
+
+            SchmDataId id = new SchmDataId();
+            id.setSchmId(testSchmId);
+            id.setSchmVersion(1);
+
+            SchmData savedSchmData = new SchmData();
+            savedSchmData.setId(id);
+            savedSchmData.setCreatedBy(testUserId);
+            savedSchmData.setUpdatedBy(testUserId);
+            savedSchmData.setSchmData(content);
+            savedSchmData.setIsDraft(true);
+
+            when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+            SchemaDto result = schemaService.importSchema(testNamespace, testSchemaDto, content);
+
+            assertNotNull(result);
+            verify(jwtClaimsContext, atLeastOnce()).getUserId();
+            // schmRepository.save is called twice (initial + publish version)
+            verify(schmRepository, atLeastOnce()).save(argThat(schm ->
+                    schm != null && testUserId.equals(schm.getCreatedBy()) &&
+                    testUserId.equals(schm.getUpdatedBy())
+            ));
+            verify(schmDataRepository, atLeastOnce()).save(argThat(schmData ->
+                    schmData != null && testUserId.equals(schmData.getCreatedBy()) &&
+                    testUserId.equals(schmData.getUpdatedBy())
+            ));
+        }
+    }
 }

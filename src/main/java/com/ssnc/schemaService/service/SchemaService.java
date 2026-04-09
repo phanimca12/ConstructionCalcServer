@@ -215,6 +215,78 @@ public class SchemaService {
     }
 
     /**
+     * Import a schema with content. If schema name already exists, throw an error.
+     * On successful save, publish the saved version atomically.
+     */
+    @Transactional
+    public SchemaDto importSchema(String namespace, SchemaDto schemaDto, String content) throws IOException {
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        // Check if schema name already exists - restrict import for existing schemas
+        Optional<Schm> exists = schmRepository.findBySchmName(schemaDto.getName());
+        if(exists.isPresent()) {
+            throw new IllegalArgumentException(ErrorMessages.SCHEMA_IMPORT_EXISTS);
+        }
+
+        // Validate that content is provided
+        if (content == null || content.isEmpty()) {
+            throw new IllegalArgumentException("Content is required for schema import");
+        }
+
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+        String tenantName = TenantContext.getTenantName();
+
+        // Resolve tenant_id and nmspc_id
+        UUID tenantId = tenantRepository.findByTenantName(tenantName)
+                .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.TENANT_CONFIG_INVALID));
+
+        // SECURITY: Use tenant-aware namespace lookup to ensure proper isolation
+        // Auto-create namespace if it doesn't exist
+        UUID nmspcId = nameSpaceService.ensureNamespaceExists(tenantId, namespace);
+
+        Schm schema = mapToSchmEntity(schemaDto);
+        schema.setTenantId(tenantId);
+        schema.setNmspcId(nmspcId);
+        schema.setCreatedBy(userName);
+        schema.setUpdatedBy(userName);
+
+        Schm saved;
+        try {
+            // Save schema - DB unique constraint handles race condition
+            saved = schmRepository.save(schema);
+        } catch (DataIntegrityViolationException e) {
+            // Handle duplicate name constraint violation
+            if (e.getMessage() != null && e.getMessage().toLowerCase().contains("unique")
+                    && e.getMessage().toLowerCase().contains("schm_name")) {
+                throw new IllegalArgumentException(ErrorMessages.SCHEMA_IMPORT_EXISTS);
+            }
+            throw e;
+        }
+
+        // Create initial version with content
+        createSchemaDataFromFile(saved.getSchmId(), content);
+
+        // Inline publish logic to maintain transaction atomicity
+        // Do not call publishSchemaVersion() as it has separate @Transactional
+        Optional<SchmData> versionOpt = schmRepository.getSchemaVersion(saved.getSchmId(), 1);
+        if (versionOpt.isEmpty()) {
+            throw new IllegalStateException("Failed to create initial version during import");
+        }
+
+        SchmData schemaData = versionOpt.get();
+        schemaData.setIsDraft(false);
+        schmDataRepository.save(schemaData);
+
+        saved.setPublishVersion(1);
+        schmRepository.save(saved);
+
+        // Refresh to get latest state with published version
+        return mapToSchemaResponse(schmRepository.findBySchmId(saved.getSchmId()).orElse(saved));
+    }
+
+    /**
      * Get schema by ID with optional version filtering and pagination
      *
      * @param namespace - Namespace filter

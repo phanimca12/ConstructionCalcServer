@@ -75,6 +75,28 @@ public class SchemaController {
     }
 
     /**
+     * POST /schemas/{nameSpace}/import
+     * Import a schema with content. If schema name already exists, returns error.
+     * On successful save, publishes the saved version.
+     */
+    @PostMapping(value = ApiConstants.PATH_SCHEMA_IMPORT, consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
+    public ResponseEntity<?> importSchema(
+            @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
+            @RequestPart(value = ApiConstants.REQUEST_PART_SCHEMA) SchemaDto schema,
+            @RequestPart(value = ApiConstants.REQUEST_PART_CONTENT) String content) {
+        try {
+            SchemaDto imported = schemaService.importSchema(nameSpace, schema, content);
+            return ResponseEntity.status(HttpStatus.OK).body(imported);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ErrorMessages.SCHEMA_CREATION_FAILED);
+        }
+    }
+
+    /**
      * GET /schemas/{nameSpace}/{id}
      * Get schema by ID with optional version filtering and pagination
      *
