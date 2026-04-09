@@ -1,6 +1,8 @@
 package com.ssnc.schemaService.entity;
 
 import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.ToString;
 import org.hibernate.annotations.*;
