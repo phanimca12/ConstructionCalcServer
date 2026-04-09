@@ -11,6 +11,7 @@ public final class ErrorMessages {
 
     // Schema related messages
     public static final String SCHEMA_ALREADY_EXISTS = "Schema with name %s already exists";
+    public static final String SCHEMA_IMPORT_EXISTS = "Schema name already exist, existing schemas can not be modified using import";
     public static final String SCHEMA_NOT_FOUND = "Schema not found: %s";
     public static final String SCHEMA_NOT_FOUND_FOR_REFERENCE = "Schema %s not found";
     public static final String SCHEMA_VERSION_NOT_FOUND = "Version %s does not exist for schema %s";

@@ -19,6 +19,7 @@ import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.repo.SchmSpecifications;
 import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import com.ssnc.schemaService.tenant.TenantContext;
+import com.ssnc.schemaService.util.DatabaseExceptionUtils;
 import com.ssnc.shared.security.JwtClaimsContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,10 +28,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -212,6 +211,75 @@ public class SchemaService {
         }
 
         return mapToSchemaResponse(saved);
+    }
+
+    /**
+     * Import a schema with content. If schema name already exists, throw an error.
+     * On successful save, publish the saved version atomically.
+     */
+    @Transactional
+    public SchemaDto importSchema(String namespace, SchemaDto schemaDto, String content) throws IOException {
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        // Validate that content is provided
+        if (content == null || content.isEmpty()) {
+            throw new IllegalArgumentException("Content is required for schema import");
+        }
+
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+        String tenantName = TenantContext.getTenantName();
+
+        // Resolve tenant_id and nmspc_id
+        UUID tenantId = tenantRepository.findByTenantName(tenantName)
+                .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
+                .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.TENANT_CONFIG_INVALID));
+
+        // SECURITY: Use tenant-aware namespace lookup to ensure proper isolation
+        // Auto-create namespace if it doesn't exist
+        UUID nmspcId = nameSpaceService.ensureNamespaceExists(tenantId, namespace);
+
+        // SECURITY: Use tenant+namespace-aware lookup to ensure proper multi-tenant isolation
+        // Check if schema name already exists within this tenant and namespace
+        Optional<Schm> exists = schmRepository.findByTenantIdAndNmspcIdAndSchmName(
+                tenantId, nmspcId, schemaDto.getName());
+        if(exists.isPresent()) {
+            throw new IllegalArgumentException(ErrorMessages.SCHEMA_IMPORT_EXISTS);
+        }
+
+        Schm schema = mapToSchmEntity(schemaDto);
+        schema.setTenantId(tenantId);
+        schema.setNmspcId(nmspcId);
+        schema.setCreatedBy(userName);
+        schema.setUpdatedBy(userName);
+
+        Schm saved;
+        try {
+            // Save schema - DB unique constraint handles race condition
+            saved = schmRepository.save(schema);
+        } catch (DataIntegrityViolationException e) {
+            // Use database-agnostic JDBC SQLState codes instead of string matching
+            if (DatabaseExceptionUtils.isUniqueConstraintViolation(e, "schm_name")) {
+                throw new IllegalArgumentException(ErrorMessages.SCHEMA_IMPORT_EXISTS);
+            }
+            throw e;
+        }
+
+        // Create initial version with content
+        createSchemaDataFromFile(saved.getSchmId(), content);
+
+        // Call existing publish method to maintain consistency and reuse validation logic
+        // Spring will join the existing transaction (PROPAGATION_REQUIRED default)
+        try {
+            publishSchemaVersion(namespace, saved.getSchmId(), 1);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to publish initial version during import", e);
+        }
+
+        // Refresh to get latest state with published version
+        // Don't fall back to stale data - throw exception if refresh fails
+        return mapToSchemaResponse(schmRepository.findBySchmId(saved.getSchmId())
+                .orElseThrow(() -> new IllegalStateException("Schema not found immediately after import - possible data corruption")));
     }
 
     /**
@@ -700,4 +768,5 @@ public class SchemaService {
 
         return schmData;
     }
+
 }

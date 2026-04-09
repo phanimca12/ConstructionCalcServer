@@ -7,6 +7,7 @@ import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.TenantDto;
 import com.ssnc.schemaService.entity.Tenant;
 import com.ssnc.schemaService.repo.TenantRepository;
+import com.ssnc.schemaService.util.DatabaseExceptionUtils;
 import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
@@ -20,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -71,7 +71,7 @@ public class TenantService {
         } catch (DataIntegrityViolationException e) {
             // Check if this was the expected unique constraint violation (concurrent creation)
             // vs. other constraint violations using JDBC SQLState codes
-            if (isUniqueConstraintViolation(e)) {
+            if (DatabaseExceptionUtils.isUniqueConstraintViolation(e, "tenant")) {
                 // Concurrent creation - another thread created it; cache and continue
                 logger.debug(ErrorMessages.TENANT_CONCURRENT_CREATION);
                 registerCacheUpdate(tenantName);
@@ -85,35 +85,6 @@ public class TenantService {
         // They will bubble up to allow retry logic or proper error handling at higher levels
     }
 
-    /**
-     * Checks if a DataIntegrityViolationException is a unique constraint violation
-     * using JDBC SQLState codes (database-agnostic).
-     *
-     * @param e - The exception to check
-     * @return true if it's a unique constraint violation on tenant_name
-     */
-    private boolean isUniqueConstraintViolation(DataIntegrityViolationException e) {
-        Throwable rootCause = e.getRootCause();
-
-        if (rootCause instanceof SQLException) {
-            SQLException sqlEx = (SQLException) rootCause;
-            String sqlState = sqlEx.getSQLState();
-
-            // Standard SQLState codes for unique constraint violations:
-            // 23505 - PostgreSQL unique_violation
-            // 23000 - MySQL/MariaDB integrity_constraint_violation
-            // 23505 - H2 unique_violation
-            if ("23505".equals(sqlState) || "23000".equals(sqlState)) {
-                // Verify it's specifically the tenant_name constraint
-                String message = sqlEx.getMessage();
-                return message != null &&
-                       (message.toLowerCase().contains("tenant_name") ||
-                        message.toLowerCase().contains("tenant"));
-            }
-        }
-
-        return false;
-    }
 
     /**
      * Registers a cache update to happen only after the current transaction commits.

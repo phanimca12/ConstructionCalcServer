@@ -32,6 +32,7 @@ public final class ApiConstants {
     public static final String PATH_SCHEMA_LOCK = "/{id}/lock";
     public static final String PATH_SCHEMA_UNLOCK = "/{id}/unLock";
     public static final String PATH_SCHEMA_EXT_REFS = "/{id}/extRefs";
+    public static final String PATH_SCHEMA_IMPORT = "/import";
 
     /**
      * Base path mappings - Tenants
