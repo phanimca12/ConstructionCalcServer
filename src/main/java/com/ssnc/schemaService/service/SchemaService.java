@@ -3,7 +3,6 @@ package com.ssnc.schemaService.service;
 import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.ExtRefDto;
-import com.ssnc.schemaService.util.DatabaseExceptionUtils;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
