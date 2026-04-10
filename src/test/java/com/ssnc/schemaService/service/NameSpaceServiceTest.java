@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.service;
 
+import com.ssnc.schemaService.config.CacheConfigProperties;
 import com.ssnc.schemaService.dto.NameSpaceDto;
 import com.ssnc.schemaService.entity.Nmspc;
 import com.ssnc.schemaService.repo.NameSpaceRepository;
@@ -8,7 +9,6 @@ import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -35,7 +35,12 @@ class NameSpaceServiceTest {
     @Mock
     private JwtClaimsContext jwtClaimsContext;
 
-    @InjectMocks
+    @Mock
+    private CacheConfigProperties cacheConfigProperties;
+
+    @Mock
+    private CacheConfigProperties.NamespaceCacheConfig namespaceCacheConfig;
+
     private NameSpaceService nameSpaceService;
 
     private String testNamespaceName;
@@ -60,6 +65,14 @@ class NameSpaceServiceTest {
         testNmspc.setUpdatedBy(testUserId);
         testNmspc.setCreatedDatetime(LocalDateTime.now());
         testNmspc.setUpdatedDatetime(LocalDateTime.now());
+
+        // Mock cache configuration
+        when(namespaceCacheConfig.getExpireAfterWriteMinutes()).thenReturn(60);
+        when(namespaceCacheConfig.getMaximumSize()).thenReturn(1000);
+        when(cacheConfigProperties.getNamespace()).thenReturn(namespaceCacheConfig);
+
+        // Instantiate service with mocked dependencies
+        nameSpaceService = new NameSpaceService(cacheConfigProperties, nameSpaceRepository, jwtClaimsContext);
     }
 
     @Test

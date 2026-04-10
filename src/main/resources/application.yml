@@ -62,3 +62,12 @@ bpm:
       whitelist-paths:
         - "/actuator/**"
         - "/swagger-ui/**"
+
+cache:
+  caffeine:
+    tenant:
+      expire-after-write-minutes: 60
+      maximum-size: 1000
+    namespace:
+      expire-after-write-minutes: 60
+      maximum-size: 1000
