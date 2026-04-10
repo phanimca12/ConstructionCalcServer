@@ -2,6 +2,7 @@ package com.ssnc.schemaService.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.ssnc.schemaService.config.CacheConfigProperties;
 import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.NameSpaceDto;
@@ -38,18 +39,27 @@ public class NameSpaceService {
      */
     private record NamespaceCacheKey(UUID tenantId, String namespace) {}
 
-    // Cache namespace IDs to avoid DB queries on every request
-    // Uses composite key for tenant-aware caching without collision risk
-    private final Cache<NamespaceCacheKey, UUID> namespaceIdCache = Caffeine.newBuilder()
-            .expireAfterWrite(AppConstants.CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES)
-            .maximumSize(AppConstants.CACHE_MAX_SIZE)
-            .build();
+    private final Cache<NamespaceCacheKey, UUID> namespaceIdCache;
+    private final NameSpaceRepository nameSpaceRepository;
+    private final JwtClaimsContext jwtClaimsContext;
 
     @Autowired
-    NameSpaceRepository nameSpaceRepository;
+    public NameSpaceService(CacheConfigProperties cacheConfig,
+                            NameSpaceRepository nameSpaceRepository,
+                            JwtClaimsContext jwtClaimsContext) {
+        this.nameSpaceRepository = nameSpaceRepository;
+        this.jwtClaimsContext = jwtClaimsContext;
 
-    @Autowired
-    private JwtClaimsContext jwtClaimsContext;
+        // Initialize cache with externalized configuration from application.yml
+        this.namespaceIdCache = Caffeine.newBuilder()
+                .expireAfterWrite(cacheConfig.getNamespace().getExpireAfterWriteMinutes(), TimeUnit.MINUTES)
+                .maximumSize(cacheConfig.getNamespace().getMaximumSize())
+                .build();
+
+        logger.debug("NameSpaceService cache initialized: TTL={}min, MaxSize={}",
+                cacheConfig.getNamespace().getExpireAfterWriteMinutes(),
+                cacheConfig.getNamespace().getMaximumSize());
+    }
 
     /**
      * Ensures a namespace exists for the given tenant, creating it if necessary.

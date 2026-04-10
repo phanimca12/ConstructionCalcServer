@@ -2,6 +2,7 @@ package com.ssnc.schemaService.service;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.ssnc.schemaService.config.CacheConfigProperties;
 import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.TenantDto;
@@ -30,17 +31,27 @@ public class TenantService {
 
     private static final Logger logger = LoggerFactory.getLogger(TenantService.class);
 
-    // Cache tenant existence to avoid DB queries on every request
-    // TTL of 10 minutes balances freshness with performance
-    private final Cache<String, Boolean> tenantExistsCache = Caffeine.newBuilder()
-            .expireAfterWrite(AppConstants.CACHE_EXPIRE_MINUTES, TimeUnit.MINUTES)
-            .maximumSize(AppConstants.CACHE_MAX_SIZE)
-            .build();
+    private final Cache<String, Boolean> tenantExistsCache;
+    private final TenantRepository tenantRepository;
+    private final JwtClaimsContext jwtClaimsContext;
 
     @Autowired
-    TenantRepository tenantRepository;
-    @Autowired
-    JwtClaimsContext jwtClaimsContext;
+    public TenantService(CacheConfigProperties cacheConfig,
+                         TenantRepository tenantRepository,
+                         JwtClaimsContext jwtClaimsContext) {
+        this.tenantRepository = tenantRepository;
+        this.jwtClaimsContext = jwtClaimsContext;
+
+        // Initialize cache with externalized configuration from application.yml
+        this.tenantExistsCache = Caffeine.newBuilder()
+                .expireAfterWrite(cacheConfig.getTenant().getExpireAfterWriteMinutes(), TimeUnit.MINUTES)
+                .maximumSize(cacheConfig.getTenant().getMaximumSize())
+                .build();
+
+        logger.debug("TenantService cache initialized: TTL={}min, MaxSize={}",
+                cacheConfig.getTenant().getExpireAfterWriteMinutes(),
+                cacheConfig.getTenant().getMaximumSize());
+    }
 
     /**
      * Ensures a tenant exists, creating it if necessary.

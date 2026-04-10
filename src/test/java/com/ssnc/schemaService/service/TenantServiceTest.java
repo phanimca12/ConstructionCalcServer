@@ -1,13 +1,14 @@
 package com.ssnc.schemaService.service;
 
+import com.ssnc.schemaService.config.CacheConfigProperties;
 import com.ssnc.schemaService.dto.TenantDto;
 import com.ssnc.schemaService.entity.Tenant;
 import com.ssnc.schemaService.repo.TenantRepository;
+import com.ssnc.shared.security.JwtClaimsContext;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -28,7 +29,15 @@ class TenantServiceTest {
     @Mock
     private TenantRepository tenantRepository;
 
-    @InjectMocks
+    @Mock
+    private JwtClaimsContext jwtClaimsContext;
+
+    @Mock
+    private CacheConfigProperties cacheConfigProperties;
+
+    @Mock
+    private CacheConfigProperties.TenantCacheConfig tenantCacheConfig;
+
     private TenantService tenantService;
 
     private String testTenantName;
@@ -46,6 +55,14 @@ class TenantServiceTest {
         testTenant.setUpdatedBy(testUserId);
         testTenant.setCreatedDatetime(LocalDateTime.now());
         testTenant.setUpdatedDatetime(LocalDateTime.now());
+
+        // Mock cache configuration
+        when(tenantCacheConfig.getExpireAfterWriteMinutes()).thenReturn(60);
+        when(tenantCacheConfig.getMaximumSize()).thenReturn(1000);
+        when(cacheConfigProperties.getTenant()).thenReturn(tenantCacheConfig);
+
+        // Instantiate service with mocked dependencies
+        tenantService = new TenantService(cacheConfigProperties, tenantRepository, jwtClaimsContext);
     }
 
     @Test
