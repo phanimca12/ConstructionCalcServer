@@ -28,14 +28,14 @@ class ExtRefDtoTest {
 
     @Test
     void testExtRefName() {
-        extRefDto.setExtRefName("Test Process");
-        assertEquals("Test Process", extRefDto.getExtRefName());
+        extRefDto.setExtRefName("Test PROCESS");
+        assertEquals("Test PROCESS", extRefDto.getExtRefName());
     }
 
     @Test
     void testExtRefType() {
-        extRefDto.setExtRefType("Process");
-        assertEquals("Process", extRefDto.getExtRefType());
+        extRefDto.setExtRefType("PROCESS");
+        assertEquals("PROCESS", extRefDto.getExtRefType());
     }
 
     @Test
@@ -75,8 +75,8 @@ class ExtRefDtoTest {
         LocalDateTime updatedDateTime = LocalDateTime.now().plusMinutes(5);
 
         extRefDto.setExtRefId(extRefId);
-        extRefDto.setExtRefName("Complete Process");
-        extRefDto.setExtRefType("Automation");
+        extRefDto.setExtRefName("Complete PROCESS");
+        extRefDto.setExtRefType("AUTOMATION");
         extRefDto.setExtRefVersion("2.0.0");
         extRefDto.setCreatedDatetime(createdDateTime);
         extRefDto.setUpdatedDatetime(updatedDateTime);
@@ -84,8 +84,8 @@ class ExtRefDtoTest {
         extRefDto.setUpdatedBy("user2");
 
         assertEquals(extRefId, extRefDto.getExtRefId());
-        assertEquals("Complete Process", extRefDto.getExtRefName());
-        assertEquals("Automation", extRefDto.getExtRefType());
+        assertEquals("Complete PROCESS", extRefDto.getExtRefName());
+        assertEquals("AUTOMATION", extRefDto.getExtRefType());
         assertEquals("2.0.0", extRefDto.getExtRefVersion());
         assertEquals(createdDateTime, extRefDto.getCreatedDatetime());
         assertEquals(updatedDateTime, extRefDto.getUpdatedDatetime());
@@ -122,8 +122,8 @@ class ExtRefDtoTest {
     @Test
     void testToString() {
         extRefDto.setExtRefId(testExtRefId);
-        extRefDto.setExtRefName("Test Process");
-        extRefDto.setExtRefType("Process");
+        extRefDto.setExtRefName("Test PROCESS");
+        extRefDto.setExtRefType("PROCESS");
 
         String result = extRefDto.toString();
         assertNotNull(result);

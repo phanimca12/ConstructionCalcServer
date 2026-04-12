@@ -463,13 +463,13 @@ class SchemaControllerTest {
         ExtRefDto extRef1 = new ExtRefDto();
         extRef1.setExtRefId(extRefId1);
         extRef1.setExtRefName("External Reference 1");
-        extRef1.setExtRefType("API");
+        extRef1.setExtRefType("PROCESS");
         extRef1.setExtRefVersion("1.0");
 
         ExtRefDto extRef2 = new ExtRefDto();
         extRef2.setExtRefId(extRefId2);
         extRef2.setExtRefName("External Reference 2");
-        extRef2.setExtRefType("DATABASE");
+        extRef2.setExtRefType("AUTOMATION");
         extRef2.setExtRefVersion("2.0");
 
         List<ExtRefDto> extRefs = Arrays.asList(extRef1, extRef2);

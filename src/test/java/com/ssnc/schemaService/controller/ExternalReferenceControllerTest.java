@@ -44,7 +44,7 @@ class ExternalReferenceControllerTest {
         MockitoAnnotations.openMocks(this);
         testNamespace = "testNamespace";
         testExtRefId = "TEST-CTRL-REF-456";
-        testExtRefType = "Process";
+        testExtRefType = "PROCESS";
         testExtRefVersion = "1.0.0";
 
         testExtRefDto = new ExtRefDto();
@@ -251,7 +251,7 @@ class ExternalReferenceControllerTest {
 
     @Test
     void testGetExternalReferences_AllTypes() {
-        String[] types = {"Process", "Automation", "PresentationFlow", "Sampling", "UXBuilder"};
+        String[] types = {"PROCESS", "AUTOMATION", "PRESENTATION_FLOW", "SAMPLING", "UX_BUILDER"};
 
         for (String type : types) {
             ExtRefDto dto = new ExtRefDto();

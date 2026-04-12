@@ -69,7 +69,7 @@
         ext_ref_id varchar(64) not null,
         tenant_id ${guid} not null,
         ext_ref_name varchar(256),
-        ext_ref_type varchar(64),
+        ext_ref_type integer not null,
         ext_ref_version varchar(64),
         created_by varchar(256),
         updated_by varchar(256),

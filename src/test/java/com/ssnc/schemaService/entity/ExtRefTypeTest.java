@@ -11,71 +11,71 @@ class ExtRefTypeTest {
     void testEnumValues() {
         ExtRefType[] values = ExtRefType.values();
         assertEquals(5, values.length);
-        assertEquals(ExtRefType.Process, values[0]);
-        assertEquals(ExtRefType.Automation, values[1]);
-        assertEquals(ExtRefType.PresentationFlow, values[2]);
-        assertEquals(ExtRefType.Sampling, values[3]);
-        assertEquals(ExtRefType.UXBuilder, values[4]);
+        assertEquals(ExtRefType.PROCESS, values[0]);
+        assertEquals(ExtRefType.AUTOMATION, values[1]);
+        assertEquals(ExtRefType.PRESENTATION_FLOW, values[2]);
+        assertEquals(ExtRefType.SAMPLING, values[3]);
+        assertEquals(ExtRefType.UX_BUILDER, values[4]);
     }
 
     @Test
     void testFromString_Process() {
         ExtRefType result = ExtRefType.fromString("Process");
-        assertEquals(ExtRefType.Process, result);
+        assertEquals(ExtRefType.PROCESS, result);
     }
 
     @Test
     void testFromString_Automation() {
         ExtRefType result = ExtRefType.fromString("Automation");
-        assertEquals(ExtRefType.Automation, result);
+        assertEquals(ExtRefType.AUTOMATION, result);
     }
 
     @Test
     void testFromString_PresentationFlow() {
         ExtRefType result = ExtRefType.fromString("PresentationFlow");
-        assertEquals(ExtRefType.PresentationFlow, result);
+        assertEquals(ExtRefType.PRESENTATION_FLOW, result);
     }
 
     @Test
     void testFromString_Sampling() {
         ExtRefType result = ExtRefType.fromString("Sampling");
-        assertEquals(ExtRefType.Sampling, result);
+        assertEquals(ExtRefType.SAMPLING, result);
     }
 
     @Test
     void testFromString_UXBuilder() {
         ExtRefType result = ExtRefType.fromString("UXBuilder");
-        assertEquals(ExtRefType.UXBuilder, result);
+        assertEquals(ExtRefType.UX_BUILDER, result);
     }
 
     @Test
     void testFromString_CaseInsensitive_Process() {
         ExtRefType result = ExtRefType.fromString("process");
-        assertEquals(ExtRefType.Process, result);
+        assertEquals(ExtRefType.PROCESS, result);
     }
 
     @Test
     void testFromString_CaseInsensitive_Automation() {
         ExtRefType result = ExtRefType.fromString("AUTOMATION");
-        assertEquals(ExtRefType.Automation, result);
+        assertEquals(ExtRefType.AUTOMATION, result);
     }
 
     @Test
     void testFromString_CaseInsensitive_PresentationFlow() {
         ExtRefType result = ExtRefType.fromString("presentationflow");
-        assertEquals(ExtRefType.PresentationFlow, result);
+        assertEquals(ExtRefType.PRESENTATION_FLOW, result);
     }
 
     @Test
     void testFromString_CaseInsensitive_Sampling() {
         ExtRefType result = ExtRefType.fromString("SaMpLiNg");
-        assertEquals(ExtRefType.Sampling, result);
+        assertEquals(ExtRefType.SAMPLING, result);
     }
 
     @Test
     void testFromString_CaseInsensitive_UXBuilder() {
         ExtRefType result = ExtRefType.fromString("uxbuilder");
-        assertEquals(ExtRefType.UXBuilder, result);
+        assertEquals(ExtRefType.UX_BUILDER, result);
     }
 
     @Test
@@ -113,52 +113,52 @@ class ExtRefTypeTest {
 
     @Test
     void testEnumName_Process() {
-        assertEquals("Process", ExtRefType.Process.name());
+        assertEquals("PROCESS", ExtRefType.PROCESS.name());
     }
 
     @Test
     void testEnumName_Automation() {
-        assertEquals("Automation", ExtRefType.Automation.name());
+        assertEquals("AUTOMATION", ExtRefType.AUTOMATION.name());
     }
 
     @Test
     void testEnumName_PresentationFlow() {
-        assertEquals("PresentationFlow", ExtRefType.PresentationFlow.name());
+        assertEquals("PRESENTATION_FLOW", ExtRefType.PRESENTATION_FLOW.name());
     }
 
     @Test
     void testEnumName_Sampling() {
-        assertEquals("Sampling", ExtRefType.Sampling.name());
+        assertEquals("SAMPLING", ExtRefType.SAMPLING.name());
     }
 
     @Test
     void testEnumName_UXBuilder() {
-        assertEquals("UXBuilder", ExtRefType.UXBuilder.name());
+        assertEquals("UX_BUILDER", ExtRefType.UX_BUILDER.name());
     }
 
     @Test
     void testValueOf_Process() {
-        assertEquals(ExtRefType.Process, ExtRefType.valueOf("Process"));
+        assertEquals(ExtRefType.PROCESS, ExtRefType.valueOf("PROCESS"));
     }
 
     @Test
     void testValueOf_Automation() {
-        assertEquals(ExtRefType.Automation, ExtRefType.valueOf("Automation"));
+        assertEquals(ExtRefType.AUTOMATION, ExtRefType.valueOf("AUTOMATION"));
     }
 
     @Test
     void testValueOf_PresentationFlow() {
-        assertEquals(ExtRefType.PresentationFlow, ExtRefType.valueOf("PresentationFlow"));
+        assertEquals(ExtRefType.PRESENTATION_FLOW, ExtRefType.valueOf("PRESENTATION_FLOW"));
     }
 
     @Test
     void testValueOf_Sampling() {
-        assertEquals(ExtRefType.Sampling, ExtRefType.valueOf("Sampling"));
+        assertEquals(ExtRefType.SAMPLING, ExtRefType.valueOf("SAMPLING"));
     }
 
     @Test
     void testValueOf_UXBuilder() {
-        assertEquals(ExtRefType.UXBuilder, ExtRefType.valueOf("UXBuilder"));
+        assertEquals(ExtRefType.UX_BUILDER, ExtRefType.valueOf("UX_BUILDER"));
     }
 
     @Test
@@ -168,27 +168,27 @@ class ExtRefTypeTest {
 
     @Test
     void testOrdinal_Process() {
-        assertEquals(0, ExtRefType.Process.ordinal());
+        assertEquals(0, ExtRefType.PROCESS.ordinal());
     }
 
     @Test
     void testOrdinal_Automation() {
-        assertEquals(1, ExtRefType.Automation.ordinal());
+        assertEquals(1, ExtRefType.AUTOMATION.ordinal());
     }
 
     @Test
     void testOrdinal_PresentationFlow() {
-        assertEquals(2, ExtRefType.PresentationFlow.ordinal());
+        assertEquals(2, ExtRefType.PRESENTATION_FLOW.ordinal());
     }
 
     @Test
     void testOrdinal_Sampling() {
-        assertEquals(3, ExtRefType.Sampling.ordinal());
+        assertEquals(3, ExtRefType.SAMPLING.ordinal());
     }
 
     @Test
     void testOrdinal_UXBuilder() {
-        assertEquals(4, ExtRefType.UXBuilder.ordinal());
+        assertEquals(4, ExtRefType.UX_BUILDER.ordinal());
     }
 
     @Test
@@ -201,7 +201,7 @@ class ExtRefTypeTest {
 
     @Test
     void testFromString_RoundTrip() {
-        String original = "Automation";
+        String original = "AUTOMATION";
         ExtRefType enumValue = ExtRefType.fromString(original);
         String converted = enumValue.name();
         assertEquals(original, converted);

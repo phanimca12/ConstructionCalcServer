@@ -656,7 +656,7 @@ public class SchemaService {
         ExtRefDto dto = new ExtRefDto();
         dto.setExtRefId(extRef.getExtRefId());
         dto.setExtRefName(extRef.getExtRefName());
-        dto.setExtRefType(extRef.getExtRefType());
+        dto.setExtRefType(extRef.getExtRefType() != null ? extRef.getExtRefType().name() : null);
         dto.setExtRefVersion(extRef.getExtRefVersion());
         dto.setCreatedDatetime(extRef.getCreatedDatetime());
         dto.setUpdatedDatetime(extRef.getUpdatedDatetime());
