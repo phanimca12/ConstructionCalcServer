@@ -42,7 +42,7 @@ public final class ErrorMessages {
     public static final String VALIDATION_EXT_REF_TYPE_MAX_LENGTH = "External reference type must not exceed 64 characters";
     public static final String VALIDATION_EXT_REF_ID_MAX_LENGTH = "External reference ID must not exceed 64 characters";
     public static final String VALIDATION_EXT_REF_NAME_MAX_LENGTH = "External reference name must not exceed 256 characters";
-    public static final String VALIDATION_EXT_REF_VERSION_MAX_LENGTH = "External reference version must not exceed 64 characters";
+    public static final String VALIDATION_EXT_REF_VERSION_MAX_LENGTH = "External reference version must not exceed 6 characters";
 
     // Field required validation messages
     public static final String VALIDATION_SCHEMAS_FIELD_REQUIRED = "schemas field is required";

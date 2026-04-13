@@ -7,6 +7,7 @@ import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
 import com.ssnc.schemaService.entity.ExtRef;
+import com.ssnc.schemaService.entity.ExtRefId;
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmData;
 import com.ssnc.schemaService.entity.SchmDataId;
@@ -618,8 +619,9 @@ public class SchemaService {
         List<SchmExtRefXref> xrefs = schmExtRefXrefRepository.findBySchmId(schmId);
 
         // Batch fetch all external references (fix N+1 query problem)
-        List<String> extRefIds = xrefs.stream()
-                .map(SchmExtRefXref::getExtRefId)
+        // With composite key, we need both ext_ref_id and ext_ref_version
+        List<ExtRefId> extRefIds = xrefs.stream()
+                .map(xref -> new ExtRefId(xref.getExtRefId(), xref.getExtRefVersion()))
                 .collect(Collectors.toList());
 
         List<ExtRef> extRefs = extRefRepository.findAllById(extRefIds);

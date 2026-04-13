@@ -16,9 +16,8 @@ import java.util.UUID;
 @Setter
 public class ExtRef {
 
-    @Id
-    @Column(name = "EXT_REF_ID", nullable = false, length = 64)
-    private String extRefId;
+    @EmbeddedId
+    private ExtRefId id;
 
     @Column(name = "TENANT_ID", nullable = false, updatable = false)
     private UUID tenantId;
@@ -29,9 +28,6 @@ public class ExtRef {
     @Enumerated(EnumType.ORDINAL)
     @Column(name = "EXT_REF_TYPE", nullable = false)
     private ExtRefType extRefType;
-
-    @Column(name = "EXT_REF_VERSION", length = 64)
-    private String extRefVersion;
 
     @Column(name = "CREATED_BY", length = 256)
     private String createdBy;
@@ -56,4 +52,27 @@ public class ExtRef {
     @JoinColumn(name = "TENANT_ID", insertable = false, updatable = false)
     @ToString.Exclude
     private Tenant tenant;
+
+    // Convenience methods for accessing composite key fields
+    public String getExtRefId() {
+        return id != null ? id.getExtRefId() : null;
+    }
+
+    public void setExtRefId(String extRefId) {
+        if (this.id == null) {
+            this.id = new ExtRefId();
+        }
+        this.id.setExtRefId(extRefId);
+    }
+
+    public String getExtRefVersion() {
+        return id != null ? id.getExtRefVersion() : null;
+    }
+
+    public void setExtRefVersion(String extRefVersion) {
+        if (this.id == null) {
+            this.id = new ExtRefId();
+        }
+        this.id.setExtRefVersion(extRefVersion);
+    }
 }

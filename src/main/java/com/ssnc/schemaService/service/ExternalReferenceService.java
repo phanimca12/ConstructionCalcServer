@@ -103,7 +103,7 @@ public class ExternalReferenceService {
         if (extRefId != null && extRefId.length() > 64) {
             throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH);
         }
-        if (extRefVersion != null && extRefVersion.length() > 64) {
+        if (extRefVersion != null && extRefVersion.length() > 6) {
             throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH);
         }
 
@@ -112,9 +112,10 @@ public class ExternalReferenceService {
         // Validate the type against the enum and convert to ExtRefType
         ExtRefType extRefTypeEnum = ExtRefType.fromString(extRefType);
 
+        // Note: We only filter by extRefId and extRefVersion since they form the composite key
+        // and uniquely identify the ExtRef (which has one extRefType)
         List<SchmExtRefXref> xrefs = schmExtRefXrefRepository
-                .findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
-                        extRefTypeEnum, extRefId, extRefVersion);
+                .findByExtRefIdAndExtRefVersion(extRefId, extRefVersion);
 
         // Batch fetch all schemas (fix N+1 query problem)
         List<UUID> schmIds = xrefs.stream()
@@ -167,7 +168,7 @@ public class ExternalReferenceService {
         if (extRefId != null && extRefId.length() > 64) {
             throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH);
         }
-        if (extRefVersion != null && extRefVersion.length() > 64) {
+        if (extRefVersion != null && extRefVersion.length() > 6) {
             throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH);
         }
 
@@ -203,14 +204,14 @@ public class ExternalReferenceService {
                 .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
                 .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.TENANT_CONFIG_INVALID));
 
-        // Check if external reference already exists by ID
-        Optional<ExtRef> existingExtRef = extRefRepository.findById(extRefId);
+        // Check if external reference already exists by composite key (ID + version)
+        Optional<ExtRef> existingExtRef = extRefRepository.findById(new com.ssnc.schemaService.entity.ExtRefId(extRefId, extRefVersion));
 
         // SECURITY: Check for unique constraint violation (tenant_id, ext_ref_name, ext_ref_type, ext_ref_version)
         // CRITICAL: Must filter by tenantId to prevent cross-tenant data leakage
         // This prevents database constraint violations and provides clear error messages
         Optional<ExtRef> existingByUnique = extRefRepository
-                .findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
+                .findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion(
                         tenantId, extRefName, extRefTypeEnum, extRefVersion);
 
         if (existingByUnique.isPresent() && !existingByUnique.get().getExtRefId().equals(extRefId)) {
@@ -229,8 +230,8 @@ public class ExternalReferenceService {
                     && Objects.equals(existing.getExtRefType(), extRefTypeEnum)
                     && Objects.equals(existing.getExtRefVersion(), extRefVersion);
 
-            // Get existing schema associations
-            List<SchmExtRefXref> existingXrefs = schmExtRefXrefRepository.findByExtRefId(extRefId);
+            // Get existing schema associations for this specific version
+            List<SchmExtRefXref> existingXrefs = schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(extRefId, extRefVersion);
             List<UUID> existingSchmIds = existingXrefs.stream()
                     .map(SchmExtRefXref::getSchmId)
                     .sorted()
@@ -330,6 +331,7 @@ public class ExternalReferenceService {
                 xref.setTenantId(tenantId);
                 xref.setSchmId(schmId);
                 xref.setExtRefId(extRefId);
+                xref.setExtRefVersion(extRefVersion);
                 xref.setCreatedBy(currentUser);
                 xrefs.add(xref);
             }

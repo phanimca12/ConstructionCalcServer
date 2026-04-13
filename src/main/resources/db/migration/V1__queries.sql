@@ -70,12 +70,12 @@
         tenant_id ${guid} not null,
         ext_ref_name varchar(256),
         ext_ref_type integer not null,
-        ext_ref_version varchar(64),
+        ext_ref_version varchar(6) not null,
         created_by varchar(256),
         updated_by varchar(256),
         created_datetime ${timestamp},
         updated_datetime ${timestamp},
-        primary key (ext_ref_id),
+        primary key (ext_ref_id, ext_ref_version),
         foreign key (tenant_id) references tenant
     );
 
@@ -83,7 +83,7 @@
     create index idx_ext_ref_tenant_id on ext_ref(tenant_id);
     create index idx_ext_ref_type on ext_ref(ext_ref_type);
     create index idx_ext_ref_type_id_version on ext_ref(ext_ref_type, ext_ref_id, ext_ref_version);
-    -- Index for unique constraint query: findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion
+    -- Index for unique constraint query: findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion
     -- Most databases auto-create index for unique constraints, but explicit index ensures optimal performance
     create index idx_ext_ref_tenant_name_type_version on ext_ref(tenant_id, ext_ref_name, ext_ref_type, ext_ref_version);
 
@@ -92,16 +92,17 @@
         tenant_id ${guid} not null,
         schm_id ${guid} not null,
         ext_ref_id varchar(64) not null,
+        ext_ref_version varchar(6) not null,
         created_by varchar(256),
         created_datetime ${timestamp},
         primary key (xref_id),
         foreign key (tenant_id) references tenant,
         foreign key (schm_id) references schm,
-        foreign key (ext_ref_id) references ext_ref
+        foreign key (ext_ref_id, ext_ref_version) references ext_ref(ext_ref_id, ext_ref_version)
     );
 
     -- Indexes for foreign key columns (improves JOIN, lookup, and cascade delete performance)
     create index idx_xref_tenant_id on schm_ext_ref_xref(tenant_id);
     create index idx_xref_schm_id on schm_ext_ref_xref(schm_id);
-    create index idx_xref_ext_ref_id on schm_ext_ref_xref(ext_ref_id);
+    create index idx_xref_ext_ref_id_version on schm_ext_ref_xref(ext_ref_id, ext_ref_version);
 
