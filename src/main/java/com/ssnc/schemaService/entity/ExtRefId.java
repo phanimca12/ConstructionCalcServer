@@ -24,7 +24,7 @@ public class ExtRefId implements Serializable {
     @Column(name = "EXT_REF_ID", nullable = false, length = 64)
     private String extRefId;
 
-    @Column(name = "EXT_REF_VERSION", nullable = false, length = 6)
+    @Column(name = "EXT_REF_VERSION", nullable = false, length = 64)
     private String extRefVersion;
 
     @Override

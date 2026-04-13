@@ -93,10 +93,9 @@ class ExternalReferenceServiceTest {
         testNmspc.setNmspcName(testNamespace);
 
         testExtRef = new ExtRef();
-        testExtRef.setExtRefId(testExtRefId);
+        testExtRef.setId(testExtRefId, testExtRefVersion); // Set composite key atomically
         testExtRef.setExtRefName("Test Process");
         testExtRef.setExtRefType(testExtRefType);
-        testExtRef.setExtRefVersion(testExtRefVersion);
         testExtRef.setTenantId(testTenantId);
         testExtRef.setCreatedBy("testUser");
         testExtRef.setUpdatedBy("testUser");
@@ -403,7 +402,7 @@ class ExternalReferenceServiceTest {
                 emptyRequest.setSchemas(Arrays.asList());
 
                 ExtRef extRef = new ExtRef();
-                extRef.setExtRefId("TEST-" + type.name() + "-ID");
+                extRef.setId("TEST-" + type.name() + "-ID", "1.0.0"); // Set composite key atomically
                 extRef.setExtRefType(type);
                 extRef.setExtRefName("Test " + type.name());
 
@@ -533,9 +532,9 @@ class ExternalReferenceServiceTest {
         request.setSchemas(Arrays.asList(schemaRef));
 
         // Existing external reference with same name, type, and version
+        testExtRef.setId(testExtRefId, testExtRefVersion);
         testExtRef.setExtRefName("Test Process");
         testExtRef.setExtRefType(testExtRefType);
-        testExtRef.setExtRefVersion(testExtRefVersion);
 
         // Existing schema association (same as request)
         SchmExtRefXref existingXref = new SchmExtRefXref();
@@ -576,9 +575,9 @@ class ExternalReferenceServiceTest {
         request.setSchemas(Arrays.asList());
 
         // Existing external reference with different name
+        testExtRef.setId(testExtRefId, testExtRefVersion);
         testExtRef.setExtRefName("Old Name");
         testExtRef.setExtRefType(testExtRefType);
-        testExtRef.setExtRefVersion(testExtRefVersion);
 
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
@@ -614,9 +613,9 @@ class ExternalReferenceServiceTest {
         request.setSchemas(Arrays.asList(schemaRef));
 
         // Existing external reference with same metadata
+        testExtRef.setId(testExtRefId, testExtRefVersion);
         testExtRef.setExtRefName("Test Process");
         testExtRef.setExtRefType(testExtRefType);
-        testExtRef.setExtRefVersion(testExtRefVersion);
 
         // Existing schema association is different (testSchmId vs newSchmId)
         SchmExtRefXref existingXref = new SchmExtRefXref();
@@ -797,11 +796,10 @@ class ExternalReferenceServiceTest {
         // Existing external reference with same name, type, version but DIFFERENT ID
         String existingExtRefId = "EXISTING-EXT-REF-999";
         ExtRef existingExtRef = new ExtRef();
-        existingExtRef.setExtRefId(existingExtRefId);
+        existingExtRef.setId(existingExtRefId, testExtRefVersion); // Set composite key atomically
         existingExtRef.setTenantId(testTenantId);
         existingExtRef.setExtRefName("Test Process");
         existingExtRef.setExtRefType(testExtRefType);
-        existingExtRef.setExtRefVersion(testExtRefVersion);
 
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
@@ -846,18 +844,16 @@ class ExternalReferenceServiceTest {
 
         // Existing external reference with same ID but version 1.0.0
         ExtRef existingV1 = new ExtRef();
-        existingV1.setExtRefId(testExtRefId);
+        existingV1.setId(testExtRefId, "1.0.0"); // Set composite key atomically
         existingV1.setExtRefName("Version 1 Name");
         existingV1.setExtRefType(testExtRefType);
-        existingV1.setExtRefVersion("1.0.0");
         existingV1.setTenantId(testTenantId);
 
         // New external reference with same ID but version 2.0.0
         ExtRef newV2 = new ExtRef();
-        newV2.setExtRefId(testExtRefId);
+        newV2.setId(testExtRefId, "2.0.0"); // Set composite key atomically
         newV2.setExtRefName("Version 2 Name");
         newV2.setExtRefType(testExtRefType);
-        newV2.setExtRefVersion("2.0.0");
         newV2.setTenantId(testTenantId);
 
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {

@@ -919,18 +919,16 @@ class SchemaServiceTest {
 
         // Mock external references
         ExtRef extRef1 = new ExtRef();
-        extRef1.setExtRefId(extRefId1);
+        extRef1.setId(extRefId1, extRefVersion1);
         extRef1.setExtRefName("API Reference");
         extRef1.setExtRefType(ExtRefType.PROCESS);
-        extRef1.setExtRefVersion(extRefVersion1);
         extRef1.setCreatedBy(testUserId);
         extRef1.setUpdatedBy(testUserId);
 
         ExtRef extRef2 = new ExtRef();
-        extRef2.setExtRefId(extRefId2);
+        extRef2.setId(extRefId2, extRefVersion2);
         extRef2.setExtRefName("Database Reference");
         extRef2.setExtRefType(ExtRefType.AUTOMATION);
-        extRef2.setExtRefVersion(extRefVersion2);
         extRef2.setCreatedBy(testUserId);
         extRef2.setUpdatedBy(testUserId);
 
@@ -1010,10 +1008,9 @@ class SchemaServiceTest {
         when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(xrefs);
 
         ExtRef extRef1 = new ExtRef();
-        extRef1.setExtRefId(extRefId1);
+        extRef1.setId(extRefId1, extRefVersion1);
         extRef1.setExtRefName("API Reference");
         extRef1.setExtRefType(ExtRefType.PROCESS);
-        extRef1.setExtRefVersion(extRefVersion1);
 
         // Mock batch fetch - only extRef1 exists, extRef2 is missing
         when(extRefRepository.findAllById(Arrays.asList(

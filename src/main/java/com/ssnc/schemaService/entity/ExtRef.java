@@ -58,21 +58,21 @@ public class ExtRef {
         return id != null ? id.getExtRefId() : null;
     }
 
-    public void setExtRefId(String extRefId) {
-        if (this.id == null) {
-            this.id = new ExtRefId();
-        }
-        this.id.setExtRefId(extRefId);
-    }
-
     public String getExtRefVersion() {
         return id != null ? id.getExtRefVersion() : null;
     }
 
-    public void setExtRefVersion(String extRefVersion) {
-        if (this.id == null) {
-            this.id = new ExtRefId();
+    /**
+     * Set the composite key. BOTH extRefId and extRefVersion are required.
+     * Do not use individual setters - they can create partial keys that violate NOT NULL constraints.
+     *
+     * @param extRefId - The external reference ID (required, NOT NULL)
+     * @param extRefVersion - The version (required, NOT NULL)
+     */
+    public void setId(String extRefId, String extRefVersion) {
+        if (extRefId == null || extRefVersion == null) {
+            throw new IllegalArgumentException("Both extRefId and extRefVersion are required (NOT NULL)");
         }
-        this.id.setExtRefVersion(extRefVersion);
+        this.id = new ExtRefId(extRefId, extRefVersion);
     }
 }

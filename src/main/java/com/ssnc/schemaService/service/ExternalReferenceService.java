@@ -103,7 +103,7 @@ public class ExternalReferenceService {
         if (extRefId != null && extRefId.length() > 64) {
             throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH);
         }
-        if (extRefVersion != null && extRefVersion.length() > 6) {
+        if (extRefVersion != null && extRefVersion.length() > 64) {
             throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH);
         }
 
@@ -168,7 +168,7 @@ public class ExternalReferenceService {
         if (extRefId != null && extRefId.length() > 64) {
             throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH);
         }
-        if (extRefVersion != null && extRefVersion.length() > 6) {
+        if (extRefVersion != null && extRefVersion.length() > 64) {
             throw new IllegalArgumentException(ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH);
         }
 
@@ -296,11 +296,10 @@ public class ExternalReferenceService {
         // ===== ALL VALIDATIONS PASSED - NOW CREATE EXTERNAL REFERENCE =====
         // Create new external reference entity
         ExtRef extRef = new ExtRef();
-        extRef.setExtRefId(extRefId);
+        extRef.setId(extRefId, extRefVersion); // Set composite key atomically
         extRef.setTenantId(tenantId);
         extRef.setExtRefName(extRefName);
         extRef.setExtRefType(extRefTypeEnum);
-        extRef.setExtRefVersion(extRefVersion);
         extRef.setCreatedBy(currentUser);
         extRef.setUpdatedBy(currentUser);
 

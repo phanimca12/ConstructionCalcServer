@@ -70,7 +70,7 @@
         tenant_id ${guid} not null,
         ext_ref_name varchar(256),
         ext_ref_type integer not null,
-        ext_ref_version varchar(6) not null,
+        ext_ref_version varchar(64) not null,
         created_by varchar(256),
         updated_by varchar(256),
         created_datetime ${timestamp},
@@ -83,16 +83,19 @@
     create index idx_ext_ref_tenant_id on ext_ref(tenant_id);
     create index idx_ext_ref_type on ext_ref(ext_ref_type);
     create index idx_ext_ref_type_id_version on ext_ref(ext_ref_type, ext_ref_id, ext_ref_version);
-    -- Index for unique constraint query: findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion
-    -- Most databases auto-create index for unique constraints, but explicit index ensures optimal performance
-    create index idx_ext_ref_tenant_name_type_version on ext_ref(tenant_id, ext_ref_name, ext_ref_type, ext_ref_version);
+
+    -- UNIQUE CONSTRAINT: Prevent duplicate external references within a tenant
+    -- Ensures (tenant_id, ext_ref_name, ext_ref_type, ext_ref_version) is unique
+    -- Enforces business rule: same name + type + version cannot exist twice in a tenant
+    -- Constraint name matches ErrorMessages.DB_CONSTRAINT_UNIQUE_EXT_REF constant
+    create unique index uk_ext_ref_tenant_id_name_type_version on ext_ref(tenant_id, ext_ref_name, ext_ref_type, ext_ref_version);
 
     create table schm_ext_ref_xref (
         xref_id ${guid} not null,
         tenant_id ${guid} not null,
         schm_id ${guid} not null,
         ext_ref_id varchar(64) not null,
-        ext_ref_version varchar(6) not null,
+        ext_ref_version varchar(64) not null,
         created_by varchar(256),
         created_datetime ${timestamp},
         primary key (xref_id),

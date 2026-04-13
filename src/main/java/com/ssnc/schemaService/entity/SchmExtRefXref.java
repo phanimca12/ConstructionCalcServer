@@ -29,7 +29,7 @@ public class SchmExtRefXref {
     @Column(name = "EXT_REF_ID", nullable = false, length = 64)
     private String extRefId;
 
-    @Column(name = "EXT_REF_VERSION", nullable = false, length = 6)
+    @Column(name = "EXT_REF_VERSION", nullable = false, length = 64)
     private String extRefVersion;
 
     @Column(name = "CREATED_BY", length = 256)

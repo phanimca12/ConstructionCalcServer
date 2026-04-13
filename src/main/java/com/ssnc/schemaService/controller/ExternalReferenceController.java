@@ -59,7 +59,7 @@ public class ExternalReferenceController {
      * @param nameSpace - Namespace filter
      * @param extRefType - External reference type (Process, Automation, PresentationFlow, Sampling, UXBuilder)
      * @param extRefId - External reference ID (supports both GUID and integer values, max 64 chars)
-     * @param extRefVersion - External reference version (max 6 chars)
+     * @param extRefVersion - External reference version (max 64 chars)
      * @return List of schemas associated with the external reference or error response
      */
     @GetMapping(ApiConstants.PATH_EXT_REF_BY_TYPE_ID_VERSION)
@@ -67,7 +67,7 @@ public class ExternalReferenceController {
             @PathVariable(ApiConstants.PARAM_NAME_SPACE) @Size(max = 32, message = ErrorMessages.VALIDATION_NAMESPACE_MAX_LENGTH) String nameSpace,
             @PathVariable(ApiConstants.PARAM_EXT_REF_TYPE) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_TYPE_MAX_LENGTH) String extRefType,
             @PathVariable(ApiConstants.PARAM_EXT_REF_ID) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH) String extRefId,
-            @PathVariable(ApiConstants.PARAM_EXT_REF_VERSION) @Size(max = 6, message = ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH) String extRefVersion) {
+            @PathVariable(ApiConstants.PARAM_EXT_REF_VERSION) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH) String extRefVersion) {
 
         try {
             List<SchemaDto> schemas = externalReferenceService.getSchemasByExternalReference(
@@ -98,7 +98,7 @@ public class ExternalReferenceController {
      * @param extRefType - External reference type (Process, Automation, PresentationFlow, Sampling, UXBuilder, max 64 chars)
      * @param extRefName - External reference name (max 256 chars)
      * @param extRefId - External reference ID (supports both GUID and integer values, max 64 chars)
-     * @param extRefVersion - External reference version (max 6 chars)
+     * @param extRefVersion - External reference version (max 64 chars)
      * @param request - REQUIRED request body containing list of schemas to associate (can be empty array)
      * @return Response containing the external reference, a message, and an update flag or error response
      * @throws IllegalArgumentException if trying to modify an existing version (400 Bad Request)
@@ -109,7 +109,7 @@ public class ExternalReferenceController {
             @PathVariable(ApiConstants.PARAM_EXT_REF_TYPE) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_TYPE_MAX_LENGTH) String extRefType,
             @PathVariable(ApiConstants.PARAM_EXT_REF_NAME) @Size(max = 256, message = ErrorMessages.VALIDATION_EXT_REF_NAME_MAX_LENGTH) String extRefName,
             @PathVariable(ApiConstants.PARAM_EXT_REF_ID) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_ID_MAX_LENGTH) String extRefId,
-            @PathVariable(ApiConstants.PARAM_EXT_REF_VERSION) @Size(max = 6, message = ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH) String extRefVersion,
+            @PathVariable(ApiConstants.PARAM_EXT_REF_VERSION) @Size(max = 64, message = ErrorMessages.VALIDATION_EXT_REF_VERSION_MAX_LENGTH) String extRefVersion,
             @RequestBody @Valid ExtRefWithSchemasRequest request) {
 
         try {
