@@ -71,14 +71,14 @@ class SchemaExtRefXrefDtoTest {
 
     @Test
     void testExtRefName() {
-        xrefDto.setExtRefName("Test Process");
-        assertEquals("Test Process", xrefDto.getExtRefName());
+        xrefDto.setExtRefName("Test PROCESS");
+        assertEquals("Test PROCESS", xrefDto.getExtRefName());
     }
 
     @Test
     void testExtRefType() {
-        xrefDto.setExtRefType("Process");
-        assertEquals("Process", xrefDto.getExtRefType());
+        xrefDto.setExtRefType("PROCESS");
+        assertEquals("PROCESS", xrefDto.getExtRefType());
     }
 
     @Test
@@ -102,8 +102,8 @@ class SchemaExtRefXrefDtoTest {
         xrefDto.setCreatedDatetime(createdDateTime);
         xrefDto.setCreatedBy("user1");
         xrefDto.setSchmName("Customer Schema");
-        xrefDto.setExtRefName("Workflow Process");
-        xrefDto.setExtRefType("Automation");
+        xrefDto.setExtRefName("Workflow PROCESS");
+        xrefDto.setExtRefType("AUTOMATION");
         xrefDto.setExtRefVersion("2.5.0");
 
         assertEquals(xrefId, xrefDto.getXrefId());
@@ -113,8 +113,8 @@ class SchemaExtRefXrefDtoTest {
         assertEquals(createdDateTime, xrefDto.getCreatedDatetime());
         assertEquals("user1", xrefDto.getCreatedBy());
         assertEquals("Customer Schema", xrefDto.getSchmName());
-        assertEquals("Workflow Process", xrefDto.getExtRefName());
-        assertEquals("Automation", xrefDto.getExtRefType());
+        assertEquals("Workflow PROCESS", xrefDto.getExtRefName());
+        assertEquals("AUTOMATION", xrefDto.getExtRefType());
         assertEquals("2.5.0", xrefDto.getExtRefVersion());
     }
 
@@ -155,12 +155,12 @@ class SchemaExtRefXrefDtoTest {
     void testNestedFieldsOnly() {
         xrefDto.setSchmName("Schema 1");
         xrefDto.setExtRefName("External Ref 1");
-        xrefDto.setExtRefType("PresentationFlow");
+        xrefDto.setExtRefType("PRESENTATION_FLOW");
         xrefDto.setExtRefVersion("3.0.0");
 
         assertEquals("Schema 1", xrefDto.getSchmName());
         assertEquals("External Ref 1", xrefDto.getExtRefName());
-        assertEquals("PresentationFlow", xrefDto.getExtRefType());
+        assertEquals("PRESENTATION_FLOW", xrefDto.getExtRefType());
         assertEquals("3.0.0", xrefDto.getExtRefVersion());
     }
 

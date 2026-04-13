@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.repo;
 
+import com.ssnc.schemaService.entity.ExtRefType;
 import com.ssnc.schemaService.entity.SchmExtRefXref;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -27,7 +28,7 @@ public interface SchmExtRefXrefRepository extends JpaRepository<SchmExtRefXref, 
      * Uses JPA method naming to navigate through the extRef relationship
      */
     List<SchmExtRefXref> findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
-            String extRefType, String extRefId, String extRefVersion);
+            ExtRefType extRefType, String extRefId, String extRefVersion);
 
     /**
      * Check if cross-reference exists

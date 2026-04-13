@@ -6,6 +6,7 @@ import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.entity.ExtRef;
+import com.ssnc.schemaService.entity.ExtRefType;
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmData;
 import com.ssnc.schemaService.entity.SchmDataId;
@@ -915,7 +916,7 @@ class SchemaServiceTest {
         ExtRef extRef1 = new ExtRef();
         extRef1.setExtRefId(extRefId1);
         extRef1.setExtRefName("API Reference");
-        extRef1.setExtRefType("API");
+        extRef1.setExtRefType(ExtRefType.PROCESS);
         extRef1.setExtRefVersion("1.0");
         extRef1.setCreatedBy(testUserId);
         extRef1.setUpdatedBy(testUserId);
@@ -923,7 +924,7 @@ class SchemaServiceTest {
         ExtRef extRef2 = new ExtRef();
         extRef2.setExtRefId(extRefId2);
         extRef2.setExtRefName("Database Reference");
-        extRef2.setExtRefType("DATABASE");
+        extRef2.setExtRefType(ExtRefType.AUTOMATION);
         extRef2.setExtRefVersion("2.0");
         extRef2.setCreatedBy(testUserId);
         extRef2.setUpdatedBy(testUserId);
@@ -939,10 +940,10 @@ class SchemaServiceTest {
         assertNotNull(result);
         assertEquals(2, result.size());
         assertEquals("API Reference", result.get(0).getExtRefName());
-        assertEquals("API", result.get(0).getExtRefType());
+        assertEquals("PROCESS", result.get(0).getExtRefType());
         assertEquals("1.0", result.get(0).getExtRefVersion());
         assertEquals("Database Reference", result.get(1).getExtRefName());
-        assertEquals("DATABASE", result.get(1).getExtRefType());
+        assertEquals("AUTOMATION", result.get(1).getExtRefType());
         assertEquals("2.0", result.get(1).getExtRefVersion());
 
         verify(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -1000,7 +1001,7 @@ class SchemaServiceTest {
         ExtRef extRef1 = new ExtRef();
         extRef1.setExtRefId(extRefId1);
         extRef1.setExtRefName("API Reference");
-        extRef1.setExtRefType("API");
+        extRef1.setExtRefType(ExtRefType.PROCESS);
         extRef1.setExtRefVersion("1.0");
 
         // Mock batch fetch - only extRef1 exists, extRef2 is missing

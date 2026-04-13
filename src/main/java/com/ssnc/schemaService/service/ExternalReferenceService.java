@@ -71,9 +71,9 @@ public class ExternalReferenceService {
 
         List<ExtRef> extRefs;
         if (type != null && !type.isEmpty()) {
-            // Validate the type against the enum
-            ExtRefType.fromString(type);
-            extRefs = extRefRepository.findByExtRefType(type);
+            // Validate the type against the enum and convert to ExtRefType
+            ExtRefType extRefTypeEnum = ExtRefType.fromString(type);
+            extRefs = extRefRepository.findByExtRefType(extRefTypeEnum);
         } else {
             extRefs = extRefRepository.findAll();
         }
@@ -109,12 +109,12 @@ public class ExternalReferenceService {
 
         namespaceFilterManager.enableIfPresent(nameSpace);
 
-        // Validate the type against the enum
-        ExtRefType.fromString(extRefType);
+        // Validate the type against the enum and convert to ExtRefType
+        ExtRefType extRefTypeEnum = ExtRefType.fromString(extRefType);
 
         List<SchmExtRefXref> xrefs = schmExtRefXrefRepository
                 .findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
-                        extRefType, extRefId, extRefVersion);
+                        extRefTypeEnum, extRefId, extRefVersion);
 
         // Batch fetch all schemas (fix N+1 query problem)
         List<UUID> schmIds = xrefs.stream()
@@ -178,8 +178,8 @@ public class ExternalReferenceService {
 
         namespaceFilterManager.enableIfPresent(nameSpace);
 
-        // Validate the type against the enum
-        ExtRefType.fromString(extRefType);
+        // Validate the type against the enum and convert to ExtRefType
+        ExtRefType extRefTypeEnum = ExtRefType.fromString(extRefType);
 
         // Validate and prepare requested schema IDs - check for nulls BEFORE any DB operations
         final List<UUID> requestedSchmIds = (request.getSchemas() != null && !request.getSchemas().isEmpty())
@@ -211,7 +211,7 @@ public class ExternalReferenceService {
         // This prevents database constraint violations and provides clear error messages
         Optional<ExtRef> existingByUnique = extRefRepository
                 .findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
-                        tenantId, extRefName, extRefType, extRefVersion);
+                        tenantId, extRefName, extRefTypeEnum, extRefVersion);
 
         if (existingByUnique.isPresent() && !existingByUnique.get().getExtRefId().equals(extRefId)) {
             throw new IllegalArgumentException(String.format(
@@ -226,7 +226,7 @@ public class ExternalReferenceService {
 
             // Check if ALL metadata matches (name, type, version)
             boolean metadataMatches = Objects.equals(existing.getExtRefName(), extRefName)
-                    && Objects.equals(existing.getExtRefType(), extRefType)
+                    && Objects.equals(existing.getExtRefType(), extRefTypeEnum)
                     && Objects.equals(existing.getExtRefVersion(), extRefVersion);
 
             // Get existing schema associations
@@ -298,7 +298,7 @@ public class ExternalReferenceService {
         extRef.setExtRefId(extRefId);
         extRef.setTenantId(tenantId);
         extRef.setExtRefName(extRefName);
-        extRef.setExtRefType(extRefType);
+        extRef.setExtRefType(extRefTypeEnum);
         extRef.setExtRefVersion(extRefVersion);
         extRef.setCreatedBy(currentUser);
         extRef.setUpdatedBy(currentUser);
@@ -350,7 +350,7 @@ public class ExternalReferenceService {
         ExtRefDto dto = new ExtRefDto();
         dto.setExtRefId(extRef.getExtRefId());
         dto.setExtRefName(extRef.getExtRefName());
-        dto.setExtRefType(extRef.getExtRefType());
+        dto.setExtRefType(extRef.getExtRefType().name());  // Convert enum to String
         dto.setExtRefVersion(extRef.getExtRefVersion());
         dto.setCreatedDatetime(extRef.getCreatedDatetime());
         dto.setUpdatedDatetime(extRef.getUpdatedDatetime());

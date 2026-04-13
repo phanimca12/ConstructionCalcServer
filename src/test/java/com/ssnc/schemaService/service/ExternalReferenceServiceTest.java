@@ -6,6 +6,7 @@ import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.entity.ExtRef;
+import com.ssnc.schemaService.entity.ExtRefType;
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmExtRefXref;
 import com.ssnc.schemaService.repo.ExtRefRepository;
@@ -63,7 +64,7 @@ class ExternalReferenceServiceTest {
     private UUID testSchmId;
     private UUID testTenantId;
     private UUID testNmspcId;
-    private String testExtRefType;
+    private ExtRefType testExtRefType;
     private String testExtRefVersion;
     private ExtRef testExtRef;
     private Schm testSchm;
@@ -79,7 +80,7 @@ class ExternalReferenceServiceTest {
         testSchmId = UUID.randomUUID();
         testTenantId = UUID.randomUUID();
         testNmspcId = UUID.randomUUID();
-        testExtRefType = "Process";
+        testExtRefType = ExtRefType.PROCESS;
         testExtRefVersion = "1.0.0";
 
         testTenant = new com.ssnc.schemaService.entity.Tenant();
@@ -145,11 +146,11 @@ class ExternalReferenceServiceTest {
         when(extRefRepository.findByExtRefType(testExtRefType)).thenReturn(extRefs);
         doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-        List<ExtRefDto> result = externalReferenceService.getExternalReferences(testNamespace, testExtRefType);
+        List<ExtRefDto> result = externalReferenceService.getExternalReferences(testNamespace, testExtRefType.name());
 
         assertNotNull(result);
         assertEquals(1, result.size());
-        assertEquals(testExtRefType, result.get(0).getExtRefType());
+        assertEquals(testExtRefType.name(), result.get(0).getExtRefType());
         verify(namespaceFilterManager).enableIfPresent(testNamespace);
         verify(extRefRepository).findByExtRefType(testExtRefType);
     }
@@ -167,20 +168,20 @@ class ExternalReferenceServiceTest {
 
     @Test
     void testGetExternalReferences_AllValidTypes() {
-        String[] validTypes = {"Process", "Automation", "PresentationFlow", "Sampling", "UXBuilder"};
+        ExtRefType[] validTypes = {ExtRefType.PROCESS, ExtRefType.AUTOMATION, ExtRefType.PRESENTATION_FLOW, ExtRefType.SAMPLING, ExtRefType.UX_BUILDER};
 
-        for (String type : validTypes) {
+        for (ExtRefType type : validTypes) {
             ExtRef extRef = new ExtRef();
             extRef.setExtRefType(type);
             List<ExtRef> extRefs = Arrays.asList(extRef);
             when(extRefRepository.findByExtRefType(type)).thenReturn(extRefs);
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-            List<ExtRefDto> result = externalReferenceService.getExternalReferences(testNamespace, type);
+            List<ExtRefDto> result = externalReferenceService.getExternalReferences(testNamespace, type.name());
 
             assertNotNull(result);
             assertEquals(1, result.size());
-            assertEquals(type, result.get(0).getExtRefType());
+            assertEquals(type.name(), result.get(0).getExtRefType());
         }
     }
 
@@ -194,7 +195,7 @@ class ExternalReferenceServiceTest {
         doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
         List<SchemaDto> result = externalReferenceService.getSchemasByExternalReference(
-                testNamespace, testExtRefType, testExtRefId, testExtRefVersion);
+                testNamespace, testExtRefType.name(), testExtRefId, testExtRefVersion);
 
         assertNotNull(result);
         assertEquals(1, result.size());
@@ -214,7 +215,7 @@ class ExternalReferenceServiceTest {
         doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
         List<SchemaDto> result = externalReferenceService.getSchemasByExternalReference(
-                testNamespace, testExtRefType, testExtRefId, testExtRefVersion);
+                testNamespace, testExtRefType.name(), testExtRefId, testExtRefVersion);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -245,7 +246,7 @@ class ExternalReferenceServiceTest {
         doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
         List<SchemaDto> result = externalReferenceService.getSchemasByExternalReference(
-                testNamespace, testExtRefType, testExtRefId, testExtRefVersion);
+                testNamespace, testExtRefType.name(), testExtRefId, testExtRefVersion);
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
@@ -266,7 +267,7 @@ class ExternalReferenceServiceTest {
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
-                    testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, emptyRequest);
+                    testNamespace, testExtRefType.name(), "New Process", testExtRefId, testExtRefVersion, emptyRequest);
 
             assertNotNull(response);
             assertTrue(response.isUpdated());
@@ -330,7 +331,7 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
@@ -341,7 +342,7 @@ class ExternalReferenceServiceTest {
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
-                    testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request);
+                    testNamespace, testExtRefType.name(), "New Process", testExtRefId, testExtRefVersion, request);
 
             assertNotNull(response);
             assertTrue(response.isUpdated());
@@ -380,7 +381,7 @@ class ExternalReferenceServiceTest {
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request)
+                            testNamespace, testExtRefType.name(), "New Process", testExtRefId, testExtRefVersion, request)
             );
 
             assertTrue(exception.getMessage().contains("not found"));
@@ -394,19 +395,19 @@ class ExternalReferenceServiceTest {
 
     @Test
     void testCreateOrUpdateExternalReference_AllTypes() {
-        String[] validTypes = {"Process", "Automation", "PresentationFlow", "Sampling", "UXBuilder"};
+        ExtRefType[] validTypes = {ExtRefType.PROCESS, ExtRefType.AUTOMATION, ExtRefType.PRESENTATION_FLOW, ExtRefType.SAMPLING, ExtRefType.UX_BUILDER};
 
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            for (String type : validTypes) {
+            for (ExtRefType type : validTypes) {
                 ExtRefWithSchemasRequest emptyRequest = new ExtRefWithSchemasRequest();
                 emptyRequest.setSchemas(Arrays.asList());
 
                 ExtRef extRef = new ExtRef();
-                extRef.setExtRefId("TEST-" + type + "-ID");
+                extRef.setExtRefId("TEST-" + type.name() + "-ID");
                 extRef.setExtRefType(type);
-                extRef.setExtRefName("Test " + type);
+                extRef.setExtRefName("Test " + type.name());
 
                 when(extRefRepository.findById(any(String.class))).thenReturn(Optional.empty());
                 when(extRefRepository.save(any(ExtRef.class))).thenReturn(extRef);
@@ -414,12 +415,12 @@ class ExternalReferenceServiceTest {
                 doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
                 ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
-                        testNamespace, type, "Test " + type, extRef.getExtRefId(), "1.0.0", emptyRequest);
+                        testNamespace, type.name(), "Test " + type.name(), extRef.getExtRefId(), "1.0.0", emptyRequest);
 
                 assertNotNull(response);
                 assertTrue(response.isUpdated());
                 assertNotNull(response.getExtRef());
-                assertEquals(type, response.getExtRef().getExtRefType());
+                assertEquals(type.name(), response.getExtRef().getExtRefType());
             }
         }
     }
@@ -447,7 +448,7 @@ class ExternalReferenceServiceTest {
         ExtRefDto dto = result.get(0);
         assertEquals(testExtRef.getExtRefId(), dto.getExtRefId());
         assertEquals(testExtRef.getExtRefName(), dto.getExtRefName());
-        assertEquals(testExtRef.getExtRefType(), dto.getExtRefType());
+        assertEquals(testExtRef.getExtRefType().name(), dto.getExtRefType());
         assertEquals(testExtRef.getExtRefVersion(), dto.getExtRefVersion());
         assertEquals(testExtRef.getCreatedDatetime(), dto.getCreatedDatetime());
         assertEquals(testExtRef.getUpdatedDatetime(), dto.getUpdatedDatetime());
@@ -478,7 +479,7 @@ class ExternalReferenceServiceTest {
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request)
+                            testNamespace, testExtRefType.name(), "New Process", testExtRefId, testExtRefVersion, request)
             );
 
             assertTrue(exception.getMessage().contains("unpublished"));
@@ -515,7 +516,7 @@ class ExternalReferenceServiceTest {
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             externalReferenceService.createOrUpdateExternalReference(
-                    testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request);
+                    testNamespace, testExtRefType.name(), "New Process", testExtRefId, testExtRefVersion, request);
 
             // Verify findWithLockBySchmId is called, NOT findBySchmId
             // This ensures the pessimistic write lock is acquired
@@ -553,7 +554,7 @@ class ExternalReferenceServiceTest {
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
-                    testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request);
+                    testNamespace, testExtRefType.name(), "Test Process", testExtRefId, testExtRefVersion, request);
 
             assertNotNull(response);
             assertFalse(response.isUpdated()); // No update occurred
@@ -585,7 +586,7 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -593,7 +594,7 @@ class ExternalReferenceServiceTest {
             // Should throw error - cannot change name for existing version
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType, "New Name", testExtRefId, testExtRefVersion, request)
+                            testNamespace, testExtRefType.name(), "New Name", testExtRefId, testExtRefVersion, request)
             );
 
             assertTrue(exception.getMessage().contains("immutable"));
@@ -629,7 +630,7 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId))
                     .thenReturn(Arrays.asList(existingXref));
@@ -638,7 +639,7 @@ class ExternalReferenceServiceTest {
             // Should throw error - cannot change schemas for existing version
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request)
+                            testNamespace, testExtRefType.name(), "Test Process", testExtRefId, testExtRefVersion, request)
             );
 
             assertTrue(exception.getMessage().contains("immutable"));
@@ -670,7 +671,7 @@ class ExternalReferenceServiceTest {
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request)
+                            testNamespace, testExtRefType.name(), "New Process", testExtRefId, testExtRefVersion, request)
             );
 
             assertTrue(exception.getMessage().contains(ErrorMessages.SCHEMA_ID_CANNOT_BE_NULL));
@@ -713,7 +714,7 @@ class ExternalReferenceServiceTest {
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
-                    testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, emptyRequest);
+                    testNamespace, testExtRefType.name(), "New Process", testExtRefId, testExtRefVersion, emptyRequest);
 
             assertNotNull(response);
             assertTrue(response.isUpdated());
@@ -747,7 +748,7 @@ class ExternalReferenceServiceTest {
 
             // External reference does NOT exist (creation scenario)
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
 
@@ -771,7 +772,7 @@ class ExternalReferenceServiceTest {
             // Execute - should throw exception during validation of second schema
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request)
+                            testNamespace, testExtRefType.name(), "Test Process", testExtRefId, testExtRefVersion, request)
             );
 
             assertTrue(exception.getMessage().contains("not found"));
@@ -820,14 +821,14 @@ class ExternalReferenceServiceTest {
             // Execute - should throw clear validation error
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request)
+                            testNamespace, testExtRefType.name(), "Test Process", testExtRefId, testExtRefVersion, request)
             );
 
             // Verify clear error message
             assertTrue(exception.getMessage().contains("already exists with ID"));
             assertTrue(exception.getMessage().contains(existingExtRefId.toString()));
             assertTrue(exception.getMessage().contains("Test Process"));
-            assertTrue(exception.getMessage().contains(testExtRefType));
+            assertTrue(exception.getMessage().contains(testExtRefType.name()));
             assertTrue(exception.getMessage().contains(testExtRefVersion));
 
             // Verify no save operations occurred
@@ -863,7 +864,7 @@ class ExternalReferenceServiceTest {
             // Should throw error - cannot change version for existing extRefId
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType, "New Name", testExtRefId, "2.0.0", request)
+                            testNamespace, testExtRefType.name(), "New Name", testExtRefId, "2.0.0", request)
             );
 
             assertTrue(exception.getMessage().contains("immutable"));
@@ -904,7 +905,7 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
@@ -914,7 +915,7 @@ class ExternalReferenceServiceTest {
 
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType, "New Process", testExtRefId, testExtRefVersion, request)
+                            testNamespace, testExtRefType.name(), "New Process", testExtRefId, testExtRefVersion, request)
             );
 
             assertTrue(exception.getMessage().contains("unpublished"));
@@ -981,7 +982,7 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), anyString(), anyString()))
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
             when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
@@ -995,7 +996,7 @@ class ExternalReferenceServiceTest {
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
-                    testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request);
+                    testNamespace, testExtRefType.name(), "Test Process", testExtRefId, testExtRefVersion, request);
 
             assertNotNull(response);
             assertTrue(response.isUpdated());
@@ -1028,7 +1029,7 @@ class ExternalReferenceServiceTest {
             // Check passes (no duplicate found)
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
             when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
-                    any(UUID.class), anyString(), anyString(), anyString()))
+                    any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
 
             // But save fails with DataIntegrityViolationException (race condition - another request created it)
@@ -1041,13 +1042,13 @@ class ExternalReferenceServiceTest {
             // Execute - should catch DataIntegrityViolationException and throw clean IllegalArgumentException
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request)
+                            testNamespace, testExtRefType.name(), "Test Process", testExtRefId, testExtRefVersion, request)
             );
 
             // Verify clean error message (not database stack trace)
             assertTrue(exception.getMessage().contains("already exists"));
             assertTrue(exception.getMessage().contains("Test Process"));
-            assertTrue(exception.getMessage().contains(testExtRefType));
+            assertTrue(exception.getMessage().contains(testExtRefType.name()));
             assertTrue(exception.getMessage().contains(testExtRefVersion));
         }
     }
@@ -1064,7 +1065,7 @@ class ExternalReferenceServiceTest {
 
             when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
             when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
-                    any(UUID.class), anyString(), anyString(), anyString()))
+                    any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
 
             // Save fails with DataIntegrityViolationException for a DIFFERENT constraint (e.g., foreign key)
@@ -1077,7 +1078,7 @@ class ExternalReferenceServiceTest {
             // Execute - should re-throw the DataIntegrityViolationException (not convert to IllegalArgumentException)
             assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () ->
                     externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType, "Test Process", testExtRefId, testExtRefVersion, request)
+                            testNamespace, testExtRefType.name(), "Test Process", testExtRefId, testExtRefVersion, request)
             );
         }
     }

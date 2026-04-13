@@ -26,8 +26,9 @@ public class ExtRef {
     @Column(name = "EXT_REF_NAME", length = 256)
     private String extRefName;
 
-    @Column(name = "EXT_REF_TYPE", length = 64)
-    private String extRefType;
+    @Enumerated(EnumType.ORDINAL)
+    @Column(name = "EXT_REF_TYPE", nullable = false)
+    private ExtRefType extRefType;
 
     @Column(name = "EXT_REF_VERSION", length = 64)
     private String extRefVersion;
