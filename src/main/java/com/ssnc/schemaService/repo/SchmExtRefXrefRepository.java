@@ -19,26 +19,26 @@ public interface SchmExtRefXrefRepository extends JpaRepository<SchmExtRefXref, 
     List<SchmExtRefXref> findBySchmId(UUID schmId);
 
     /**
-     * Find cross-references by external reference ID
+     * Find cross-references by external reference ID (all versions)
      */
     List<SchmExtRefXref> findByExtRefId(String extRefId);
 
     /**
-     * Find schemas by external reference details
-     * Uses JPA method naming to navigate through the extRef relationship
+     * Find cross-references by external reference ID and version (specific version)
+     * Uses direct fields instead of navigating through the extRef relationship to avoid composite key issues.
+     * Note: extRefType is not needed since (extRefId, extRefVersion) uniquely identifies an ExtRef.
      */
-    List<SchmExtRefXref> findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
-            ExtRefType extRefType, String extRefId, String extRefVersion);
+    List<SchmExtRefXref> findByExtRefIdAndExtRefVersion(String extRefId, String extRefVersion);
 
     /**
-     * Check if cross-reference exists
+     * Check if cross-reference exists for specific version
      */
-    boolean existsBySchmIdAndExtRefId(UUID schmId, String extRefId);
+    boolean existsBySchmIdAndExtRefIdAndExtRefVersion(UUID schmId, String extRefId, String extRefVersion);
 
     /**
-     * Delete cross-reference by schema ID and external reference ID
+     * Delete cross-reference by schema ID and external reference ID and version
      */
     @Modifying
     @Transactional
-    void deleteBySchmIdAndExtRefId(UUID schmId, String extRefId);
+    void deleteBySchmIdAndExtRefIdAndExtRefVersion(UUID schmId, String extRefId, String extRefVersion);
 }

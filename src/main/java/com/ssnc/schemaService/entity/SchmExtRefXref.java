@@ -29,6 +29,9 @@ public class SchmExtRefXref {
     @Column(name = "EXT_REF_ID", nullable = false, length = 64)
     private String extRefId;
 
+    @Column(name = "EXT_REF_VERSION", nullable = false, length = 64)
+    private String extRefVersion;
+
     @Column(name = "CREATED_BY", length = 256)
     private String createdBy;
 
@@ -59,10 +62,13 @@ public class SchmExtRefXref {
     /**
      * ORM mapping relationship - DO NOT ACCESS directly.
      * Accessing this field triggers lazy-loading and causes N+1 query problems.
-     * Use extRefId field instead for filtering/queries.
+     * Use extRefId and extRefVersion fields instead for filtering/queries.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "EXT_REF_ID", insertable = false, updatable = false)
+    @JoinColumns({
+        @JoinColumn(name = "EXT_REF_ID", referencedColumnName = "EXT_REF_ID", insertable = false, updatable = false),
+        @JoinColumn(name = "EXT_REF_VERSION", referencedColumnName = "EXT_REF_VERSION", insertable = false, updatable = false)
+    })
     @ToString.Exclude
     private ExtRef extRef;
 }

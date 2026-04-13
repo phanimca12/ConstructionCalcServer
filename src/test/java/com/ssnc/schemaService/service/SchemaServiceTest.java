@@ -6,6 +6,7 @@ import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.entity.ExtRef;
+import com.ssnc.schemaService.entity.ExtRefId;
 import com.ssnc.schemaService.entity.ExtRefType;
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmData;
@@ -896,41 +897,45 @@ class SchemaServiceTest {
     void testGetExternalReferencesBySchemaId_Success() {
         String extRefId1 = "EXT-REF-001";
         String extRefId2 = "EXT-REF-002";
+        String extRefVersion1 = "1.0";
+        String extRefVersion2 = "2.0";
 
         // Mock schema exists
         when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
-        // Mock cross-references
+        // Mock cross-references with versions
         SchmExtRefXref xref1 = new SchmExtRefXref();
         xref1.setSchmId(testSchmId);
         xref1.setExtRefId(extRefId1);
+        xref1.setExtRefVersion(extRefVersion1);
 
         SchmExtRefXref xref2 = new SchmExtRefXref();
         xref2.setSchmId(testSchmId);
         xref2.setExtRefId(extRefId2);
+        xref2.setExtRefVersion(extRefVersion2);
 
         List<SchmExtRefXref> xrefs = Arrays.asList(xref1, xref2);
         when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(xrefs);
 
         // Mock external references
         ExtRef extRef1 = new ExtRef();
-        extRef1.setExtRefId(extRefId1);
+        extRef1.setId(extRefId1, extRefVersion1);
         extRef1.setExtRefName("API Reference");
         extRef1.setExtRefType(ExtRefType.PROCESS);
-        extRef1.setExtRefVersion("1.0");
         extRef1.setCreatedBy(testUserId);
         extRef1.setUpdatedBy(testUserId);
 
         ExtRef extRef2 = new ExtRef();
-        extRef2.setExtRefId(extRefId2);
+        extRef2.setId(extRefId2, extRefVersion2);
         extRef2.setExtRefName("Database Reference");
         extRef2.setExtRefType(ExtRefType.AUTOMATION);
-        extRef2.setExtRefVersion("2.0");
         extRef2.setCreatedBy(testUserId);
         extRef2.setUpdatedBy(testUserId);
 
-        // Mock batch fetch (fix N+1 query)
-        when(extRefRepository.findAllById(Arrays.asList(extRefId1, extRefId2)))
+        // Mock batch fetch (fix N+1 query) - using composite keys
+        when(extRefRepository.findAllById(Arrays.asList(
+                new ExtRefId(extRefId1, extRefVersion1),
+                new ExtRefId(extRefId2, extRefVersion2))))
                 .thenReturn(Arrays.asList(extRef1, extRef2));
 
         // Execute
@@ -984,28 +989,33 @@ class SchemaServiceTest {
     void testGetExternalReferencesBySchemaId_WithMissingExtRef() {
         String extRefId1 = "EXT-REF-100";
         String extRefId2 = "EXT-REF-200";
+        String extRefVersion1 = "1.0";
+        String extRefVersion2 = "2.0";
 
         when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
         SchmExtRefXref xref1 = new SchmExtRefXref();
         xref1.setSchmId(testSchmId);
         xref1.setExtRefId(extRefId1);
+        xref1.setExtRefVersion(extRefVersion1);
 
         SchmExtRefXref xref2 = new SchmExtRefXref();
         xref2.setSchmId(testSchmId);
         xref2.setExtRefId(extRefId2);
+        xref2.setExtRefVersion(extRefVersion2);
 
         List<SchmExtRefXref> xrefs = Arrays.asList(xref1, xref2);
         when(schmExtRefXrefRepository.findBySchmId(testSchmId)).thenReturn(xrefs);
 
         ExtRef extRef1 = new ExtRef();
-        extRef1.setExtRefId(extRefId1);
+        extRef1.setId(extRefId1, extRefVersion1);
         extRef1.setExtRefName("API Reference");
         extRef1.setExtRefType(ExtRefType.PROCESS);
-        extRef1.setExtRefVersion("1.0");
 
         // Mock batch fetch - only extRef1 exists, extRef2 is missing
-        when(extRefRepository.findAllById(Arrays.asList(extRefId1, extRefId2)))
+        when(extRefRepository.findAllById(Arrays.asList(
+                new ExtRefId(extRefId1, extRefVersion1),
+                new ExtRefId(extRefId2, extRefVersion2))))
                 .thenReturn(Arrays.asList(extRef1)); // Only returns extRef1
 
         List<ExtRefDto> result = schemaService.getExternalReferencesBySchemaId(testNamespace, testSchmId, PageRequest.of(0, 20)).getContent();

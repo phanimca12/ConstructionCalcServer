@@ -6,6 +6,7 @@ import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.entity.ExtRef;
+import com.ssnc.schemaService.entity.ExtRefId;
 import com.ssnc.schemaService.entity.ExtRefType;
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmExtRefXref;
@@ -92,10 +93,9 @@ class ExternalReferenceServiceTest {
         testNmspc.setNmspcName(testNamespace);
 
         testExtRef = new ExtRef();
-        testExtRef.setExtRefId(testExtRefId);
+        testExtRef.setId(testExtRefId, testExtRefVersion); // Set composite key atomically
         testExtRef.setExtRefName("Test Process");
         testExtRef.setExtRefType(testExtRefType);
-        testExtRef.setExtRefVersion(testExtRefVersion);
         testExtRef.setTenantId(testTenantId);
         testExtRef.setCreatedBy("testUser");
         testExtRef.setUpdatedBy("testUser");
@@ -117,6 +117,7 @@ class ExternalReferenceServiceTest {
         testXref.setTenantId(testTenantId);
         testXref.setSchmId(testSchmId);
         testXref.setExtRefId(testExtRefId);
+        testXref.setExtRefVersion(testExtRefVersion);
         testXref.setCreatedBy("testUser");
 
         when(jwtClaimsContext.getUserId()).thenReturn("testUser");
@@ -188,8 +189,7 @@ class ExternalReferenceServiceTest {
     @Test
     void testGetSchemasByExternalReference_Success() {
         List<SchmExtRefXref> xrefs = Arrays.asList(testXref);
-        when(schmExtRefXrefRepository.findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
-                testExtRefType, testExtRefId, testExtRefVersion)).thenReturn(xrefs);
+        when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(xrefs);
         // Mock batch fetch instead of individual findBySchmId
         when(schmRepository.findAllById(Arrays.asList(testSchmId))).thenReturn(Arrays.asList(testSchm));
         doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -202,16 +202,14 @@ class ExternalReferenceServiceTest {
         assertEquals(testSchmId, result.get(0).getId());
         assertEquals("Test Schema", result.get(0).getName());
         verify(namespaceFilterManager).enableIfPresent(testNamespace);
-        verify(schmExtRefXrefRepository).findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
-                testExtRefType, testExtRefId, testExtRefVersion);
+        verify(schmExtRefXrefRepository).findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion);
         verify(schmRepository).findAllById(anyList());
         verify(schmRepository, never()).findBySchmId(any());
     }
 
     @Test
     void testGetSchemasByExternalReference_NoSchemas() {
-        when(schmExtRefXrefRepository.findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
-                testExtRefType, testExtRefId, testExtRefVersion)).thenReturn(Arrays.asList());
+        when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(Arrays.asList());
         doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
         List<SchemaDto> result = externalReferenceService.getSchemasByExternalReference(
@@ -239,8 +237,7 @@ class ExternalReferenceServiceTest {
     @Test
     void testGetSchemasByExternalReference_SchemaNotFound() {
         List<SchmExtRefXref> xrefs = Arrays.asList(testXref);
-        when(schmExtRefXrefRepository.findByExtRefExtRefTypeAndExtRefExtRefIdAndExtRefExtRefVersion(
-                testExtRefType, testExtRefId, testExtRefVersion)).thenReturn(xrefs);
+        when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(xrefs);
         // Mock batch fetch returns empty list (schema not found)
         when(schmRepository.findAllById(Arrays.asList(testSchmId))).thenReturn(Arrays.asList());
         doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -261,9 +258,9 @@ class ExternalReferenceServiceTest {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(Arrays.asList());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
@@ -276,7 +273,7 @@ class ExternalReferenceServiceTest {
             assertEquals(testExtRefId, response.getExtRef().getExtRefId());
             assertEquals("Test Process", response.getExtRef().getExtRefName());
             verify(namespaceFilterManager).enableIfPresent(testNamespace);
-            verify(extRefRepository).findById(testExtRefId);
+            verify(extRefRepository).findById(new ExtRefId(testExtRefId, testExtRefVersion));
             verify(extRefRepository).save(any(ExtRef.class));
         }
     }
@@ -330,11 +327,11 @@ class ExternalReferenceServiceTest {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(Arrays.asList());
             when(schmExtRefXrefRepository.saveAll(anyList())).thenAnswer(i -> i.getArguments()[0]);
             // Mock schema validation with locking
             when(schmRepository.findWithLockBySchmId(schmId1)).thenReturn(Optional.of(schm1));
@@ -372,9 +369,9 @@ class ExternalReferenceServiceTest {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(Arrays.asList());
             // Schema doesn't exist
             when(schmRepository.findWithLockBySchmId(nonExistentSchmId)).thenReturn(Optional.empty());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -405,13 +402,13 @@ class ExternalReferenceServiceTest {
                 emptyRequest.setSchemas(Arrays.asList());
 
                 ExtRef extRef = new ExtRef();
-                extRef.setExtRefId("TEST-" + type.name() + "-ID");
+                extRef.setId("TEST-" + type.name() + "-ID", "1.0.0"); // Set composite key atomically
                 extRef.setExtRefType(type);
                 extRef.setExtRefName("Test " + type.name());
 
-                when(extRefRepository.findById(any(String.class))).thenReturn(Optional.empty());
+                when(extRefRepository.findById(any(ExtRefId.class))).thenReturn(Optional.empty());
                 when(extRefRepository.save(any(ExtRef.class))).thenReturn(extRef);
-                when(schmExtRefXrefRepository.findByExtRefId(any(String.class))).thenReturn(Arrays.asList());
+                when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(any(String.class), any(String.class))).thenReturn(Arrays.asList());
                 doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
                 ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
@@ -471,9 +468,9 @@ class ExternalReferenceServiceTest {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(Arrays.asList());
             when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
@@ -508,9 +505,9 @@ class ExternalReferenceServiceTest {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(Arrays.asList());
             when(schmExtRefXrefRepository.saveAll(anyList())).thenAnswer(i -> i.getArguments()[0]);
             when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -535,9 +532,9 @@ class ExternalReferenceServiceTest {
         request.setSchemas(Arrays.asList(schemaRef));
 
         // Existing external reference with same name, type, and version
+        testExtRef.setId(testExtRefId, testExtRefVersion);
         testExtRef.setExtRefName("Test Process");
         testExtRef.setExtRefType(testExtRefType);
-        testExtRef.setExtRefVersion(testExtRefVersion);
 
         // Existing schema association (same as request)
         SchmExtRefXref existingXref = new SchmExtRefXref();
@@ -548,8 +545,8 @@ class ExternalReferenceServiceTest {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId))
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.of(testExtRef));
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion))
                     .thenReturn(Arrays.asList(existingXref));
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
@@ -578,17 +575,17 @@ class ExternalReferenceServiceTest {
         request.setSchemas(Arrays.asList());
 
         // Existing external reference with different name
+        testExtRef.setId(testExtRefId, testExtRefVersion);
         testExtRef.setExtRefName("Old Name");
         testExtRef.setExtRefType(testExtRefType);
-        testExtRef.setExtRefVersion(testExtRefVersion);
 
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.of(testExtRef));
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(Arrays.asList());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             // Should throw error - cannot change name for existing version
@@ -616,9 +613,9 @@ class ExternalReferenceServiceTest {
         request.setSchemas(Arrays.asList(schemaRef));
 
         // Existing external reference with same metadata
+        testExtRef.setId(testExtRefId, testExtRefVersion);
         testExtRef.setExtRefName("Test Process");
         testExtRef.setExtRefType(testExtRefType);
-        testExtRef.setExtRefVersion(testExtRefVersion);
 
         // Existing schema association is different (testSchmId vs newSchmId)
         SchmExtRefXref existingXref = new SchmExtRefXref();
@@ -629,10 +626,10 @@ class ExternalReferenceServiceTest {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.of(testExtRef));
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId))
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion))
                     .thenReturn(Arrays.asList(existingXref));
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
@@ -702,7 +699,7 @@ class ExternalReferenceServiceTest {
             // Simulate null jwtClaimsContext
             when(jwtClaimsContext.getUserId()).thenReturn(null);
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenAnswer(invocation -> {
                 ExtRef saved = invocation.getArgument(0);
                 // Verify SYSTEM_USER was used
@@ -710,7 +707,7 @@ class ExternalReferenceServiceTest {
                 assertEquals("system", saved.getUpdatedBy());
                 return saved;
             });
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(Arrays.asList());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
             ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
@@ -747,8 +744,8 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             // External reference does NOT exist (creation scenario)
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
 
@@ -799,20 +796,19 @@ class ExternalReferenceServiceTest {
         // Existing external reference with same name, type, version but DIFFERENT ID
         String existingExtRefId = "EXISTING-EXT-REF-999";
         ExtRef existingExtRef = new ExtRef();
-        existingExtRef.setExtRefId(existingExtRefId);
+        existingExtRef.setId(existingExtRefId, testExtRefVersion); // Set composite key atomically
         existingExtRef.setTenantId(testTenantId);
         existingExtRef.setExtRefName("Test Process");
         existingExtRef.setExtRefType(testExtRefType);
-        existingExtRef.setExtRefVersion(testExtRefVersion);
 
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             // No record with testExtRefId (new ID)
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
 
             // But a record EXISTS with same name/type/version and different ID
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion(
                     testTenantId, "Test Process", testExtRefType, testExtRefVersion))
                     .thenReturn(Optional.of(existingExtRef));
 
@@ -840,35 +836,49 @@ class ExternalReferenceServiceTest {
     }
 
     @Test
-    void testCreateOrUpdateExternalReference_SameIdDifferentVersion_ThrowsError() {
-        // IMMUTABILITY: Cannot change version for existing extRefId
-        // Each version needs its own extRefId (primary key)
+    void testCreateOrUpdateExternalReference_SameIdDifferentVersion_CreatesNewRecord() {
+        // COMPOSITE KEY: With composite key (ext_ref_id, ext_ref_version), you CAN have
+        // multiple versions of the same ext_ref_id. This is now ALLOWED behavior.
         ExtRefWithSchemasRequest request = new ExtRefWithSchemasRequest();
         request.setSchemas(Arrays.asList());
 
-        // Existing external reference with same ID but different version
-        testExtRef.setExtRefName("Old Name");
-        testExtRef.setExtRefType(testExtRefType);
-        testExtRef.setExtRefVersion("1.0.0");
+        // Existing external reference with same ID but version 1.0.0
+        ExtRef existingV1 = new ExtRef();
+        existingV1.setId(testExtRefId, "1.0.0"); // Set composite key atomically
+        existingV1.setExtRefName("Version 1 Name");
+        existingV1.setExtRefType(testExtRefType);
+        existingV1.setTenantId(testTenantId);
+
+        // New external reference with same ID but version 2.0.0
+        ExtRef newV2 = new ExtRef();
+        newV2.setId(testExtRefId, "2.0.0"); // Set composite key atomically
+        newV2.setExtRefName("Version 2 Name");
+        newV2.setExtRefType(testExtRefType);
+        newV2.setTenantId(testTenantId);
 
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.of(testExtRef));
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
-                    testTenantId, "New Name", testExtRefType, "2.0.0"))
+            // Version 1.0.0 exists
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, "1.0.0"))).thenReturn(Optional.of(existingV1));
+            // Version 2.0.0 does NOT exist yet (this is what we're creating)
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, "2.0.0"))).thenReturn(Optional.empty());
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion(
+                    testTenantId, "Version 2 Name", testExtRefType, "2.0.0"))
                     .thenReturn(Optional.empty());
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(extRefRepository.save(any(ExtRef.class))).thenReturn(newV2);
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, "2.0.0")).thenReturn(Arrays.asList());
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
 
-            // Should throw error - cannot change version for existing extRefId
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
-                    externalReferenceService.createOrUpdateExternalReference(
-                            testNamespace, testExtRefType.name(), "New Name", testExtRefId, "2.0.0", request)
-            );
+            // Should successfully create version 2.0.0
+            ExtRefResponse response = externalReferenceService.createOrUpdateExternalReference(
+                    testNamespace, testExtRefType.name(), "Version 2 Name", testExtRefId, "2.0.0", request);
 
-            assertTrue(exception.getMessage().contains("immutable"));
-            verify(extRefRepository, never()).save(any(ExtRef.class));
+            assertNotNull(response);
+            assertTrue(response.isUpdated());
+            assertEquals(ErrorMessages.EXTERNAL_REFERENCE_CREATED_SUCCESS, response.getMessage());
+            // Verify save was called (new version created)
+            verify(extRefRepository, times(1)).save(any(ExtRef.class));
         }
     }
 
@@ -904,11 +914,11 @@ class ExternalReferenceServiceTest {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(Arrays.asList());
             when(schmRepository.findWithLockBySchmId(publishedSchmId)).thenReturn(Optional.of(publishedSchm));
             when(schmRepository.findWithLockBySchmId(unpublishedSchmId)).thenReturn(Optional.of(unpublishedSchm));
             doNothing().when(namespaceFilterManager).enableIfPresent(testNamespace);
@@ -981,11 +991,11 @@ class ExternalReferenceServiceTest {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion(any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
             when(extRefRepository.save(any(ExtRef.class))).thenReturn(testExtRef);
-            when(schmExtRefXrefRepository.findByExtRefId(testExtRefId)).thenReturn(Arrays.asList());
+            when(schmExtRefXrefRepository.findByExtRefIdAndExtRefVersion(testExtRefId, testExtRefVersion)).thenReturn(Arrays.asList());
             when(schmExtRefXrefRepository.saveAll(anyList())).thenAnswer(i -> i.getArguments()[0]);
 
             // Mock the repository to return schemas - locks should be acquired in SORTED order (1, 2, 3)
@@ -1027,8 +1037,8 @@ class ExternalReferenceServiceTest {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
             // Check passes (no duplicate found)
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion(
                     any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
 
@@ -1063,8 +1073,8 @@ class ExternalReferenceServiceTest {
         try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
             mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
 
-            when(extRefRepository.findById(testExtRefId)).thenReturn(Optional.empty());
-            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndExtRefVersion(
+            when(extRefRepository.findById(new ExtRefId(testExtRefId, testExtRefVersion))).thenReturn(Optional.empty());
+            when(extRefRepository.findByTenantIdAndExtRefNameAndExtRefTypeAndId_ExtRefVersion(
                     any(UUID.class), anyString(), any(ExtRefType.class), anyString()))
                     .thenReturn(Optional.empty());
 
