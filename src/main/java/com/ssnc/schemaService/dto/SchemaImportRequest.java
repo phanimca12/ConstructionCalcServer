@@ -1,6 +1,8 @@
 package com.ssnc.schemaService.dto;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -10,6 +12,6 @@ public class SchemaImportRequest {
     @Valid
     private SchemaDto schema;
 
-    @NotNull(message = "Content is required")
+    @NotBlank(message = "Content is required for schema import")
     private String content;
 }

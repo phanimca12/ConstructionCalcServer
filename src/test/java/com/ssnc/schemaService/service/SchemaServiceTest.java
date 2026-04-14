@@ -1599,4 +1599,56 @@ class SchemaServiceTest {
             assertTrue(responses.get(0).isSuccess());
         }
     }
+
+    @Test
+    void testImportSchemas_NullSchema_ReturnsValidationError() {
+        com.ssnc.schemaService.dto.SchemaImportRequest request = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request.setSchema(null);
+        request.setContent("content");
+
+        List<com.ssnc.schemaService.dto.SchemaImportResponse> responses =
+            schemaService.importSchemas(testNamespace, Arrays.asList(request));
+
+        assertEquals(1, responses.size());
+        assertFalse(responses.get(0).isSuccess());
+        assertNull(responses.get(0).getSchemaName());
+        assertTrue(responses.get(0).getErrorMessage().contains("Schema information is required"));
+    }
+
+    @Test
+    void testImportSchemas_NullSchemaName_ReturnsValidationError() {
+        SchemaDto schemaWithoutName = new SchemaDto();
+        schemaWithoutName.setName(null);
+        schemaWithoutName.setSchemaType("JSON");
+
+        com.ssnc.schemaService.dto.SchemaImportRequest request = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request.setSchema(schemaWithoutName);
+        request.setContent("content");
+
+        List<com.ssnc.schemaService.dto.SchemaImportResponse> responses =
+            schemaService.importSchemas(testNamespace, Arrays.asList(request));
+
+        assertEquals(1, responses.size());
+        assertFalse(responses.get(0).isSuccess());
+        assertNull(responses.get(0).getSchemaName());
+        assertTrue(responses.get(0).getErrorMessage().contains("Schema name is required"));
+    }
+
+    @Test
+    void testImportSchemas_EmptySchemaName_ReturnsValidationError() {
+        SchemaDto schemaWithEmptyName = new SchemaDto();
+        schemaWithEmptyName.setName("   ");
+        schemaWithEmptyName.setSchemaType("JSON");
+
+        com.ssnc.schemaService.dto.SchemaImportRequest request = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request.setSchema(schemaWithEmptyName);
+        request.setContent("content");
+
+        List<com.ssnc.schemaService.dto.SchemaImportResponse> responses =
+            schemaService.importSchemas(testNamespace, Arrays.asList(request));
+
+        assertEquals(1, responses.size());
+        assertFalse(responses.get(0).isSuccess());
+        assertTrue(responses.get(0).getErrorMessage().contains("Schema name is required"));
+    }
 }

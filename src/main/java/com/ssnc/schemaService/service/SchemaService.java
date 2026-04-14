@@ -296,26 +296,36 @@ public class SchemaService {
         List<com.ssnc.schemaService.dto.SchemaImportResponse> responses = new ArrayList<>();
 
         for (com.ssnc.schemaService.dto.SchemaImportRequest request : importRequests) {
-            String schemaName = (request.getSchema() != null && request.getSchema().getName() != null)
-                    ? request.getSchema().getName()
-                    : "Unknown";
-
             try {
+                // Validate request structure
+                if (request.getSchema() == null) {
+                    throw new IllegalArgumentException(ErrorMessages.SCHEMA_REQUIRED);
+                }
+                if (request.getSchema().getName() == null || request.getSchema().getName().trim().isEmpty()) {
+                    throw new IllegalArgumentException(ErrorMessages.SCHEMA_NAME_REQUIRED);
+                }
+
                 SchemaDto imported = importSchema(namespace, request.getSchema(), request.getContent());
                 responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(imported));
             } catch (IllegalArgumentException e) {
+                String schemaName = (request.getSchema() != null && request.getSchema().getName() != null)
+                        ? request.getSchema().getName()
+                        : null;
                 responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
                         schemaName,
                         ErrorMessages.ERROR_PREFIX_BAD_REQUEST + e.getMessage()));
             } catch (IllegalStateException e) {
                 responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
-                        schemaName,
+                        request.getSchema().getName(),
                         ErrorMessages.ERROR_PREFIX_CONFLICT + e.getMessage()));
             } catch (IOException e) {
                 responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
-                        schemaName,
+                        request.getSchema().getName(),
                         ErrorMessages.ERROR_PREFIX_INTERNAL_SERVER + ErrorMessages.SCHEMA_CREATION_FAILED));
             } catch (Exception e) {
+                String schemaName = (request.getSchema() != null && request.getSchema().getName() != null)
+                        ? request.getSchema().getName()
+                        : null;
                 responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
                         schemaName,
                         ErrorMessages.ERROR_PREFIX_ERROR + e.getMessage()));

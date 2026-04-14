@@ -776,4 +776,51 @@ class SchemaControllerTest {
         assertEquals("Not Found: Schema not found", response.getBody().get(1).getErrorMessage());
         verify(schemaService).exportSchemas(testNamespace, requests);
     }
+
+    @Test
+    void testImportSchemas_ValidationError_NullSchema() {
+        com.ssnc.schemaService.dto.SchemaImportRequest request = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request.setSchema(null);
+        request.setContent("content");
+
+        com.ssnc.schemaService.dto.SchemaImportResponse errorResponse =
+            new com.ssnc.schemaService.dto.SchemaImportResponse(null, "Bad Request: Schema information is required");
+
+        when(schemaService.importSchemas(eq(testNamespace), anyList()))
+            .thenReturn(Arrays.asList(errorResponse));
+
+        ResponseEntity<List<com.ssnc.schemaService.dto.SchemaImportResponse>> response =
+                schemaController.importSchemas(testNamespace, Arrays.asList(request));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(1, response.getBody().size());
+        assertFalse(response.getBody().get(0).isSuccess());
+        assertNull(response.getBody().get(0).getSchemaName());
+    }
+
+    @Test
+    void testImportSchemas_ValidationError_NullSchemaName() {
+        SchemaDto schemaWithoutName = new SchemaDto();
+        schemaWithoutName.setName(null);
+
+        com.ssnc.schemaService.dto.SchemaImportRequest request = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request.setSchema(schemaWithoutName);
+        request.setContent("content");
+
+        com.ssnc.schemaService.dto.SchemaImportResponse errorResponse =
+            new com.ssnc.schemaService.dto.SchemaImportResponse(null, "Bad Request: Schema name is required");
+
+        when(schemaService.importSchemas(eq(testNamespace), anyList()))
+            .thenReturn(Arrays.asList(errorResponse));
+
+        ResponseEntity<List<com.ssnc.schemaService.dto.SchemaImportResponse>> response =
+                schemaController.importSchemas(testNamespace, Arrays.asList(request));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(1, response.getBody().size());
+        assertFalse(response.getBody().get(0).isSuccess());
+        assertTrue(response.getBody().get(0).getErrorMessage().contains("Schema name is required"));
+    }
 }

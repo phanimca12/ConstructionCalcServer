@@ -29,6 +29,8 @@ public final class ErrorMessages {
 
     // Schema validation messages
     public static final String SCHEMA_ID_CANNOT_BE_NULL = "Schema ID cannot be null in request";
+    public static final String SCHEMA_REQUIRED = "Schema information is required";
+    public static final String SCHEMA_NAME_REQUIRED = "Schema name is required";
     public static final String SCHEMA_CONTENT_REQUIRED = "Content is required for schema import";
     public static final String SCHEMA_ID_OR_NAME_REQUIRED = "Either schmId or name must be provided";
     public static final String CANNOT_REFERENCE_UNPUBLISHED_SCHEMA = "Cannot create reference to unpublished schema %s. Schema must be published before creating external references.";
