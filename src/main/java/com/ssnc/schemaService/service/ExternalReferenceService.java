@@ -7,12 +7,16 @@ import com.ssnc.schemaService.dto.ExtRefResponse;
 import com.ssnc.schemaService.dto.ExtRefWithSchemasRequest;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.entity.ExtRef;
+import com.ssnc.schemaService.entity.ExtRefId;
 import com.ssnc.schemaService.entity.ExtRefType;
 import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmExtRefXref;
+import com.ssnc.schemaService.entity.Tenant;
 import com.ssnc.schemaService.repo.ExtRefRepository;
+import com.ssnc.schemaService.repo.NameSpaceRepository;
 import com.ssnc.schemaService.repo.SchmExtRefXrefRepository;
 import com.ssnc.schemaService.repo.SchmRepository;
+import com.ssnc.schemaService.repo.TenantRepository;
 import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.shared.security.JwtClaimsContext;
@@ -49,10 +53,10 @@ public class ExternalReferenceService {
     private JwtClaimsContext jwtClaimsContext;
 
     @Autowired
-    private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
+    private TenantRepository tenantRepository;
 
     @Autowired
-    private com.ssnc.schemaService.repo.NameSpaceRepository nameSpaceRepository;
+    private NameSpaceRepository nameSpaceRepository;
 
     /**
      * Get external references with optional type filter
@@ -201,11 +205,11 @@ public class ExternalReferenceService {
 
         // Resolve tenant_id from tenant_name
         UUID tenantId = tenantRepository.findByTenantName(tenantName)
-                .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
+                .map(Tenant::getTenantId)
                 .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.TENANT_CONFIG_INVALID));
 
         // Check if external reference already exists by composite key (ID + version)
-        Optional<ExtRef> existingExtRef = extRefRepository.findById(new com.ssnc.schemaService.entity.ExtRefId(extRefId, extRefVersion));
+        Optional<ExtRef> existingExtRef = extRefRepository.findById(new ExtRefId(extRefId, extRefVersion));
 
         // SECURITY: Check for unique constraint violation (tenant_id, ext_ref_name, ext_ref_type, ext_ref_version)
         // CRITICAL: Must filter by tenantId to prevent cross-tenant data leakage

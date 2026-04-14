@@ -1436,4 +1436,219 @@ class SchemaServiceTest {
             verify(schmRepository).findByTenantIdAndNmspcIdAndSchmName(testTenantId, testNmspcId, schemaName);
         }
     }
+
+    @Test
+    void testExportSchema_Success() {
+        testSchm.setPublishVersion(1);
+        testSchm.setSchmName("TestSchema");
+        testSchm.setSchmDesc("Test Description");
+        testSchm.setSchemaType("JSON");
+        testSchm.setContentType("application/json");
+        testSchm.setSchmGroup("group1");
+
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData("test content");
+        publishedData.setIsDraft(false);
+
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        com.ssnc.schemaService.dto.SchemaExportDto result = schemaService.exportSchema(testNamespace, testSchmId);
+
+        assertNotNull(result);
+        assertEquals("TestSchema", result.getName());
+        assertEquals("Test Description", result.getDescription());
+        assertEquals("JSON", result.getSchemaType());
+        assertEquals("application/json", result.getContentType());
+        assertEquals("group1", result.getSchmGroup());
+        assertEquals("test content", result.getContent());
+        verify(schmRepository).findBySchmId(testSchmId);
+    }
+
+    @Test
+    void testExportSchema_SchemaNotFound() {
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () ->
+            schemaService.exportSchema(testNamespace, testSchmId));
+        verify(schmRepository).findBySchmId(testSchmId);
+    }
+
+    @Test
+    void testExportSchema_NoPublishedVersion() {
+        testSchm.setPublishVersion(null);
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        assertThrows(IllegalStateException.class, () ->
+            schemaService.exportSchema(testNamespace, testSchmId));
+        verify(schmRepository).findBySchmId(testSchmId);
+    }
+
+    @Test
+    void testExportSchemas_BySchmId() {
+        testSchm.setPublishVersion(1);
+        testSchm.setSchmName("TestSchema");
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData("test content");
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        com.ssnc.schemaService.dto.SchemaExportRequest request = new com.ssnc.schemaService.dto.SchemaExportRequest();
+        request.setSchmId(testSchmId);
+
+        List<com.ssnc.schemaService.dto.SchemaExportResponse> responses =
+            schemaService.exportSchemas(testNamespace, Arrays.asList(request));
+
+        assertEquals(1, responses.size());
+        assertTrue(responses.get(0).isSuccess());
+        assertEquals("TestSchema", responses.get(0).getSchemaName());
+        assertNotNull(responses.get(0).getSchema());
+    }
+
+    @Test
+    void testExportSchemas_ByName() {
+        testSchm.setPublishVersion(1);
+        testSchm.setSchmName("TestSchema");
+        when(schmRepository.findBySchmName("TestSchema")).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData("test content");
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        com.ssnc.schemaService.dto.SchemaExportRequest request = new com.ssnc.schemaService.dto.SchemaExportRequest();
+        request.setName("TestSchema");
+
+        List<com.ssnc.schemaService.dto.SchemaExportResponse> responses =
+            schemaService.exportSchemas(testNamespace, Arrays.asList(request));
+
+        assertEquals(1, responses.size());
+        assertTrue(responses.get(0).isSuccess());
+        assertEquals("TestSchema", responses.get(0).getSchemaName());
+    }
+
+    @Test
+    void testExportSchemas_WithFailures() {
+        com.ssnc.schemaService.dto.SchemaExportRequest request1 = new com.ssnc.schemaService.dto.SchemaExportRequest();
+        request1.setSchmId(testSchmId);
+
+        com.ssnc.schemaService.dto.SchemaExportRequest request2 = new com.ssnc.schemaService.dto.SchemaExportRequest();
+        request2.setName("NonExistent");
+
+        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.empty());
+        when(schmRepository.findBySchmName("NonExistent")).thenReturn(Optional.empty());
+
+        List<com.ssnc.schemaService.dto.SchemaExportResponse> responses =
+            schemaService.exportSchemas(testNamespace, Arrays.asList(request1, request2));
+
+        assertEquals(2, responses.size());
+        assertFalse(responses.get(0).isSuccess());
+        assertFalse(responses.get(1).isSuccess());
+        assertNotNull(responses.get(0).getErrorMessage());
+        assertNotNull(responses.get(1).getErrorMessage());
+    }
+
+    @Test
+    void testImportSchemas_BulkSuccess() throws IOException {
+        try (MockedStatic<TenantContext> mockedTenantContext = mockStatic(TenantContext.class)) {
+            mockedTenantContext.when(TenantContext::getTenantName).thenReturn("client1Id");
+
+            when(jwtClaimsContext.getUserId()).thenReturn(testUserId);
+            when(tenantRepository.findByTenantName("client1Id")).thenReturn(Optional.of(testTenant));
+            when(nameSpaceService.ensureNamespaceExists(testTenantId, testNamespace)).thenReturn(testNmspcId);
+            when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(any(), any(), any())).thenReturn(Optional.empty());
+            when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+            when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any())).thenReturn(Optional.empty());
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+            SchmDataId id = new SchmDataId();
+            id.setSchmId(testSchmId);
+            id.setSchmVersion(1);
+
+            SchmData savedSchmData = new SchmData();
+            savedSchmData.setId(id);
+            savedSchmData.setIsDraft(true);
+            when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+            when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+
+            com.ssnc.schemaService.dto.SchemaImportRequest request = new com.ssnc.schemaService.dto.SchemaImportRequest();
+            request.setSchema(testSchemaDto);
+            request.setContent("content");
+
+            List<com.ssnc.schemaService.dto.SchemaImportResponse> responses =
+                schemaService.importSchemas(testNamespace, Arrays.asList(request));
+
+            assertEquals(1, responses.size());
+            assertTrue(responses.get(0).isSuccess());
+        }
+    }
+
+    @Test
+    void testImportSchemas_NullSchema_ReturnsValidationError() {
+        com.ssnc.schemaService.dto.SchemaImportRequest request = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request.setSchema(null);
+        request.setContent("content");
+
+        List<com.ssnc.schemaService.dto.SchemaImportResponse> responses =
+            schemaService.importSchemas(testNamespace, Arrays.asList(request));
+
+        assertEquals(1, responses.size());
+        assertFalse(responses.get(0).isSuccess());
+        assertNull(responses.get(0).getSchemaName());
+        assertTrue(responses.get(0).getErrorMessage().contains("Schema information is required"));
+    }
+
+    @Test
+    void testImportSchemas_NullSchemaName_ReturnsValidationError() {
+        SchemaDto schemaWithoutName = new SchemaDto();
+        schemaWithoutName.setName(null);
+        schemaWithoutName.setSchemaType("JSON");
+
+        com.ssnc.schemaService.dto.SchemaImportRequest request = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request.setSchema(schemaWithoutName);
+        request.setContent("content");
+
+        List<com.ssnc.schemaService.dto.SchemaImportResponse> responses =
+            schemaService.importSchemas(testNamespace, Arrays.asList(request));
+
+        assertEquals(1, responses.size());
+        assertFalse(responses.get(0).isSuccess());
+        assertNull(responses.get(0).getSchemaName());
+        assertTrue(responses.get(0).getErrorMessage().contains("Schema name is required"));
+    }
+
+    @Test
+    void testImportSchemas_EmptySchemaName_ReturnsValidationError() {
+        SchemaDto schemaWithEmptyName = new SchemaDto();
+        schemaWithEmptyName.setName("   ");
+        schemaWithEmptyName.setSchemaType("JSON");
+
+        com.ssnc.schemaService.dto.SchemaImportRequest request = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request.setSchema(schemaWithEmptyName);
+        request.setContent("content");
+
+        List<com.ssnc.schemaService.dto.SchemaImportResponse> responses =
+            schemaService.importSchemas(testNamespace, Arrays.asList(request));
+
+        assertEquals(1, responses.size());
+        assertFalse(responses.get(0).isSuccess());
+        assertTrue(responses.get(0).getErrorMessage().contains("Schema name is required"));
+    }
 }

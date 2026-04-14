@@ -13,16 +13,26 @@ public final class ErrorMessages {
     public static final String SCHEMA_ALREADY_EXISTS = "Schema with name %s already exists";
     public static final String SCHEMA_IMPORT_EXISTS = "Schema name already exist, existing schemas can not be modified using import";
     public static final String SCHEMA_NOT_FOUND = "Schema not found: %s";
+    public static final String SCHEMA_NOT_FOUND_BY_ID = "Schema not found with ID: %s";
+    public static final String SCHEMA_NOT_FOUND_BY_NAME = "Schema not found with name: %s";
+    public static final String SCHEMA_NOT_FOUND_AFTER_IMPORT = "Schema not found immediately after import - possible data corruption";
     public static final String SCHEMA_NOT_FOUND_FOR_REFERENCE = "Schema %s not found";
     public static final String SCHEMA_VERSION_NOT_FOUND = "Version %s does not exist for schema %s";
+    public static final String SCHEMA_NO_PUBLISHED_VERSION = "Schema does not have a published version: %s";
+    public static final String SCHEMA_PUBLISHED_CONTENT_NOT_FOUND = "Published content not found for schema: %s";
     public static final String SCHEMA_ALREADY_PUBLISHED = "Schema %s already has published version %s";
     public static final String SCHEMA_CREATION_FAILED = "Failed to create Schema, Please contact support";
     public static final String SCHEMA_IN_USE = "Schema %s cannot be unpublished as it is in use by external references";
     public static final String SCHEMA_ALREADY_LOCKED = "Schema %s is already locked by %s";
     public static final String SCHEMA_UNLOCK_NOT_PERMITTED = "Cannot unlock - schema %s is locked by %s";
+    public static final String SCHEMA_PUBLISH_FAILED_ON_IMPORT = "Failed to publish initial version during import";
 
     // Schema validation messages
     public static final String SCHEMA_ID_CANNOT_BE_NULL = "Schema ID cannot be null in request";
+    public static final String SCHEMA_REQUIRED = "Schema information is required";
+    public static final String SCHEMA_NAME_REQUIRED = "Schema name is required";
+    public static final String SCHEMA_CONTENT_REQUIRED = "Content is required for schema import";
+    public static final String SCHEMA_ID_OR_NAME_REQUIRED = "Either schmId or name must be provided";
     public static final String CANNOT_REFERENCE_UNPUBLISHED_SCHEMA = "Cannot create reference to unpublished schema %s. Schema must be published before creating external references.";
 
     // External reference messages
@@ -35,6 +45,7 @@ public final class ErrorMessages {
 
     // External reference validation messages
     public static final String EXTERNAL_REFERENCE_REQUEST_BODY_NULL = "Request body cannot be null";
+    public static final String EXTERNAL_REFERENCE_ID_VERSION_REQUIRED = "Both extRefId and extRefVersion are required (NOT NULL)";
 
     // Field length validation messages
     public static final String VALIDATION_NAMESPACE_MAX_LENGTH = "Namespace must not exceed 32 characters";
@@ -48,8 +59,13 @@ public final class ErrorMessages {
     public static final String VALIDATION_SCHEMAS_FIELD_REQUIRED = "schemas field is required";
     public static final String VALIDATION_SCHM_ID_REQUIRED = "schmId is required for each schema reference";
 
-    // HTTP status messages
+    // HTTP status messages and error prefixes
     public static final String HTTP_BAD_REQUEST = "Bad Request";
+    public static final String ERROR_PREFIX_BAD_REQUEST = "Bad Request: ";
+    public static final String ERROR_PREFIX_CONFLICT = "Conflict: ";
+    public static final String ERROR_PREFIX_NOT_FOUND = "Not Found: ";
+    public static final String ERROR_PREFIX_ERROR = "Error: ";
+    public static final String ERROR_PREFIX_INTERNAL_SERVER = "Internal Server Error: ";
 
     // Tenant related messages
     public static final String TENANT_NOT_FOUND = "Tenant not found";
