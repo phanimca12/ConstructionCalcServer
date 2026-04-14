@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -13,10 +14,14 @@ public class SchemaDto {
     private String schemaType;
     private String contentType;
     private String lockBy;
+
+    @JsonProperty("group")
     private String schmGroup;
 
-    private String published;
-    private String draft;
+    private Integer published;
+    private Integer draft;
+
+    private SchemaVersionDto version;
 
     private String createdByUser;
     private LocalDateTime createDateTime;

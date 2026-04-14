@@ -99,7 +99,7 @@ public class SchemaService {
 
         // Map to DTOs and apply version filtering and sorting
         List<SchemaDto> filteredSchemas = schemas.stream()
-                .map(this::mapToSchemaResponse)
+                .map(schm -> mapToSchemaResponse(schm, withVersion))
                 .filter(schemaDto -> filterByVersion(schemaDto, withVersion))
                 .sorted(getSortComparator(sort))
                 .collect(Collectors.toList());
@@ -281,6 +281,137 @@ public class SchemaService {
         // Don't fall back to stale data - throw exception if refresh fails
         return mapToSchemaResponse(schmRepository.findBySchmId(saved.getSchmId())
                 .orElseThrow(() -> new IllegalStateException("Schema not found immediately after import - possible data corruption")));
+    }
+
+    /**
+     * Import multiple schemas with content. Processes each schema independently.
+     * On successful save, publishes the saved version.
+     *
+     * @param namespace - Namespace for the schemas
+     * @param importRequests - List of schema import requests (each containing schema and content)
+     * @return List of import responses (success/failure per schema)
+     */
+    @Transactional
+    public List<com.ssnc.schemaService.dto.SchemaImportResponse> importSchemas(String namespace, List<com.ssnc.schemaService.dto.SchemaImportRequest> importRequests) {
+        List<com.ssnc.schemaService.dto.SchemaImportResponse> responses = new ArrayList<>();
+
+        for (com.ssnc.schemaService.dto.SchemaImportRequest request : importRequests) {
+            try {
+                SchemaDto imported = importSchema(namespace, request.getSchema(), request.getContent());
+                responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(imported));
+            } catch (IllegalArgumentException e) {
+                responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
+                        request.getSchema().getName(),
+                        "Bad Request: " + e.getMessage()));
+            } catch (IllegalStateException e) {
+                responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
+                        request.getSchema().getName(),
+                        "Conflict: " + e.getMessage()));
+            } catch (IOException e) {
+                responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
+                        request.getSchema().getName(),
+                        "Internal Server Error: Schema creation failed"));
+            } catch (Exception e) {
+                responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
+                        request.getSchema().getName(),
+                        "Error: " + e.getMessage()));
+            }
+        }
+
+        return responses;
+    }
+
+    /**
+     * Export a single schema with its published version content.
+     * Returns schema information (name, description, type, contentType, group) and published content.
+     *
+     * @param namespace - Namespace for the schema
+     * @param schmId - Schema ID
+     * @return Schema export DTO with published content
+     */
+    public com.ssnc.schemaService.dto.SchemaExportDto exportSchema(String namespace, UUID schmId) {
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        // Find schema
+        Schm schema = schmRepository.findBySchmId(schmId)
+                .orElseThrow(() -> new IllegalArgumentException("Schema not found with ID: " + schmId));
+
+        // Check if schema has published version
+        if (schema.getPublishVersion() == null) {
+            throw new IllegalStateException("Schema does not have a published version: " + schema.getSchmName());
+        }
+
+        // Get published version content
+        String content = getPublishedContent(namespace, schmId)
+                .orElseThrow(() -> new IllegalStateException("Published content not found for schema: " + schema.getSchmName()));
+
+        // Map to export DTO
+        com.ssnc.schemaService.dto.SchemaExportDto exportDto = new com.ssnc.schemaService.dto.SchemaExportDto();
+        exportDto.setName(schema.getSchmName());
+        exportDto.setDescription(schema.getSchmDesc());
+        exportDto.setSchemaType(schema.getSchemaType());
+        exportDto.setContentType(schema.getContentType());
+        exportDto.setSchmGroup(schema.getSchmGroup());
+        exportDto.setContent(content);
+
+        return exportDto;
+    }
+
+    /**
+     * Export multiple schemas with their published version content.
+     * Processes each schema independently based on schmId or name.
+     *
+     * @param namespace - Namespace for the schemas
+     * @param exportRequests - List of schema export requests (containing schmId and/or name)
+     * @return List of export responses (success/failure per schema)
+     */
+    public List<com.ssnc.schemaService.dto.SchemaExportResponse> exportSchemas(String namespace, List<com.ssnc.schemaService.dto.SchemaExportRequest> exportRequests) {
+        namespaceFilterManager.enableIfPresent(namespace);
+
+        List<com.ssnc.schemaService.dto.SchemaExportResponse> responses = new ArrayList<>();
+
+        for (com.ssnc.schemaService.dto.SchemaExportRequest request : exportRequests) {
+            try {
+                UUID schmId;
+
+                // Determine schema ID from request
+                if (request.getSchmId() != null) {
+                    schmId = request.getSchmId();
+                } else if (request.getName() != null && !request.getName().isEmpty()) {
+                    // Find schema by name
+                    Schm schema = schmRepository.findBySchmName(request.getName())
+                            .orElseThrow(() -> new IllegalArgumentException("Schema not found with name: " + request.getName()));
+                    schmId = schema.getSchmId();
+                } else {
+                    throw new IllegalArgumentException("Either schmId or name must be provided");
+                }
+
+                // Export schema
+                com.ssnc.schemaService.dto.SchemaExportDto exportDto = exportSchema(namespace, schmId);
+                responses.add(new com.ssnc.schemaService.dto.SchemaExportResponse(exportDto));
+
+            } catch (IllegalArgumentException e) {
+                String schemaName = request.getName() != null ? request.getName() :
+                                   (request.getSchmId() != null ? request.getSchmId().toString() : "Unknown");
+                responses.add(new com.ssnc.schemaService.dto.SchemaExportResponse(
+                        schemaName,
+                        "Not Found: " + e.getMessage()));
+            } catch (IllegalStateException e) {
+                String schemaName = request.getName() != null ? request.getName() :
+                                   (request.getSchmId() != null ? request.getSchmId().toString() : "Unknown");
+                responses.add(new com.ssnc.schemaService.dto.SchemaExportResponse(
+                        schemaName,
+                        "Error: " + e.getMessage()));
+            } catch (Exception e) {
+                String schemaName = request.getName() != null ? request.getName() :
+                                   (request.getSchmId() != null ? request.getSchmId().toString() : "Unknown");
+                responses.add(new com.ssnc.schemaService.dto.SchemaExportResponse(
+                        schemaName,
+                        "Error: " + e.getMessage()));
+            }
+        }
+
+        return responses;
     }
 
     /**
@@ -694,8 +825,9 @@ public class SchemaService {
 
     /**
      * Map Schm entity to SchemaResponse DTO
+     * @param withVersion - Controls what version information to include (none, draft, published, latest)
      */
-    private SchemaDto mapToSchemaResponse(Schm schm) {
+    private SchemaDto mapToSchemaResponse(Schm schm, String withVersion) {
         SchemaDto response = new SchemaDto();
         response.setId(schm.getSchmId());
         response.setName(schm.getSchmName());
@@ -711,14 +843,61 @@ public class SchemaService {
 
         // Set published version number from SCHM table
         if (schm.getPublishVersion() != null) {
-            response.setPublished(String.valueOf(schm.getPublishVersion()));
+            response.setPublished(schm.getPublishVersion());
         }
 
         // Set draft version number from SCHM_DATA table where isDraft = Y
-        schmDataRepository.findByIdSchmIdAndIsDraft(schm.getSchmId(), true)
-                .ifPresent(draft -> response.setDraft(String.valueOf(draft.getId().getSchmVersion())));
+        Optional<SchmData> draftVersion = schmDataRepository.findByIdSchmIdAndIsDraft(schm.getSchmId(), true);
+        draftVersion.ifPresent(draft -> response.setDraft(draft.getId().getSchmVersion()));
+
+        // Populate version object based on withVersion parameter
+        if (withVersion != null && !AppConstants.VERSION_NAME_NONE.equalsIgnoreCase(withVersion)) {
+            SchemaVersionDto versionDto = null;
+
+            switch (withVersion.toLowerCase()) {
+                case AppConstants.VERSION_NAME_DRAFT:
+                    // Get draft version
+                    versionDto = draftVersion.map(this::mapToVersionResponse).orElse(null);
+                    break;
+
+                case AppConstants.VERSION_NAME_PUBLISHED:
+                    // Get published version
+                    if (schm.getPublishVersion() != null) {
+                        versionDto = schmDataRepository.findById(
+                                new com.ssnc.schemaService.entity.SchmDataId(schm.getSchmId(), schm.getPublishVersion()))
+                                .map(this::mapToVersionResponse)
+                                .orElse(null);
+                    }
+                    break;
+
+                case AppConstants.VERSION_NAME_LATEST:
+                    // Get latest version (draft if exists, otherwise published)
+                    if (draftVersion.isPresent()) {
+                        versionDto = mapToVersionResponse(draftVersion.get());
+                    } else if (schm.getPublishVersion() != null) {
+                        versionDto = schmDataRepository.findById(
+                                new com.ssnc.schemaService.entity.SchmDataId(schm.getSchmId(), schm.getPublishVersion()))
+                                .map(this::mapToVersionResponse)
+                                .orElse(null);
+                    }
+                    break;
+
+                default:
+                    // For any other value, don't populate version
+                    break;
+            }
+
+            response.setVersion(versionDto);
+        }
 
         return response;
+    }
+
+    /**
+     * Map Schm entity to SchemaResponse DTO (without version filtering)
+     */
+    private SchemaDto mapToSchemaResponse(Schm schm) {
+        return mapToSchemaResponse(schm, null);
     }
 
     /**

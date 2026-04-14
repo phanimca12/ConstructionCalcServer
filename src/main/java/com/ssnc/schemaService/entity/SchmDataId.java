@@ -15,6 +15,15 @@ public class SchmDataId implements Serializable {
     @Column(name = "SCHM_VERSION", nullable = false)
     private Integer schmVersion;
 
+    // Constructors
+    public SchmDataId() {
+    }
+
+    public SchmDataId(UUID schmId, Integer schmVersion) {
+        this.schmId = schmId;
+        this.schmVersion = schmVersion;
+    }
+
     // equals & hashCode (mandatory)
 
 

@@ -97,6 +97,53 @@ public class SchemaController {
     }
 
     /**
+     * POST /schemas/{nameSpace}/import/bulk
+     * Import multiple schemas with content. Processes each schema independently.
+     * On successful save, publishes each saved version.
+     * Returns a list of responses indicating success or failure for each schema.
+     */
+    @PostMapping(value = ApiConstants.PATH_SCHEMA_IMPORT + "/bulk", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<List<com.ssnc.schemaService.dto.SchemaImportResponse>> importSchemas(
+            @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
+            @RequestBody List<com.ssnc.schemaService.dto.SchemaImportRequest> importRequests) {
+        List<com.ssnc.schemaService.dto.SchemaImportResponse> responses = schemaService.importSchemas(nameSpace, importRequests);
+        return ResponseEntity.status(HttpStatus.OK).body(responses);
+    }
+
+    /**
+     * GET /schemas/{nameSpace}/{id}/export
+     * Export a single schema with its published version content.
+     * Returns schema information (name, description, type, contentType, group) and published content.
+     */
+    @GetMapping(value = ApiConstants.PATH_SCHEMA_BY_ID + "/export")
+    public ResponseEntity<?> exportSchema(
+            @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
+            @PathVariable(ApiConstants.PARAM_ID) String id) {
+        try {
+            com.ssnc.schemaService.dto.SchemaExportDto exportDto = schemaService.exportSchema(nameSpace, UUID.fromString(id));
+            return ResponseEntity.ok(exportDto);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    /**
+     * POST /schemas/{nameSpace}/export/bulk
+     * Export multiple schemas with their published version content.
+     * Processes each schema independently based on schmId or name.
+     * Returns a list of responses indicating success or failure for each schema.
+     */
+    @PostMapping(value = "/export/bulk", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<List<com.ssnc.schemaService.dto.SchemaExportResponse>> exportSchemas(
+            @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
+            @RequestBody List<com.ssnc.schemaService.dto.SchemaExportRequest> exportRequests) {
+        List<com.ssnc.schemaService.dto.SchemaExportResponse> responses = schemaService.exportSchemas(nameSpace, exportRequests);
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
      * GET /schemas/{nameSpace}/{id}
      * Get schema by ID with optional version filtering and pagination
      *

@@ -356,7 +356,14 @@ class SchemaControllerTest {
         SchemaDto schema1 = new SchemaDto();
         schema1.setId(UUID.randomUUID());
         schema1.setName("Schema 1");
-        schema1.setDraft("1");
+        schema1.setDraft(1);
+
+        // Set version object for draft
+        SchemaVersionDto draftVersion = new SchemaVersionDto();
+        draftVersion.setVersionNumber(1);
+        draftVersion.setIsDraft(true);
+        draftVersion.setModifiedByUser("testUser");
+        schema1.setVersion(draftVersion);
 
         List<SchemaDto> schemas = Arrays.asList(schema1);
         Page<SchemaDto> expectedPage = new PageImpl<>(schemas, pageable, schemas.size());
@@ -370,6 +377,8 @@ class SchemaControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(schemas, response.getBody());
         assertEquals(1, response.getBody().size());
+        assertNotNull(response.getBody().get(0).getVersion());
+        assertTrue(response.getBody().get(0).getVersion().getIsDraft());
         verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "draft", pageable);
     }
 
@@ -379,7 +388,14 @@ class SchemaControllerTest {
         SchemaDto schema1 = new SchemaDto();
         schema1.setId(UUID.randomUUID());
         schema1.setName("Schema 1");
-        schema1.setPublished("2");
+        schema1.setPublished(2);
+
+        // Set version object for published
+        SchemaVersionDto publishedVersion = new SchemaVersionDto();
+        publishedVersion.setVersionNumber(2);
+        publishedVersion.setIsDraft(false);
+        publishedVersion.setModifiedByUser("testUser");
+        schema1.setVersion(publishedVersion);
 
         List<SchemaDto> schemas = Arrays.asList(schema1);
         Page<SchemaDto> expectedPage = new PageImpl<>(schemas, pageable, schemas.size());
@@ -393,6 +409,8 @@ class SchemaControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(schemas, response.getBody());
         assertEquals(1, response.getBody().size());
+        assertNotNull(response.getBody().get(0).getVersion());
+        assertFalse(response.getBody().get(0).getVersion().getIsDraft());
         verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "published", pageable);
     }
 
@@ -402,8 +420,15 @@ class SchemaControllerTest {
         SchemaDto schema1 = new SchemaDto();
         schema1.setId(UUID.randomUUID());
         schema1.setName("Schema 1");
-        schema1.setDraft("2");
-        schema1.setPublished("1");
+        schema1.setDraft(2);
+        schema1.setPublished(1);
+
+        // Set version object for latest (draft takes precedence)
+        SchemaVersionDto latestVersion = new SchemaVersionDto();
+        latestVersion.setVersionNumber(2);
+        latestVersion.setIsDraft(true);
+        latestVersion.setModifiedByUser("testUser");
+        schema1.setVersion(latestVersion);
 
         List<SchemaDto> schemas = Arrays.asList(schema1);
         Page<SchemaDto> expectedPage = new PageImpl<>(schemas, pageable, schemas.size());
@@ -417,6 +442,8 @@ class SchemaControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(schemas, response.getBody());
         assertEquals(1, response.getBody().size());
+        assertNotNull(response.getBody().get(0).getVersion());
+        assertEquals(2, response.getBody().get(0).getVersion().getVersionNumber());
         verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "latest", pageable);
     }
 
@@ -572,5 +599,181 @@ class SchemaControllerTest {
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
         assertEquals(ErrorMessages.SCHEMA_CREATION_FAILED, response.getBody());
         verify(schemaService).importSchema(testNamespace, testSchemaDto, content);
+    }
+
+    @Test
+    void testImportSchemas_BulkImport_ReturnsOk() {
+        com.ssnc.schemaService.dto.SchemaImportRequest request1 = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request1.setSchema(testSchemaDto);
+        request1.setContent("content1");
+
+        SchemaDto schema2 = new SchemaDto();
+        schema2.setName("Schema2");
+        com.ssnc.schemaService.dto.SchemaImportRequest request2 = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request2.setSchema(schema2);
+        request2.setContent("content2");
+
+        List<com.ssnc.schemaService.dto.SchemaImportRequest> requests = Arrays.asList(request1, request2);
+
+        com.ssnc.schemaService.dto.SchemaImportResponse response1 = new com.ssnc.schemaService.dto.SchemaImportResponse(testSchemaDto);
+        com.ssnc.schemaService.dto.SchemaImportResponse response2 = new com.ssnc.schemaService.dto.SchemaImportResponse(schema2);
+        List<com.ssnc.schemaService.dto.SchemaImportResponse> expectedResponses = Arrays.asList(response1, response2);
+
+        when(schemaService.importSchemas(testNamespace, requests)).thenReturn(expectedResponses);
+
+        ResponseEntity<List<com.ssnc.schemaService.dto.SchemaImportResponse>> response =
+                schemaController.importSchemas(testNamespace, requests);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(2, response.getBody().size());
+        assertTrue(response.getBody().get(0).isSuccess());
+        assertTrue(response.getBody().get(1).isSuccess());
+        verify(schemaService).importSchemas(testNamespace, requests);
+    }
+
+    @Test
+    void testImportSchemas_BulkImportWithFailures_ReturnsOk() {
+        com.ssnc.schemaService.dto.SchemaImportRequest request1 = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request1.setSchema(testSchemaDto);
+        request1.setContent("content1");
+
+        SchemaDto schema2 = new SchemaDto();
+        schema2.setName("Schema2");
+        com.ssnc.schemaService.dto.SchemaImportRequest request2 = new com.ssnc.schemaService.dto.SchemaImportRequest();
+        request2.setSchema(schema2);
+        request2.setContent("content2");
+
+        List<com.ssnc.schemaService.dto.SchemaImportRequest> requests = Arrays.asList(request1, request2);
+
+        com.ssnc.schemaService.dto.SchemaImportResponse response1 = new com.ssnc.schemaService.dto.SchemaImportResponse(testSchemaDto);
+        com.ssnc.schemaService.dto.SchemaImportResponse response2 = new com.ssnc.schemaService.dto.SchemaImportResponse("Schema2", "Schema already exists");
+        List<com.ssnc.schemaService.dto.SchemaImportResponse> expectedResponses = Arrays.asList(response1, response2);
+
+        when(schemaService.importSchemas(testNamespace, requests)).thenReturn(expectedResponses);
+
+        ResponseEntity<List<com.ssnc.schemaService.dto.SchemaImportResponse>> response =
+                schemaController.importSchemas(testNamespace, requests);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(2, response.getBody().size());
+        assertTrue(response.getBody().get(0).isSuccess());
+        assertFalse(response.getBody().get(1).isSuccess());
+        assertEquals("Schema already exists", response.getBody().get(1).getErrorMessage());
+        verify(schemaService).importSchemas(testNamespace, requests);
+    }
+
+    @Test
+    void testExportSchema_Success_ReturnsOk() {
+        com.ssnc.schemaService.dto.SchemaExportDto exportDto = new com.ssnc.schemaService.dto.SchemaExportDto();
+        exportDto.setName("Test Schema");
+        exportDto.setDescription("Test Description");
+        exportDto.setSchemaType("JSON");
+        exportDto.setContentType("application/json");
+        exportDto.setSchmGroup("group1");
+        exportDto.setContent("test content");
+
+        when(schemaService.exportSchema(testNamespace, testSchemaId)).thenReturn(exportDto);
+
+        ResponseEntity<?> response = schemaController.exportSchema(testNamespace, testSchemaId.toString());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(exportDto, response.getBody());
+        verify(schemaService).exportSchema(testNamespace, testSchemaId);
+    }
+
+    @Test
+    void testExportSchema_SchemaNotFound_ReturnsNotFound() {
+        when(schemaService.exportSchema(testNamespace, testSchemaId))
+                .thenThrow(new IllegalArgumentException("Schema not found"));
+
+        ResponseEntity<?> response = schemaController.exportSchema(testNamespace, testSchemaId.toString());
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals("Schema not found", response.getBody());
+        verify(schemaService).exportSchema(testNamespace, testSchemaId);
+    }
+
+    @Test
+    void testExportSchema_NoPublishedVersion_ReturnsBadRequest() {
+        when(schemaService.exportSchema(testNamespace, testSchemaId))
+                .thenThrow(new IllegalStateException("Schema does not have a published version"));
+
+        ResponseEntity<?> response = schemaController.exportSchema(testNamespace, testSchemaId.toString());
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Schema does not have a published version", response.getBody());
+        verify(schemaService).exportSchema(testNamespace, testSchemaId);
+    }
+
+    @Test
+    void testExportSchemas_BulkExport_ReturnsOk() {
+        UUID schema2Id = UUID.randomUUID();
+
+        com.ssnc.schemaService.dto.SchemaExportRequest request1 = new com.ssnc.schemaService.dto.SchemaExportRequest();
+        request1.setSchmId(testSchemaId);
+
+        com.ssnc.schemaService.dto.SchemaExportRequest request2 = new com.ssnc.schemaService.dto.SchemaExportRequest();
+        request2.setName("Schema2");
+
+        List<com.ssnc.schemaService.dto.SchemaExportRequest> requests = Arrays.asList(request1, request2);
+
+        com.ssnc.schemaService.dto.SchemaExportDto exportDto1 = new com.ssnc.schemaService.dto.SchemaExportDto();
+        exportDto1.setName("Test Schema");
+        exportDto1.setContent("content1");
+
+        com.ssnc.schemaService.dto.SchemaExportDto exportDto2 = new com.ssnc.schemaService.dto.SchemaExportDto();
+        exportDto2.setName("Schema2");
+        exportDto2.setContent("content2");
+
+        com.ssnc.schemaService.dto.SchemaExportResponse response1 = new com.ssnc.schemaService.dto.SchemaExportResponse(exportDto1);
+        com.ssnc.schemaService.dto.SchemaExportResponse response2 = new com.ssnc.schemaService.dto.SchemaExportResponse(exportDto2);
+        List<com.ssnc.schemaService.dto.SchemaExportResponse> expectedResponses = Arrays.asList(response1, response2);
+
+        when(schemaService.exportSchemas(testNamespace, requests)).thenReturn(expectedResponses);
+
+        ResponseEntity<List<com.ssnc.schemaService.dto.SchemaExportResponse>> response =
+                schemaController.exportSchemas(testNamespace, requests);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(2, response.getBody().size());
+        assertTrue(response.getBody().get(0).isSuccess());
+        assertTrue(response.getBody().get(1).isSuccess());
+        verify(schemaService).exportSchemas(testNamespace, requests);
+    }
+
+    @Test
+    void testExportSchemas_BulkExportWithFailures_ReturnsOk() {
+        com.ssnc.schemaService.dto.SchemaExportRequest request1 = new com.ssnc.schemaService.dto.SchemaExportRequest();
+        request1.setSchmId(testSchemaId);
+
+        com.ssnc.schemaService.dto.SchemaExportRequest request2 = new com.ssnc.schemaService.dto.SchemaExportRequest();
+        request2.setName("NonExistentSchema");
+
+        List<com.ssnc.schemaService.dto.SchemaExportRequest> requests = Arrays.asList(request1, request2);
+
+        com.ssnc.schemaService.dto.SchemaExportDto exportDto1 = new com.ssnc.schemaService.dto.SchemaExportDto();
+        exportDto1.setName("Test Schema");
+        exportDto1.setContent("content1");
+
+        com.ssnc.schemaService.dto.SchemaExportResponse response1 = new com.ssnc.schemaService.dto.SchemaExportResponse(exportDto1);
+        com.ssnc.schemaService.dto.SchemaExportResponse response2 = new com.ssnc.schemaService.dto.SchemaExportResponse("NonExistentSchema", "Not Found: Schema not found");
+        List<com.ssnc.schemaService.dto.SchemaExportResponse> expectedResponses = Arrays.asList(response1, response2);
+
+        when(schemaService.exportSchemas(testNamespace, requests)).thenReturn(expectedResponses);
+
+        ResponseEntity<List<com.ssnc.schemaService.dto.SchemaExportResponse>> response =
+                schemaController.exportSchemas(testNamespace, requests);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(2, response.getBody().size());
+        assertTrue(response.getBody().get(0).isSuccess());
+        assertFalse(response.getBody().get(1).isSuccess());
+        assertEquals("Not Found: Schema not found", response.getBody().get(1).getErrorMessage());
+        verify(schemaService).exportSchemas(testNamespace, requests);
     }
 }
