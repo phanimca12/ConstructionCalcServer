@@ -4,6 +4,11 @@ import com.ssnc.schemaService.constants.AppConstants;
 import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
+import com.ssnc.schemaService.dto.SchemaExportDto;
+import com.ssnc.schemaService.dto.SchemaExportRequest;
+import com.ssnc.schemaService.dto.SchemaExportResponse;
+import com.ssnc.schemaService.dto.SchemaImportRequest;
+import com.ssnc.schemaService.dto.SchemaImportResponse;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
 import com.ssnc.schemaService.entity.ExtRef;
@@ -12,12 +17,14 @@ import com.ssnc.schemaService.entity.Schm;
 import com.ssnc.schemaService.entity.SchmData;
 import com.ssnc.schemaService.entity.SchmDataId;
 import com.ssnc.schemaService.entity.SchmExtRefXref;
+import com.ssnc.schemaService.entity.Tenant;
 import com.ssnc.schemaService.repo.ExtRefRepository;
 import com.ssnc.schemaService.repo.SchmDataRepository;
 import com.ssnc.schemaService.repo.SchmExtRefXrefRepository;
 import com.ssnc.schemaService.repo.SchmFilterCriteria;
 import com.ssnc.schemaService.repo.SchmRepository;
 import com.ssnc.schemaService.repo.SchmSpecifications;
+import com.ssnc.schemaService.repo.TenantRepository;
 import com.ssnc.schemaService.tenant.NamespaceFilterManager;
 import com.ssnc.schemaService.tenant.TenantContext;
 import com.ssnc.schemaService.util.DatabaseExceptionUtils;
@@ -61,7 +68,7 @@ public class SchemaService {
     private ExtRefRepository extRefRepository;
 
     @Autowired
-    private com.ssnc.schemaService.repo.TenantRepository tenantRepository;
+    private TenantRepository tenantRepository;
 
     @Autowired
     private NameSpaceService nameSpaceService;
@@ -192,7 +199,7 @@ public class SchemaService {
 
         // Resolve tenant_id and nmspc_id
         UUID tenantId = tenantRepository.findByTenantName(tenantName)
-                .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
+                .map(Tenant::getTenantId)
                 .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.TENANT_CONFIG_INVALID));
 
         // SECURITY: Use tenant-aware namespace lookup to ensure proper isolation
@@ -233,7 +240,7 @@ public class SchemaService {
 
         // Resolve tenant_id and nmspc_id
         UUID tenantId = tenantRepository.findByTenantName(tenantName)
-                .map(com.ssnc.schemaService.entity.Tenant::getTenantId)
+                .map(Tenant::getTenantId)
                 .orElseThrow(() -> new IllegalArgumentException(ErrorMessages.TENANT_CONFIG_INVALID));
 
         // SECURITY: Use tenant-aware namespace lookup to ensure proper isolation
@@ -292,10 +299,10 @@ public class SchemaService {
      * @param importRequests - List of schema import requests (each containing schema and content)
      * @return List of import responses (success/failure per schema)
      */
-    public List<com.ssnc.schemaService.dto.SchemaImportResponse> importSchemas(String namespace, List<com.ssnc.schemaService.dto.SchemaImportRequest> importRequests) {
-        List<com.ssnc.schemaService.dto.SchemaImportResponse> responses = new ArrayList<>();
+    public List<SchemaImportResponse> importSchemas(String namespace, List<SchemaImportRequest> importRequests) {
+        List<SchemaImportResponse> responses = new ArrayList<>();
 
-        for (com.ssnc.schemaService.dto.SchemaImportRequest request : importRequests) {
+        for (SchemaImportRequest request : importRequests) {
             try {
                 // Validate request structure
                 if (request.getSchema() == null) {
@@ -306,27 +313,27 @@ public class SchemaService {
                 }
 
                 SchemaDto imported = importSchema(namespace, request.getSchema(), request.getContent());
-                responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(imported));
+                responses.add(new SchemaImportResponse(imported));
             } catch (IllegalArgumentException e) {
                 String schemaName = (request.getSchema() != null && request.getSchema().getName() != null)
                         ? request.getSchema().getName()
                         : null;
-                responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
+                responses.add(new SchemaImportResponse(
                         schemaName,
                         ErrorMessages.ERROR_PREFIX_BAD_REQUEST + e.getMessage()));
             } catch (IllegalStateException e) {
-                responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
+                responses.add(new SchemaImportResponse(
                         request.getSchema().getName(),
                         ErrorMessages.ERROR_PREFIX_CONFLICT + e.getMessage()));
             } catch (IOException e) {
-                responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
+                responses.add(new SchemaImportResponse(
                         request.getSchema().getName(),
                         ErrorMessages.ERROR_PREFIX_INTERNAL_SERVER + ErrorMessages.SCHEMA_CREATION_FAILED));
             } catch (Exception e) {
                 String schemaName = (request.getSchema() != null && request.getSchema().getName() != null)
                         ? request.getSchema().getName()
                         : null;
-                responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
+                responses.add(new SchemaImportResponse(
                         schemaName,
                         ErrorMessages.ERROR_PREFIX_ERROR + e.getMessage()));
             }
@@ -343,7 +350,7 @@ public class SchemaService {
      * @param schmId - Schema ID
      * @return Schema export DTO with published content
      */
-    public com.ssnc.schemaService.dto.SchemaExportDto exportSchema(String namespace, UUID schmId) {
+    public SchemaExportDto exportSchema(String namespace, UUID schmId) {
         namespaceFilterManager.enableIfPresent(namespace);
 
         // Find schema
@@ -360,7 +367,7 @@ public class SchemaService {
                 .orElseThrow(() -> new IllegalStateException(String.format(ErrorMessages.SCHEMA_PUBLISHED_CONTENT_NOT_FOUND, schema.getSchmName())));
 
         // Map to export DTO
-        com.ssnc.schemaService.dto.SchemaExportDto exportDto = new com.ssnc.schemaService.dto.SchemaExportDto();
+        SchemaExportDto exportDto = new SchemaExportDto();
         exportDto.setName(schema.getSchmName());
         exportDto.setDescription(schema.getSchmDesc());
         exportDto.setSchemaType(schema.getSchemaType());
@@ -379,12 +386,12 @@ public class SchemaService {
      * @param exportRequests - List of schema export requests (containing schmId and/or name)
      * @return List of export responses (success/failure per schema)
      */
-    public List<com.ssnc.schemaService.dto.SchemaExportResponse> exportSchemas(String namespace, List<com.ssnc.schemaService.dto.SchemaExportRequest> exportRequests) {
+    public List<SchemaExportResponse> exportSchemas(String namespace, List<SchemaExportRequest> exportRequests) {
         namespaceFilterManager.enableIfPresent(namespace);
 
-        List<com.ssnc.schemaService.dto.SchemaExportResponse> responses = new ArrayList<>();
+        List<SchemaExportResponse> responses = new ArrayList<>();
 
-        for (com.ssnc.schemaService.dto.SchemaExportRequest request : exportRequests) {
+        for (SchemaExportRequest request : exportRequests) {
             try {
                 UUID schmId;
 
@@ -401,25 +408,25 @@ public class SchemaService {
                 }
 
                 // Export schema
-                com.ssnc.schemaService.dto.SchemaExportDto exportDto = exportSchema(namespace, schmId);
-                responses.add(new com.ssnc.schemaService.dto.SchemaExportResponse(exportDto));
+                SchemaExportDto exportDto = exportSchema(namespace, schmId);
+                responses.add(new SchemaExportResponse(exportDto));
 
             } catch (IllegalArgumentException e) {
                 String schemaName = request.getName() != null ? request.getName() :
                                    (request.getSchmId() != null ? request.getSchmId().toString() : "Unknown");
-                responses.add(new com.ssnc.schemaService.dto.SchemaExportResponse(
+                responses.add(new SchemaExportResponse(
                         schemaName,
                         ErrorMessages.ERROR_PREFIX_NOT_FOUND + e.getMessage()));
             } catch (IllegalStateException e) {
                 String schemaName = request.getName() != null ? request.getName() :
                                    (request.getSchmId() != null ? request.getSchmId().toString() : "Unknown");
-                responses.add(new com.ssnc.schemaService.dto.SchemaExportResponse(
+                responses.add(new SchemaExportResponse(
                         schemaName,
                         ErrorMessages.ERROR_PREFIX_ERROR + e.getMessage()));
             } catch (Exception e) {
                 String schemaName = request.getName() != null ? request.getName() :
                                    (request.getSchmId() != null ? request.getSchmId().toString() : "Unknown");
-                responses.add(new com.ssnc.schemaService.dto.SchemaExportResponse(
+                responses.add(new SchemaExportResponse(
                         schemaName,
                         ErrorMessages.ERROR_PREFIX_ERROR + e.getMessage()));
             }
@@ -878,7 +885,7 @@ public class SchemaService {
                     // Get published version
                     if (schm.getPublishVersion() != null) {
                         versionDto = schmDataRepository.findById(
-                                new com.ssnc.schemaService.entity.SchmDataId(schm.getSchmId(), schm.getPublishVersion()))
+                                new SchmDataId(schm.getSchmId(), schm.getPublishVersion()))
                                 .map(this::mapToVersionResponse)
                                 .orElse(null);
                     }
@@ -890,7 +897,7 @@ public class SchemaService {
                         versionDto = mapToVersionResponse(draftVersion.get());
                     } else if (schm.getPublishVersion() != null) {
                         versionDto = schmDataRepository.findById(
-                                new com.ssnc.schemaService.entity.SchmDataId(schm.getSchmId(), schm.getPublishVersion()))
+                                new SchmDataId(schm.getSchmId(), schm.getPublishVersion()))
                                 .map(this::mapToVersionResponse)
                                 .orElse(null);
                     }

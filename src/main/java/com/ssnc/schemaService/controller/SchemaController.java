@@ -4,6 +4,11 @@ import com.ssnc.schemaService.constants.ApiConstants;
 import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.ExtRefDto;
 import com.ssnc.schemaService.dto.SchemaDto;
+import com.ssnc.schemaService.dto.SchemaExportDto;
+import com.ssnc.schemaService.dto.SchemaExportRequest;
+import com.ssnc.schemaService.dto.SchemaExportResponse;
+import com.ssnc.schemaService.dto.SchemaImportRequest;
+import com.ssnc.schemaService.dto.SchemaImportResponse;
 import com.ssnc.schemaService.dto.SchemaVersionDto;
 import com.ssnc.schemaService.dto.SchemaWithVersionDto;
 import com.ssnc.schemaService.service.SchemaService;
@@ -104,10 +109,10 @@ public class SchemaController {
      * Returns a list of responses indicating success or failure for each schema.
      */
     @PostMapping(value = ApiConstants.PATH_SCHEMA_IMPORT_BULK, consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<List<com.ssnc.schemaService.dto.SchemaImportResponse>> importSchemas(
+    public ResponseEntity<List<SchemaImportResponse>> importSchemas(
             @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
-            @Valid @RequestBody List<com.ssnc.schemaService.dto.SchemaImportRequest> importRequests) {
-        List<com.ssnc.schemaService.dto.SchemaImportResponse> responses = schemaService.importSchemas(nameSpace, importRequests);
+            @Valid @RequestBody List<SchemaImportRequest> importRequests) {
+        List<SchemaImportResponse> responses = schemaService.importSchemas(nameSpace, importRequests);
         return ResponseEntity.status(HttpStatus.OK).body(responses);
     }
 
@@ -121,7 +126,7 @@ public class SchemaController {
             @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
             @PathVariable(ApiConstants.PARAM_ID) String id) {
         try {
-            com.ssnc.schemaService.dto.SchemaExportDto exportDto = schemaService.exportSchema(nameSpace, UUID.fromString(id));
+            SchemaExportDto exportDto = schemaService.exportSchema(nameSpace, UUID.fromString(id));
             return ResponseEntity.ok(exportDto);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
@@ -137,10 +142,10 @@ public class SchemaController {
      * Returns a list of responses indicating success or failure for each schema.
      */
     @PostMapping(value = ApiConstants.PATH_SCHEMA_EXPORT_BULK, consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<List<com.ssnc.schemaService.dto.SchemaExportResponse>> exportSchemas(
+    public ResponseEntity<List<SchemaExportResponse>> exportSchemas(
             @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
-            @Valid @RequestBody List<com.ssnc.schemaService.dto.SchemaExportRequest> exportRequests) {
-        List<com.ssnc.schemaService.dto.SchemaExportResponse> responses = schemaService.exportSchemas(nameSpace, exportRequests);
+            @Valid @RequestBody List<SchemaExportRequest> exportRequests) {
+        List<SchemaExportResponse> responses = schemaService.exportSchemas(nameSpace, exportRequests);
         return ResponseEntity.ok(responses);
     }
 
