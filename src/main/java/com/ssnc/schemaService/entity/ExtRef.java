@@ -1,5 +1,6 @@
 package com.ssnc.schemaService.entity;
 
+import com.ssnc.schemaService.constants.ErrorMessages;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -71,7 +72,7 @@ public class ExtRef {
      */
     public void setId(String extRefId, String extRefVersion) {
         if (extRefId == null || extRefVersion == null) {
-            throw new IllegalArgumentException("Both extRefId and extRefVersion are required (NOT NULL)");
+            throw new IllegalArgumentException(ErrorMessages.EXTERNAL_REFERENCE_ID_VERSION_REQUIRED);
         }
         this.id = new ExtRefId(extRefId, extRefVersion);
     }

@@ -15,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -102,10 +103,10 @@ public class SchemaController {
      * On successful save, publishes each saved version.
      * Returns a list of responses indicating success or failure for each schema.
      */
-    @PostMapping(value = ApiConstants.PATH_SCHEMA_IMPORT + "/bulk", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = ApiConstants.PATH_SCHEMA_IMPORT_BULK, consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<com.ssnc.schemaService.dto.SchemaImportResponse>> importSchemas(
             @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
-            @RequestBody List<com.ssnc.schemaService.dto.SchemaImportRequest> importRequests) {
+            @Valid @RequestBody List<com.ssnc.schemaService.dto.SchemaImportRequest> importRequests) {
         List<com.ssnc.schemaService.dto.SchemaImportResponse> responses = schemaService.importSchemas(nameSpace, importRequests);
         return ResponseEntity.status(HttpStatus.OK).body(responses);
     }
@@ -115,7 +116,7 @@ public class SchemaController {
      * Export a single schema with its published version content.
      * Returns schema information (name, description, type, contentType, group) and published content.
      */
-    @GetMapping(value = ApiConstants.PATH_SCHEMA_BY_ID + "/export")
+    @GetMapping(value = ApiConstants.PATH_SCHEMA_EXPORT_BY_ID)
     public ResponseEntity<?> exportSchema(
             @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
             @PathVariable(ApiConstants.PARAM_ID) String id) {
@@ -135,10 +136,10 @@ public class SchemaController {
      * Processes each schema independently based on schmId or name.
      * Returns a list of responses indicating success or failure for each schema.
      */
-    @PostMapping(value = "/export/bulk", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = ApiConstants.PATH_SCHEMA_EXPORT_BULK, consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<List<com.ssnc.schemaService.dto.SchemaExportResponse>> exportSchemas(
             @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
-            @RequestBody List<com.ssnc.schemaService.dto.SchemaExportRequest> exportRequests) {
+            @Valid @RequestBody List<com.ssnc.schemaService.dto.SchemaExportRequest> exportRequests) {
         List<com.ssnc.schemaService.dto.SchemaExportResponse> responses = schemaService.exportSchemas(nameSpace, exportRequests);
         return ResponseEntity.ok(responses);
     }

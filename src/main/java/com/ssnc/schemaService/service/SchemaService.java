@@ -224,7 +224,7 @@ public class SchemaService {
 
         // Validate that content is provided
         if (content == null || content.isEmpty()) {
-            throw new IllegalArgumentException("Content is required for schema import");
+            throw new IllegalArgumentException(ErrorMessages.SCHEMA_CONTENT_REQUIRED);
         }
 
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
@@ -274,47 +274,51 @@ public class SchemaService {
         try {
             publishSchemaVersion(namespace, saved.getSchmId(), 1);
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to publish initial version during import", e);
+            throw new IllegalStateException(ErrorMessages.SCHEMA_PUBLISH_FAILED_ON_IMPORT, e);
         }
 
         // Refresh to get latest state with published version
         // Don't fall back to stale data - throw exception if refresh fails
         return mapToSchemaResponse(schmRepository.findBySchmId(saved.getSchmId())
-                .orElseThrow(() -> new IllegalStateException("Schema not found immediately after import - possible data corruption")));
+                .orElseThrow(() -> new IllegalStateException(ErrorMessages.SCHEMA_NOT_FOUND_AFTER_IMPORT)));
     }
 
     /**
      * Import multiple schemas with content. Processes each schema independently.
      * On successful save, publishes the saved version.
+     * Each import runs in its own transaction (inherited from importSchema method).
      *
      * @param namespace - Namespace for the schemas
      * @param importRequests - List of schema import requests (each containing schema and content)
      * @return List of import responses (success/failure per schema)
      */
-    @Transactional
     public List<com.ssnc.schemaService.dto.SchemaImportResponse> importSchemas(String namespace, List<com.ssnc.schemaService.dto.SchemaImportRequest> importRequests) {
         List<com.ssnc.schemaService.dto.SchemaImportResponse> responses = new ArrayList<>();
 
         for (com.ssnc.schemaService.dto.SchemaImportRequest request : importRequests) {
+            String schemaName = (request.getSchema() != null && request.getSchema().getName() != null)
+                    ? request.getSchema().getName()
+                    : "Unknown";
+
             try {
                 SchemaDto imported = importSchema(namespace, request.getSchema(), request.getContent());
                 responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(imported));
             } catch (IllegalArgumentException e) {
                 responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
-                        request.getSchema().getName(),
-                        "Bad Request: " + e.getMessage()));
+                        schemaName,
+                        ErrorMessages.ERROR_PREFIX_BAD_REQUEST + e.getMessage()));
             } catch (IllegalStateException e) {
                 responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
-                        request.getSchema().getName(),
-                        "Conflict: " + e.getMessage()));
+                        schemaName,
+                        ErrorMessages.ERROR_PREFIX_CONFLICT + e.getMessage()));
             } catch (IOException e) {
                 responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
-                        request.getSchema().getName(),
-                        "Internal Server Error: Schema creation failed"));
+                        schemaName,
+                        ErrorMessages.ERROR_PREFIX_INTERNAL_SERVER + ErrorMessages.SCHEMA_CREATION_FAILED));
             } catch (Exception e) {
                 responses.add(new com.ssnc.schemaService.dto.SchemaImportResponse(
-                        request.getSchema().getName(),
-                        "Error: " + e.getMessage()));
+                        schemaName,
+                        ErrorMessages.ERROR_PREFIX_ERROR + e.getMessage()));
             }
         }
 
@@ -334,16 +338,16 @@ public class SchemaService {
 
         // Find schema
         Schm schema = schmRepository.findBySchmId(schmId)
-                .orElseThrow(() -> new IllegalArgumentException("Schema not found with ID: " + schmId));
+                .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND_BY_ID, schmId)));
 
         // Check if schema has published version
         if (schema.getPublishVersion() == null) {
-            throw new IllegalStateException("Schema does not have a published version: " + schema.getSchmName());
+            throw new IllegalStateException(String.format(ErrorMessages.SCHEMA_NO_PUBLISHED_VERSION, schema.getSchmName()));
         }
 
         // Get published version content
         String content = getPublishedContent(namespace, schmId)
-                .orElseThrow(() -> new IllegalStateException("Published content not found for schema: " + schema.getSchmName()));
+                .orElseThrow(() -> new IllegalStateException(String.format(ErrorMessages.SCHEMA_PUBLISHED_CONTENT_NOT_FOUND, schema.getSchmName())));
 
         // Map to export DTO
         com.ssnc.schemaService.dto.SchemaExportDto exportDto = new com.ssnc.schemaService.dto.SchemaExportDto();
@@ -380,10 +384,10 @@ public class SchemaService {
                 } else if (request.getName() != null && !request.getName().isEmpty()) {
                     // Find schema by name
                     Schm schema = schmRepository.findBySchmName(request.getName())
-                            .orElseThrow(() -> new IllegalArgumentException("Schema not found with name: " + request.getName()));
+                            .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND_BY_NAME, request.getName())));
                     schmId = schema.getSchmId();
                 } else {
-                    throw new IllegalArgumentException("Either schmId or name must be provided");
+                    throw new IllegalArgumentException(ErrorMessages.SCHEMA_ID_OR_NAME_REQUIRED);
                 }
 
                 // Export schema
@@ -395,19 +399,19 @@ public class SchemaService {
                                    (request.getSchmId() != null ? request.getSchmId().toString() : "Unknown");
                 responses.add(new com.ssnc.schemaService.dto.SchemaExportResponse(
                         schemaName,
-                        "Not Found: " + e.getMessage()));
+                        ErrorMessages.ERROR_PREFIX_NOT_FOUND + e.getMessage()));
             } catch (IllegalStateException e) {
                 String schemaName = request.getName() != null ? request.getName() :
                                    (request.getSchmId() != null ? request.getSchmId().toString() : "Unknown");
                 responses.add(new com.ssnc.schemaService.dto.SchemaExportResponse(
                         schemaName,
-                        "Error: " + e.getMessage()));
+                        ErrorMessages.ERROR_PREFIX_ERROR + e.getMessage()));
             } catch (Exception e) {
                 String schemaName = request.getName() != null ? request.getName() :
                                    (request.getSchmId() != null ? request.getSchmId().toString() : "Unknown");
                 responses.add(new com.ssnc.schemaService.dto.SchemaExportResponse(
                         schemaName,
-                        "Error: " + e.getMessage()));
+                        ErrorMessages.ERROR_PREFIX_ERROR + e.getMessage()));
             }
         }
 
