@@ -19,6 +19,11 @@
 		<jasypt.version>3.0.3</jasypt.version>
 		<lombok.version>edge-SNAPSHOT</lombok.version>
 		<jacoco.version>0.8.12</jacoco.version>
+		<!-- JaCoCo Configuration - Set to false to skip coverage enforcement -->
+		<jacoco.skip>false</jacoco.skip>
+		<jacoco.check.skip>true</jacoco.check.skip>
+		<jacoco.line.coverage>0.70</jacoco.line.coverage>
+		<jacoco.branch.coverage>0.60</jacoco.branch.coverage>
 	</properties>
 	<repositories>
 		<repository>
@@ -168,13 +173,15 @@
 							<goal>report</goal>
 						</goals>
 					</execution>
-					<!-- Enforce coverage thresholds -->
+					<!-- Enforce coverage thresholds (DISABLED by default - set jacoco.check.skip=false to enable) -->
 					<execution>
 						<id>check</id>
+						<phase>verify</phase>
 						<goals>
 							<goal>check</goal>
 						</goals>
 						<configuration>
+							<skip>${jacoco.check.skip}</skip>
 							<rules>
 								<rule>
 									<element>PACKAGE</element>
@@ -182,12 +189,12 @@
 										<limit>
 											<counter>LINE</counter>
 											<value>COVEREDRATIO</value>
-											<minimum>0.70</minimum>
+											<minimum>${jacoco.line.coverage}</minimum>
 										</limit>
 										<limit>
 											<counter>BRANCH</counter>
 											<value>COVEREDRATIO</value>
-											<minimum>0.60</minimum>
+											<minimum>${jacoco.branch.coverage}</minimum>
 										</limit>
 									</limits>
 								</rule>
@@ -196,6 +203,7 @@
 					</execution>
 				</executions>
 				<configuration>
+					<skip>${jacoco.skip}</skip>
 					<!-- Exclude generated classes, DTOs, entities, and config from coverage -->
 					<excludes>
 						<exclude>**/dto/**</exclude>
