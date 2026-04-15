@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -84,6 +85,9 @@ public class ExternalReferenceService {
 
         return extRefs.stream()
                 .map(this::mapToDto)
+                .sorted(Comparator.comparing(
+                        ExtRefDto::getExtRefName,
+                        Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)))
                 .collect(Collectors.toList());
     }
 
@@ -133,6 +137,9 @@ public class ExternalReferenceService {
 
         return schemas.stream()
                 .map(this::mapSchmToDto)
+                .sorted(Comparator.comparing(
+                        SchemaDto::getName,
+                        Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)))
                 .collect(Collectors.toList());
     }
 

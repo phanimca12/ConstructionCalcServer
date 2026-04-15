@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -145,6 +146,9 @@ public class TenantService {
     public List<TenantDto> getAllTenants() {
         return tenantRepository.findAll().stream()
                 .map(this::mapToTenantDto)
+                .sorted(Comparator.comparing(
+                        TenantDto::getName,
+                        Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
     }
 

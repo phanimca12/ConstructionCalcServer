@@ -116,8 +116,9 @@ class NameSpaceServiceTest {
 
         assertNotNull(result);
         assertEquals(2, result.size());
-        assertEquals(testNamespaceName, result.get(0).getName());
-        assertEquals("namespace2", result.get(1).getName());
+        // Results are sorted alphabetically (case-insensitive): "namespace2" comes before "testNamespace"
+        assertEquals("namespace2", result.get(0).getName());
+        assertEquals(testNamespaceName, result.get(1).getName());
         verify(nameSpaceRepository).findAll();
     }
 
