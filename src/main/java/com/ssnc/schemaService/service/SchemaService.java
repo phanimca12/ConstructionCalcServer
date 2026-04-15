@@ -781,7 +781,9 @@ public class SchemaService {
         // Map to DTOs
         List<ExtRefDto> extRefDtos = extRefs.stream()
                 .map(this::mapExtRefToDto)
-                .sorted((dto1, dto2) -> String.CASE_INSENSITIVE_ORDER.compare(dto1.getExtRefName(), dto2.getExtRefName()))
+                .sorted(Comparator.comparing(
+                        ExtRefDto::getExtRefName,
+                        Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)))
                 .collect(Collectors.toList());
 
         // Apply pagination manually

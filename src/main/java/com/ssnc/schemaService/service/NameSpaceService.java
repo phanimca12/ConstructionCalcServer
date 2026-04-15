@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -178,7 +179,9 @@ public class NameSpaceService {
     public List<NameSpaceDto> getAllNameSpaces() {
         return nameSpaceRepository.findAll().stream()
                 .map(this::mapToNameSpaceDto)
-                .sorted((dto1, dto2) -> String.CASE_INSENSITIVE_ORDER.compare(dto1.getName(), dto2.getName()))
+                .sorted(Comparator.comparing(
+                        NameSpaceDto::getName,
+                        Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
     }
 }
