@@ -145,6 +145,7 @@ public class TenantService {
     public List<TenantDto> getAllTenants() {
         return tenantRepository.findAll().stream()
                 .map(this::mapToTenantDto)
+                .sorted((dto1, dto2) -> String.CASE_INSENSITIVE_ORDER.compare(dto1.getName(), dto2.getName()))
                 .toList();
     }
 

@@ -160,7 +160,7 @@ public class SchemaService {
     private Comparator<SchemaDto> getSortComparator(String sort) {
         if (sort == null) {
             return Comparator.comparing(SchemaDto::getName,
-                    Comparator.nullsFirst(Comparator.naturalOrder()));
+                    Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER));
         }
 
         switch (sort) {
@@ -172,13 +172,13 @@ public class SchemaService {
                         Comparator.nullsLast(Comparator.reverseOrder()));
             case AppConstants.SORT_NAME_ASC:
                 return Comparator.comparing(SchemaDto::getName,
-                        Comparator.nullsFirst(Comparator.naturalOrder()));
+                        Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER));
             case AppConstants.SORT_NAME_DESC:
                 return Comparator.comparing(SchemaDto::getName,
-                        Comparator.nullsFirst(Comparator.naturalOrder())).reversed();
+                        Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)).reversed();
             default:
                 return Comparator.comparing(SchemaDto::getName,
-                        Comparator.nullsFirst(Comparator.naturalOrder()));
+                        Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER));
         }
    }
 
@@ -781,6 +781,7 @@ public class SchemaService {
         // Map to DTOs
         List<ExtRefDto> extRefDtos = extRefs.stream()
                 .map(this::mapExtRefToDto)
+                .sorted((dto1, dto2) -> String.CASE_INSENSITIVE_ORDER.compare(dto1.getExtRefName(), dto2.getExtRefName()))
                 .collect(Collectors.toList());
 
         // Apply pagination manually

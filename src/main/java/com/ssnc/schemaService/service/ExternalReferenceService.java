@@ -84,6 +84,7 @@ public class ExternalReferenceService {
 
         return extRefs.stream()
                 .map(this::mapToDto)
+                .sorted((dto1, dto2) -> String.CASE_INSENSITIVE_ORDER.compare(dto1.getExtRefName(), dto2.getExtRefName()))
                 .collect(Collectors.toList());
     }
 
@@ -133,6 +134,7 @@ public class ExternalReferenceService {
 
         return schemas.stream()
                 .map(this::mapSchmToDto)
+                .sorted((dto1, dto2) -> String.CASE_INSENSITIVE_ORDER.compare(dto1.getName(), dto2.getName()))
                 .collect(Collectors.toList());
     }
 

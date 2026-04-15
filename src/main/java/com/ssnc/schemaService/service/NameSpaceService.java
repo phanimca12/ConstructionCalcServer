@@ -178,6 +178,7 @@ public class NameSpaceService {
     public List<NameSpaceDto> getAllNameSpaces() {
         return nameSpaceRepository.findAll().stream()
                 .map(this::mapToNameSpaceDto)
+                .sorted((dto1, dto2) -> String.CASE_INSENSITIVE_ORDER.compare(dto1.getName(), dto2.getName()))
                 .toList();
     }
 }
