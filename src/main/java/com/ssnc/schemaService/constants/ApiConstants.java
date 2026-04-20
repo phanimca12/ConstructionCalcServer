@@ -75,6 +75,7 @@ public final class ApiConstants {
     public static final String QUERY_PARAM_VERSION_MODIFIED_BY_USER = "versionModifiedByUser";
     public static final String QUERY_PARAM_WITH_VERSION = "withVersion";
     public static final String QUERY_PARAM_VERSION_NUMBER = "versionNumber";
+    public static final String QUERY_PARAM_UNPAGED = "unpaged";
 
     /**
      * Request part names (multipart form data)

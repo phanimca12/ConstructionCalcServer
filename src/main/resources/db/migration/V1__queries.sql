@@ -34,6 +34,7 @@
         content_type VARCHAR(128),
         schm_group varchar(256),
         publish_version integer,
+        draft_version integer,
         lock_by varchar(256),
         created_by varchar(256),
         updated_by varchar(256),

@@ -43,6 +43,9 @@ class SchmTest {
         schm.setPublishVersion(1);
         assertEquals(1, schm.getPublishVersion());
 
+        schm.setDraftVersion(2);
+        assertEquals(2, schm.getDraftVersion());
+
         schm.setLockBy("testUser");
         assertEquals("testUser", schm.getLockBy());
 
@@ -95,6 +98,7 @@ class SchmTest {
         assertNull(schm.getSchmName());
         assertNull(schm.getSchemaType());
         assertNull(schm.getPublishVersion());
+        assertNull(schm.getDraftVersion());
     }
 
     @Test
@@ -127,5 +131,21 @@ class SchmTest {
 
         schm.setLockBy(null);
         assertNull(schm.getLockBy());
+    }
+
+    @Test
+    void testDraftVersionUpdate() {
+        Schm schm = new Schm();
+
+        assertNull(schm.getDraftVersion());
+
+        schm.setDraftVersion(1);
+        assertEquals(1, schm.getDraftVersion());
+
+        schm.setDraftVersion(2);
+        assertEquals(2, schm.getDraftVersion());
+
+        schm.setDraftVersion(null);
+        assertNull(schm.getDraftVersion());
     }
 }

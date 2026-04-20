@@ -54,6 +54,9 @@ public class Schm {
     @Column(name = "PUBLISH_VERSION")
     private Integer publishVersion;
 
+    @Column(name = "DRAFT_VERSION")
+    private Integer draftVersion;
+
     @Column(name = "LOCK_BY", length = 256)
     private String lockBy;
 
