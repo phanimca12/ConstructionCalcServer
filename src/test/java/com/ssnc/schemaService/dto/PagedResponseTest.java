@@ -21,7 +21,7 @@ class PagedResponseTest {
         PagedResponse<String> response = new PagedResponse<>(
                 content, 100L, 10, 0, 10, true, false);
 
-        assertEquals(content, response.getContent());
+        assertEquals(content, response.getSchemas());
         assertEquals(100L, response.getTotalElements());
         assertEquals(10, response.getTotalPages());
         assertEquals(0, response.getCurrentPage());
@@ -35,7 +35,7 @@ class PagedResponseTest {
         PagedResponse<String> response = new PagedResponse<>();
         List<String> content = Arrays.asList("test");
 
-        response.setContent(content);
+        response.setSchemas(content);
         response.setTotalElements(50L);
         response.setTotalPages(5);
         response.setCurrentPage(2);
@@ -43,7 +43,7 @@ class PagedResponseTest {
         response.setHasNext(true);
         response.setHasPrevious(true);
 
-        assertEquals(content, response.getContent());
+        assertEquals(content, response.getSchemas());
         assertEquals(50L, response.getTotalElements());
         assertEquals(5, response.getTotalPages());
         assertEquals(2, response.getCurrentPage());

@@ -10,7 +10,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PagedResponse<T> {
-    private List<T> content;
+    private List<T> schemas;
     private long totalElements;
     private int totalPages;
     private int currentPage;

@@ -67,9 +67,8 @@ public class SchemaController {
         Page<SchemaDto> page = schemaService.getSchemas(
                 nameSpace, name, type, group, modifiedByUser, versionModifiedByUser, sort, withVersion, effectivePageable);
 
-        List<SchemaDto> schemas = page.getContent();
         PagedResponse<SchemaDto> response = new PagedResponse<>(
-                schemas,
+                page.getContent(),
                 page.getTotalElements(),
                 page.getTotalPages(),
                 page.getNumber(),

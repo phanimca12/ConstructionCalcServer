@@ -76,8 +76,8 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(schemas, response.getBody().getContent());
-        assertEquals(1, response.getBody().getContent().size());
+        assertEquals(schemas, response.getBody().getSchemas());
+        assertEquals(1, response.getBody().getSchemas().size());
         assertEquals(1, response.getBody().getTotalElements());
         assertEquals(1, response.getBody().getTotalPages());
         assertEquals(0, response.getBody().getCurrentPage());
@@ -101,7 +101,7 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(schemas, response.getBody().getContent());
+        assertEquals(schemas, response.getBody().getSchemas());
         verify(schemaService).getSchemas(testNamespace, "testSchema", "FormData", "group1", "user1", null, "nameAsc", "none", pageable);
     }
 
@@ -119,7 +119,7 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(schemas, response.getBody().getContent());
+        assertEquals(schemas, response.getBody().getSchemas());
         verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, "versionUpdateDesc", "latest", pageable);
     }
 
@@ -386,10 +386,10 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(schemas, response.getBody().getContent());
-        assertEquals(1, response.getBody().getContent().size());
-        assertNotNull(response.getBody().getContent().get(0).getVersion());
-        assertTrue(response.getBody().getContent().get(0).getVersion().getIsDraft());
+        assertEquals(schemas, response.getBody().getSchemas());
+        assertEquals(1, response.getBody().getSchemas().size());
+        assertNotNull(response.getBody().getSchemas().get(0).getVersion());
+        assertTrue(response.getBody().getSchemas().get(0).getVersion().getIsDraft());
         verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "draft", pageable);
     }
 
@@ -419,10 +419,10 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(schemas, response.getBody().getContent());
-        assertEquals(1, response.getBody().getContent().size());
-        assertNotNull(response.getBody().getContent().get(0).getVersion());
-        assertFalse(response.getBody().getContent().get(0).getVersion().getIsDraft());
+        assertEquals(schemas, response.getBody().getSchemas());
+        assertEquals(1, response.getBody().getSchemas().size());
+        assertNotNull(response.getBody().getSchemas().get(0).getVersion());
+        assertFalse(response.getBody().getSchemas().get(0).getVersion().getIsDraft());
         verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "published", pageable);
     }
 
@@ -453,10 +453,10 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(schemas, response.getBody().getContent());
-        assertEquals(1, response.getBody().getContent().size());
-        assertNotNull(response.getBody().getContent().get(0).getVersion());
-        assertEquals(2, response.getBody().getContent().get(0).getVersion().getVersionNumber());
+        assertEquals(schemas, response.getBody().getSchemas());
+        assertEquals(1, response.getBody().getSchemas().size());
+        assertNotNull(response.getBody().getSchemas().get(0).getVersion());
+        assertEquals(2, response.getBody().getSchemas().get(0).getVersion().getVersionNumber());
         verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "latest", pageable);
     }
 
@@ -474,7 +474,7 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(schemas, response.getBody().getContent());
+        assertEquals(schemas, response.getBody().getSchemas());
         verify(schemaService).getSchemas(testNamespace, null, null, null, "john.doe", null, null, "none", pageable);
     }
 
@@ -492,7 +492,7 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(schemas, response.getBody().getContent());
+        assertEquals(schemas, response.getBody().getSchemas());
         verify(schemaService).getSchemas(testNamespace, null, null, null, null, "jane.smith", null, "none", pageable);
     }
 
@@ -866,9 +866,9 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(3, response.getBody().getContent().size());
+        assertEquals(3, response.getBody().getSchemas().size());
         assertEquals(3, response.getBody().getTotalElements());
-        assertEquals(allSchemas, response.getBody().getContent());
+        assertEquals(allSchemas, response.getBody().getSchemas());
         verify(schemaService).getSchemas(testNamespace, null, null, null, null, null, null, "none", Pageable.unpaged());
     }
 
@@ -895,7 +895,7 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(2, response.getBody().getContent().size());
+        assertEquals(2, response.getBody().getSchemas().size());
         assertEquals(2, response.getBody().getTotalElements());
         verify(schemaService).getSchemas(testNamespace, "Filtered", "FormData", "group1", null, null, null, "none", Pageable.unpaged());
     }
