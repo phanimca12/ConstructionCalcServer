@@ -18,7 +18,7 @@
 		<schemaservice.version>1.0</schemaservice.version>
 		<jasypt.version>3.0.5</jasypt.version>
 		<lombok.version>edge-SNAPSHOT</lombok.version>
-		<jacoco.version>0.8.12</jacoco.version>
+		<jacoco.version>0.8.14</jacoco.version>
 		<!-- JaCoCo Configuration - Set to false to skip coverage enforcement -->
 		<jacoco.skip>false</jacoco.skip>
 		<jacoco.check.skip>true</jacoco.check.skip>
