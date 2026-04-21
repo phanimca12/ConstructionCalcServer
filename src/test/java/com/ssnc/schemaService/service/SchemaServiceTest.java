@@ -258,7 +258,7 @@ class SchemaServiceTest {
 
     @Test
     void testUpdateSchema_SetsUserFromJwtContext() {
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
         SchemaDto updateDto = new SchemaDto();
@@ -275,7 +275,7 @@ class SchemaServiceTest {
 
     @Test
     void testUpdateSchema_NotFound_ThrowsException() {
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.empty());
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.empty());
 
         SchemaDto updateDto = new SchemaDto();
         updateDto.setDescription("Updated Description");
@@ -290,7 +290,7 @@ class SchemaServiceTest {
     @Test
     void testUpdateDraftContent_CreatesNewVersion_WithJwtUser() {
         testSchm.setDraftVersion(null);
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(testSchmId))
                 .thenReturn(Optional.empty());
 
@@ -332,7 +332,7 @@ class SchemaServiceTest {
         existingDraft.setSchmData("old content");
 
         testSchm.setDraftVersion(1);
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmDataRepository.findById(id)).thenReturn(Optional.of(existingDraft));
         when(schmDataRepository.save(any(SchmData.class))).thenReturn(existingDraft);
 
@@ -355,7 +355,7 @@ class SchemaServiceTest {
         schemaData.setId(id);
         schemaData.setIsDraft(true);
 
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(schemaData));
         when(schmDataRepository.save(any(SchmData.class))).thenReturn(schemaData);
         when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
@@ -370,7 +370,7 @@ class SchemaServiceTest {
     @Test
     void testPublishSchemaVersion_AlreadyPublished_ThrowsException() {
         testSchm.setPublishVersion(1);
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
         assertThrows(IllegalStateException.class, () ->
                 schemaService.publishSchemaVersion(testNamespace, testSchmId, 1)
@@ -379,7 +379,7 @@ class SchemaServiceTest {
 
     @Test
     void testPublishSchemaVersion_VersionNotFound_ThrowsException() {
-        when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.empty());
 
         assertThrows(IllegalArgumentException.class, () ->
@@ -1027,9 +1027,11 @@ class SchemaServiceTest {
 
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
 
-            // Mock publishSchemaVersion internal calls
-            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            // Mock publishSchemaVersion internal calls - uses findWithLockBySchmId
+            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
             when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+            // Mock for refresh after import
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
             SchemaDto result = schemaService.importSchema(testNamespace, testSchemaDto, content);
 
@@ -1123,8 +1125,10 @@ class SchemaServiceTest {
 
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
 
-            // Mock findBySchmId for publishSchemaVersion
+            // Mock findBySchmId for createSchemaDataFromFile
             when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            // Mock findWithLockBySchmId for publishSchemaVersion
+            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
             // Version not found during publish step - publishSchemaVersion will throw
             when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.empty());
 
@@ -1161,8 +1165,10 @@ class SchemaServiceTest {
 
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
 
-            // Mock findBySchmId for publishSchemaVersion
+            // Mock findBySchmId for createSchemaDataFromFile
             when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            // Mock findWithLockBySchmId for publishSchemaVersion
+            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
             when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
 
             // Simulate failure during publish step - second save in publishSchemaVersion
@@ -1261,9 +1267,11 @@ class SchemaServiceTest {
             savedSchmData.setIsDraft(true);
 
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
-            // Mock publishSchemaVersion calls
-            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            // Mock publishSchemaVersion calls - uses findWithLockBySchmId
+            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
             when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+            // Mock for refresh after import
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
             SchemaDto result = schemaService.importSchema(testNamespace, testSchemaDto, content);
 
@@ -1315,9 +1323,11 @@ class SchemaServiceTest {
             savedSchmData.setIsDraft(true);
 
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
-            // Mock publishSchemaVersion calls
-            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            // Mock publishSchemaVersion calls - uses findWithLockBySchmId
+            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
             when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+            // Mock for refresh after import
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
             // Should succeed - same name in different tenant is allowed
             SchemaDto result = schemaService.importSchema(testNamespace, testSchemaDto, content);
@@ -1351,19 +1361,24 @@ class SchemaServiceTest {
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
             when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
 
-            // First call for createSchemaDataFromFile, second for publishSchemaVersion, third for refresh fails
+            // Mock for createSchemaDataFromFile and refresh
             when(schmRepository.findBySchmId(testSchmId))
                     .thenReturn(Optional.of(testSchm))  // First call during createSchemaDataFromFile
-                    .thenReturn(Optional.of(testSchm))  // Second call during publishSchemaVersion
-                    .thenReturn(Optional.empty());       // Third call during refresh fails
+                    .thenReturn(Optional.empty());       // Second call during refresh fails
+
+            // Mock for publishSchemaVersion which uses findWithLockBySchmId
+            when(schmRepository.findWithLockBySchmId(testSchmId))
+                    .thenReturn(Optional.of(testSchm));
 
             IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
                     schemaService.importSchema(testNamespace, testSchemaDto, content)
             );
 
             assertEquals("Schema not found immediately after import - possible data corruption", exception.getMessage());
-            // Verify findBySchmId was called at least 3 times (createSchemaData + publish + refresh attempt)
-            verify(schmRepository, atLeast(3)).findBySchmId(testSchmId);
+            // Verify findBySchmId was called at least 2 times (createSchemaData + refresh attempt)
+            verify(schmRepository, atLeast(2)).findBySchmId(testSchmId);
+            // Verify findWithLockBySchmId was called during publish
+            verify(schmRepository).findWithLockBySchmId(testSchmId);
         }
     }
 
@@ -1401,9 +1416,11 @@ class SchemaServiceTest {
             savedSchmData.setIsDraft(true);
 
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
-            // Mock publishSchemaVersion calls
-            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+            // Mock publishSchemaVersion calls - uses findWithLockBySchmId
+            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
             when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
+            // Mock for refresh after import
+            when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
             // Should succeed - same name in different namespace is allowed
             SchemaDto result = schemaService.importSchema(testNamespace, testSchemaDto, content);
@@ -1553,6 +1570,7 @@ class SchemaServiceTest {
             when(schmRepository.findByTenantIdAndNmspcIdAndSchmName(any(), any(), any())).thenReturn(Optional.empty());
             when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
             when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(any())).thenReturn(Optional.empty());
+            // Mock for refresh after import
             when(schmRepository.findBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
 
             SchmDataId id = new SchmDataId();
@@ -1563,6 +1581,8 @@ class SchemaServiceTest {
             savedSchmData.setId(id);
             savedSchmData.setIsDraft(true);
             when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+            // Mock publishSchemaVersion - uses findWithLockBySchmId
+            when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
             when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(savedSchmData));
 
             com.ssnc.schemaService.dto.SchemaImportRequest request = new com.ssnc.schemaService.dto.SchemaImportRequest();

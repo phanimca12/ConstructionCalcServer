@@ -511,8 +511,9 @@ public class SchemaService {
     public SchemaDto updateSchema(String namespace, UUID schmId, SchemaDto schemaDto) {
         namespaceFilterManager.enableIfPresent(namespace);
 
+        // Use pessimistic locking to prevent lost updates during concurrent modifications
         // Fetch existing entity - schmName is non-editable and always from DB
-        Schm existing = schmRepository.findBySchmId(schmId)
+        Schm existing = schmRepository.findWithLockBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
 
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
@@ -545,8 +546,10 @@ public class SchemaService {
     @Transactional
     public void publishSchemaVersion(String namespace, UUID schmId, Integer versionNumber) {
         namespaceFilterManager.enableIfPresent(namespace);
-        //Verify schema exists before trying to publish version
-        Optional<Schm> schemaOpt = schmRepository.findBySchmId(schmId);
+
+        // Use pessimistic locking to prevent race conditions during publish
+        // This ensures the read-modify-write sequence is atomic
+        Optional<Schm> schemaOpt = schmRepository.findWithLockBySchmId(schmId);
         if(schemaOpt.isPresent()){
             Schm schema = schemaOpt.get();
             if (schema.getPublishVersion() != null && schema.getPublishVersion().equals(versionNumber)) {
@@ -666,7 +669,9 @@ public class SchemaService {
     public SchemaVersionDto updateDraftContent(String namespace, UUID schmId, String content) {
         namespaceFilterManager.enableIfPresent(namespace);
 
-        Schm schema = schmRepository.findBySchmId(schmId)
+        // Use pessimistic locking to prevent race conditions during draft updates
+        // This ensures the read-modify-write sequence is atomic
+        Schm schema = schmRepository.findWithLockBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
 
         Optional<SchmData> draftOpt = Optional.empty();
