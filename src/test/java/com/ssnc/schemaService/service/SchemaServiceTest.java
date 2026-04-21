@@ -355,6 +355,9 @@ class SchemaServiceTest {
         schemaData.setId(id);
         schemaData.setIsDraft(true);
 
+        // Set draft version to 1 (the version we're publishing)
+        testSchm.setDraftVersion(1);
+
         when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         when(schmRepository.getSchemaVersion(testSchmId, 1)).thenReturn(Optional.of(schemaData));
         when(schmDataRepository.save(any(SchmData.class))).thenReturn(schemaData);
@@ -363,6 +366,7 @@ class SchemaServiceTest {
         schemaService.publishSchemaVersion(testNamespace, testSchmId, 1);
 
         verify(schmDataRepository).save(argThat(sd -> !sd.getIsDraft()));
+        // Draft version should be cleared since we're publishing the current draft (version 1)
         verify(schmRepository).save(argThat(schm ->
                 schm.getPublishVersion().equals(1) && schm.getDraftVersion() == null));
     }
@@ -385,6 +389,33 @@ class SchemaServiceTest {
         assertThrows(IllegalArgumentException.class, () ->
                 schemaService.publishSchemaVersion(testNamespace, testSchmId, 1)
         );
+    }
+
+    @Test
+    void testPublishSchemaVersion_PublishOlderVersion_PreservesDraft() {
+        // Scenario: Schema has draft_version=3, user publishes version 2 (older version)
+        // Expected: draft_version should remain 3 (not be cleared)
+        SchmDataId id = new SchmDataId();
+        id.setSchmId(testSchmId);
+        id.setSchmVersion(2);
+
+        SchmData schemaData = new SchmData();
+        schemaData.setId(id);
+        schemaData.setIsDraft(false);  // Version 2 is not a draft
+
+        // Set draft version to 3 (newer unpublished work)
+        testSchm.setDraftVersion(3);
+
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getSchemaVersion(testSchmId, 2)).thenReturn(Optional.of(schemaData));
+        when(schmDataRepository.save(any(SchmData.class))).thenReturn(schemaData);
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        schemaService.publishSchemaVersion(testNamespace, testSchmId, 2);
+
+        // Verify draft version 3 is preserved (not cleared)
+        verify(schmRepository).save(argThat(schm ->
+                schm.getPublishVersion().equals(2) && schm.getDraftVersion().equals(3)));
     }
 
     @Test

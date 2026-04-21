@@ -565,8 +565,11 @@ public class SchemaService {
                 schmDataRepository.save(schemaData);
 
                 schema.setPublishVersion(versionNumber);
-                // Clear draft version when publishing
-                schema.setDraftVersion(null);
+                // Only clear draft version if we're publishing the current draft
+                // This prevents orphaning draft work when publishing an older version
+                if (schema.getDraftVersion() != null && schema.getDraftVersion().equals(versionNumber)) {
+                    schema.setDraftVersion(null);
+                }
                 schmRepository.save(schema);
             } else {
                 throw new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_VERSION_NOT_FOUND, versionNumber, schmId));
