@@ -3,6 +3,7 @@ package com.ssnc.schemaService.controller;
 import com.ssnc.schemaService.constants.ApiConstants;
 import com.ssnc.schemaService.constants.ErrorMessages;
 import com.ssnc.schemaService.dto.ExtRefDto;
+import com.ssnc.schemaService.dto.PagedResponse;
 import com.ssnc.schemaService.dto.SchemaDto;
 import com.ssnc.schemaService.dto.SchemaExportDto;
 import com.ssnc.schemaService.dto.SchemaExportRequest;
@@ -44,11 +45,12 @@ public class SchemaController {
      * @param versionModifiedByUser - Optional version modified by user filter
      * @param sort - Optional sort parameter
      * @param withVersion - Optional version filter (none, draft, published)
+     * @param unpaged - Optional flag to retrieve all records without pagination (default: false)
      * @param pageable - Pagination parameters (page, size, sort)
-     * @return List of schemas (without pagination metadata)
+     * @return Paginated response with schemas and metadata (totalElements, totalPages, etc.)
      */
     @GetMapping
-    public ResponseEntity<List<SchemaDto>> getSchemas(
+    public ResponseEntity<PagedResponse<SchemaDto>> getSchemas(
             @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
             @RequestParam(value = ApiConstants.QUERY_PARAM_NAME, required = false) String name,
             @RequestParam(value = ApiConstants.QUERY_PARAM_TYPE, required = false) String type,
@@ -57,10 +59,25 @@ public class SchemaController {
             @RequestParam(value = ApiConstants.QUERY_PARAM_VERSION_MODIFIED_BY_USER, required = false) String versionModifiedByUser,
             @RequestParam(value = ApiConstants.QUERY_PARAM_SORT, required = false) String sort,
             @RequestParam(value = ApiConstants.QUERY_PARAM_WITH_VERSION, required = false, defaultValue = ApiConstants.DEFAULT_WITH_VERSION) String withVersion,
+            @RequestParam(value = ApiConstants.QUERY_PARAM_UNPAGED, required = false, defaultValue = "false") boolean unpaged,
             Pageable pageable) {
-        Page<SchemaDto> schemas = schemaService.getSchemas(
-                nameSpace, name, type, group, modifiedByUser, versionModifiedByUser, sort, withVersion, pageable);
-        return ResponseEntity.ok(schemas.getContent());
+
+        Pageable effectivePageable = unpaged ? Pageable.unpaged() : pageable;
+
+        Page<SchemaDto> page = schemaService.getSchemas(
+                nameSpace, name, type, group, modifiedByUser, versionModifiedByUser, sort, withVersion, effectivePageable);
+
+        PagedResponse<SchemaDto> response = new PagedResponse<>(
+                page.getContent(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.getNumber(),
+                page.getSize(),
+                page.hasNext(),
+                page.hasPrevious()
+        );
+
+        return ResponseEntity.ok(response);
     }
 
     /**

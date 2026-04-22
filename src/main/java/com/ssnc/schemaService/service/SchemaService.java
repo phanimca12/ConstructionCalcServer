@@ -112,6 +112,10 @@ public class SchemaService {
                 .collect(Collectors.toList());
 
         // Apply pagination manually (since filtering/sorting happens in Java)
+        if (pageable.isUnpaged()) {
+            return new PageImpl<>(filteredSchemas, pageable, filteredSchemas.size());
+        }
+
         // SECURITY: Validate offset to prevent integer overflow DoS attack
         long offset = pageable.getOffset();
         if (offset < 0 || offset > Integer.MAX_VALUE) {
@@ -507,8 +511,9 @@ public class SchemaService {
     public SchemaDto updateSchema(String namespace, UUID schmId, SchemaDto schemaDto) {
         namespaceFilterManager.enableIfPresent(namespace);
 
+        // Use pessimistic locking to prevent lost updates during concurrent modifications
         // Fetch existing entity - schmName is non-editable and always from DB
-        Schm existing = schmRepository.findBySchmId(schmId)
+        Schm existing = schmRepository.findWithLockBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
 
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
@@ -541,8 +546,10 @@ public class SchemaService {
     @Transactional
     public void publishSchemaVersion(String namespace, UUID schmId, Integer versionNumber) {
         namespaceFilterManager.enableIfPresent(namespace);
-        //Verify schema exists before trying to publish version
-        Optional<Schm> schemaOpt = schmRepository.findBySchmId(schmId);
+
+        // Use pessimistic locking to prevent race conditions during publish
+        // This ensures the read-modify-write sequence is atomic
+        Optional<Schm> schemaOpt = schmRepository.findWithLockBySchmId(schmId);
         if(schemaOpt.isPresent()){
             Schm schema = schemaOpt.get();
             if (schema.getPublishVersion() != null && schema.getPublishVersion().equals(versionNumber)) {
@@ -558,6 +565,11 @@ public class SchemaService {
                 schmDataRepository.save(schemaData);
 
                 schema.setPublishVersion(versionNumber);
+                // Only clear draft version if we're publishing the current draft
+                // This prevents orphaning draft work when publishing an older version
+                if (schema.getDraftVersion() != null && schema.getDraftVersion().equals(versionNumber)) {
+                    schema.setDraftVersion(null);
+                }
                 schmRepository.save(schema);
             } else {
                 throw new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_VERSION_NOT_FOUND, versionNumber, schmId));
@@ -608,7 +620,14 @@ public class SchemaService {
      */
     public Optional<SchemaVersionDto> getDraftVersion(String namespace, UUID schmId) {
         namespaceFilterManager.enableIfPresent(namespace);
-        return schmDataRepository.findByIdSchmIdAndIsDraft(schmId, true)
+        return schmRepository.findBySchmId(schmId)
+                .flatMap(schema -> {
+                    if (schema.getDraftVersion() != null) {
+                        return schmDataRepository.findById(
+                                new SchmDataId(schmId, schema.getDraftVersion()));
+                    }
+                    return Optional.empty();
+                })
                 .map(this::mapToVersionResponse);
     }
 
@@ -635,7 +654,14 @@ public class SchemaService {
      */
     public Optional<String> getDraftContent(String namespace, UUID schmId) {
         namespaceFilterManager.enableIfPresent(namespace);
-        return schmDataRepository.findByIdSchmIdAndIsDraft(schmId, true)
+        return schmRepository.findBySchmId(schmId)
+                .flatMap(schema -> {
+                    if (schema.getDraftVersion() != null) {
+                        return schmDataRepository.findById(
+                                new SchmDataId(schmId, schema.getDraftVersion()));
+                    }
+                    return Optional.empty();
+                })
                 .map(SchmData::getSchmData);
     }
 
@@ -646,7 +672,16 @@ public class SchemaService {
     public SchemaVersionDto updateDraftContent(String namespace, UUID schmId, String content) {
         namespaceFilterManager.enableIfPresent(namespace);
 
-        Optional<SchmData> draftOpt = schmDataRepository.findByIdSchmIdAndIsDraft(schmId, true);
+        // Use pessimistic locking to prevent race conditions during draft updates
+        // This ensures the read-modify-write sequence is atomic
+        Schm schema = schmRepository.findWithLockBySchmId(schmId)
+                .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
+
+        Optional<SchmData> draftOpt = Optional.empty();
+        if (schema.getDraftVersion() != null) {
+            draftOpt = schmDataRepository.findById(
+                    new SchmDataId(schmId, schema.getDraftVersion()));
+        }
 
         if (draftOpt.isPresent()) {
             // Update existing draft
@@ -677,6 +712,11 @@ public class SchemaService {
             newVersion.setUpdatedDatetime(LocalDateTime.now());
 
             SchmData saved = schmDataRepository.save(newVersion);
+
+            // Update draft version in SCHM table
+            schema.setDraftVersion(newId.getSchmVersion());
+            schmRepository.save(schema);
+
             return mapToVersionResponse(saved);
         }
     }
@@ -845,6 +885,12 @@ public class SchemaService {
         newVersion.setCreatedBy(userName);
 
         schmDataRepository.save(newVersion);
+
+        // Update draft version in SCHM table
+        Schm schema = schmRepository.findBySchmId(schmId)
+                .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
+        schema.setDraftVersion(newId.getSchmVersion());
+        schmRepository.save(schema);
     }
 
     /**
@@ -870,9 +916,10 @@ public class SchemaService {
             response.setPublished(schm.getPublishVersion());
         }
 
-        // Set draft version number from SCHM_DATA table where isDraft = Y
-        Optional<SchmData> draftVersion = schmDataRepository.findByIdSchmIdAndIsDraft(schm.getSchmId(), true);
-        draftVersion.ifPresent(draft -> response.setDraft(draft.getId().getSchmVersion()));
+        // Set draft version number from SCHM table
+        if (schm.getDraftVersion() != null) {
+            response.setDraft(schm.getDraftVersion());
+        }
 
         // Populate version object based on withVersion parameter
         if (withVersion != null && !AppConstants.VERSION_NAME_NONE.equalsIgnoreCase(withVersion)) {
@@ -881,7 +928,12 @@ public class SchemaService {
             switch (withVersion.toLowerCase()) {
                 case AppConstants.VERSION_NAME_DRAFT:
                     // Get draft version
-                    versionDto = draftVersion.map(this::mapToVersionResponse).orElse(null);
+                    if (schm.getDraftVersion() != null) {
+                        versionDto = schmDataRepository.findById(
+                                new SchmDataId(schm.getSchmId(), schm.getDraftVersion()))
+                                .map(this::mapToVersionResponse)
+                                .orElse(null);
+                    }
                     break;
 
                 case AppConstants.VERSION_NAME_PUBLISHED:
@@ -896,8 +948,11 @@ public class SchemaService {
 
                 case AppConstants.VERSION_NAME_LATEST:
                     // Get latest version (draft if exists, otherwise published)
-                    if (draftVersion.isPresent()) {
-                        versionDto = mapToVersionResponse(draftVersion.get());
+                    if (schm.getDraftVersion() != null) {
+                        versionDto = schmDataRepository.findById(
+                                new SchmDataId(schm.getSchmId(), schm.getDraftVersion()))
+                                .map(this::mapToVersionResponse)
+                                .orElse(null);
                     } else if (schm.getPublishVersion() != null) {
                         versionDto = schmDataRepository.findById(
                                 new SchmDataId(schm.getSchmId(), schm.getPublishVersion()))
