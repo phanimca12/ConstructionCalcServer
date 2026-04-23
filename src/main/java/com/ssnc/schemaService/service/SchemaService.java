@@ -564,12 +564,21 @@ public class SchemaService {
                 schemaData.setIsDraft(false);
                 schmDataRepository.save(schemaData);
 
+                // Get current user for audit trail
+                String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                        ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+
+                // Update schema: set publish version and optionally clear draft
                 schema.setPublishVersion(versionNumber);
+                schema.setUpdatedBy(userName);
+                // updatedDatetime is automatically set by @UpdateTimestamp
+
                 // Only clear draft version if we're publishing the current draft
                 // This prevents orphaning draft work when publishing an older version
                 if (schema.getDraftVersion() != null && schema.getDraftVersion().equals(versionNumber)) {
                     schema.setDraftVersion(null);
                 }
+
                 schmRepository.save(schema);
             } else {
                 throw new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_VERSION_NOT_FOUND, versionNumber, schmId));
@@ -684,10 +693,20 @@ public class SchemaService {
         }
 
         if (draftOpt.isPresent()) {
-            // Update existing draft
+            // Update existing draft content only (schema draft_version pointer stays the same)
+            String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                    ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+
             SchmData draft = draftOpt.get();
             draft.setSchmData(content);
+            draft.setUpdatedBy(userName);
+            // updatedDatetime is automatically set by @UpdateTimestamp
             SchmData updated = schmDataRepository.save(draft);
+
+            // NOTE: We do NOT save the schema entity here because draft_version didn't change
+            // The schema entity was fetched with pessimistic lock, but we're not modifying it
+            // Hibernate won't auto-flush it because we haven't changed any fields
+
             return mapToVersionResponse(updated);
         } else {
             // Create new version
@@ -713,8 +732,11 @@ public class SchemaService {
 
             SchmData saved = schmDataRepository.save(newVersion);
 
-            // Update draft version in SCHM table
+            // Update draft version in SCHM table WITH audit fields
+            // Creating a new draft IS a schema-level change
             schema.setDraftVersion(newId.getSchmVersion());
+            schema.setUpdatedBy(userName);
+            // updatedDatetime is automatically set by @UpdateTimestamp
             schmRepository.save(schema);
 
             return mapToVersionResponse(saved);
@@ -755,6 +777,8 @@ public class SchemaService {
 
         // Set lock (idempotent if already locked by same user)
         schema.setLockBy(userName);
+        schema.setUpdatedBy(userName);
+        // updatedDatetime is automatically set by @UpdateTimestamp
         schmRepository.save(schema);
     }
 
@@ -787,7 +811,10 @@ public class SchemaService {
                     String.format(ErrorMessages.SCHEMA_UNLOCK_NOT_PERMITTED, schmId, schema.getLockBy()));
         }
 
+        // Clear lock with audit field updates
         schema.setLockBy(null);
+        schema.setUpdatedBy(userName);
+        // updatedDatetime is automatically set by @UpdateTimestamp
         schmRepository.save(schema);
     }
 
@@ -886,10 +913,13 @@ public class SchemaService {
 
         schmDataRepository.save(newVersion);
 
-        // Update draft version in SCHM table
+        // Update draft version in SCHM table WITH audit fields
+        // Creating a new draft IS a schema-level change
         Schm schema = schmRepository.findBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
         schema.setDraftVersion(newId.getSchmVersion());
+        schema.setUpdatedBy(userName);
+        // updatedDatetime is automatically set by @UpdateTimestamp
         schmRepository.save(schema);
     }
 

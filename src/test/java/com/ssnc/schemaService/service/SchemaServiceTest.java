@@ -310,12 +310,18 @@ class SchemaServiceTest {
         SchemaVersionDto result = schemaService.updateDraftContent(testNamespace, testSchmId, content);
 
         assertNotNull(result);
+        // Verify version-level audit fields are set
         verify(schmDataRepository).save(argThat(schmData ->
                 testUserId.equals(schmData.getCreatedBy()) &&
                 testUserId.equals(schmData.getUpdatedBy()) &&
                 content.equals(schmData.getSchmData())
         ));
-        verify(schmRepository).save(argThat(schm -> schm.getDraftVersion() != null && schm.getDraftVersion().equals(1)));
+        // Verify schema-level audit fields are set (creating new draft IS a schema change)
+        verify(schmRepository).save(argThat(schm ->
+                schm.getDraftVersion() != null &&
+                schm.getDraftVersion().equals(1) &&
+                testUserId.equals(schm.getUpdatedBy())  // Schema audit should be updated
+        ));
     }
 
     @Test
@@ -333,16 +339,25 @@ class SchemaServiceTest {
 
         testSchm.setDraftVersion(1);
         when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
-        when(schmDataRepository.findById(id)).thenReturn(Optional.of(existingDraft));
+        // Use argThat to match the SchmDataId with the correct schmId and version
+        when(schmDataRepository.findById(argThat(schmDataId ->
+                schmDataId != null &&
+                testSchmId.equals(schmDataId.getSchmId()) &&
+                Integer.valueOf(1).equals(schmDataId.getSchmVersion())
+        ))).thenReturn(Optional.of(existingDraft));
         when(schmDataRepository.save(any(SchmData.class))).thenReturn(existingDraft);
 
         String newContent = "updated draft content";
         SchemaVersionDto result = schemaService.updateDraftContent(testNamespace, testSchmId, newContent);
 
         assertNotNull(result);
+        // Verify version-level audit fields are updated
         verify(schmDataRepository).save(argThat(schmData ->
-                newContent.equals(schmData.getSchmData())
+                newContent.equals(schmData.getSchmData()) &&
+                testUserId.equals(schmData.getUpdatedBy())  // Version updatedBy should be set
         ));
+        // Verify schema is NOT saved (draft_version pointer didn't change)
+        verify(schmRepository, never()).save(any(Schm.class));
     }
 
     @Test
@@ -367,8 +382,12 @@ class SchemaServiceTest {
 
         verify(schmDataRepository).save(argThat(sd -> !sd.getIsDraft()));
         // Draft version should be cleared since we're publishing the current draft (version 1)
+        // Schema audit should be updated (publish IS a schema-level change)
         verify(schmRepository).save(argThat(schm ->
-                schm.getPublishVersion().equals(1) && schm.getDraftVersion() == null));
+                schm.getPublishVersion().equals(1) &&
+                schm.getDraftVersion() == null &&
+                testUserId.equals(schm.getUpdatedBy())  // Schema audit should be updated
+        ));
     }
 
     @Test
@@ -492,8 +511,10 @@ class SchemaServiceTest {
         schemaService.lockSchema(testNamespace, testSchmId);
 
         verify(schmRepository).findWithLockBySchmId(testSchmId);
+        // Verify schema is saved with lock and audit fields
         verify(schmRepository).save(argThat(schm ->
-                testUserId.equals(schm.getLockBy())
+                testUserId.equals(schm.getLockBy()) &&
+                testUserId.equals(schm.getUpdatedBy())
         ));
         verify(jwtClaimsContext, atLeastOnce()).getUserId();
     }
@@ -508,7 +529,8 @@ class SchemaServiceTest {
 
         verify(schmRepository).findWithLockBySchmId(testSchmId);
         verify(schmRepository).save(argThat(schm ->
-                testUserId.equals(schm.getLockBy())
+                testUserId.equals(schm.getLockBy()) &&
+                testUserId.equals(schm.getUpdatedBy())
         ));
     }
 
@@ -547,7 +569,8 @@ class SchemaServiceTest {
 
         verify(schmRepository).findWithLockBySchmId(testSchmId);
         verify(schmRepository).save(argThat(schm ->
-                AppConstants.SYSTEM_USER.equals(schm.getLockBy())
+                AppConstants.SYSTEM_USER.equals(schm.getLockBy()) &&
+                AppConstants.SYSTEM_USER.equals(schm.getUpdatedBy())
         ));
     }
 
@@ -560,7 +583,10 @@ class SchemaServiceTest {
         schemaService.unlockSchema(testNamespace, testSchmId);
 
         verify(schmRepository).findWithLockBySchmId(testSchmId);
-        verify(schmRepository).save(argThat(schm -> schm.getLockBy() == null));
+        verify(schmRepository).save(argThat(schm ->
+                schm.getLockBy() == null &&
+                testUserId.equals(schm.getUpdatedBy())
+        ));
     }
 
     @Test
@@ -587,7 +613,10 @@ class SchemaServiceTest {
         schemaService.unlockSchema(testNamespace, testSchmId);
 
         verify(schmRepository).findWithLockBySchmId(testSchmId);
-        verify(schmRepository).save(argThat(schm -> schm.getLockBy() == null));
+        verify(schmRepository).save(argThat(schm ->
+                schm.getLockBy() == null &&
+                AppConstants.SYSTEM_USER.equals(schm.getUpdatedBy())
+        ));
     }
 
     @Test
@@ -635,7 +664,8 @@ class SchemaServiceTest {
 
         // Verify final state: still locked by the same user
         verify(schmRepository, atLeast(1)).save(argThat(schm ->
-                testUserId.equals(schm.getLockBy())
+                testUserId.equals(schm.getLockBy()) &&
+                testUserId.equals(schm.getUpdatedBy())
         ));
     }
 
