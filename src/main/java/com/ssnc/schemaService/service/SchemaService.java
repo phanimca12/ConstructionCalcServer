@@ -280,13 +280,20 @@ public class SchemaService {
         // Create initial version with content
         createSchemaDataFromFile(saved.getSchmId(), content);
 
-        // Call existing publish method to maintain consistency and reuse validation logic
-        // Spring will join the existing transaction (PROPAGATION_REQUIRED default)
-        try {
-            publishSchemaVersion(namespace, saved.getSchmId(), 1);
-        } catch (Exception e) {
-            throw new IllegalStateException(ErrorMessages.SCHEMA_PUBLISH_FAILED_ON_IMPORT, e);
-        }
+        // Publish initial version inline to avoid "already published" check
+        // This makes import idempotent - if publish partially completed before, it won't fail
+        SchmData schemaData = schmDataRepository.findById(new SchmDataId(saved.getSchmId(), 1))
+                .orElseThrow(() -> new IllegalStateException(ErrorMessages.SCHEMA_PUBLISH_FAILED_ON_IMPORT));
+
+        // Set isDraft to false when publishing
+        schemaData.setIsDraft(false);
+        schmDataRepository.save(schemaData);
+
+        // Update schema: set publish version and clear draft
+        saved.setPublishVersion(1);
+        saved.setDraftVersion(null);
+        saved.setUpdatedBy(userName);
+        schmRepository.save(saved);
 
         // Refresh to get latest state with published version
         // Don't fall back to stale data - throw exception if refresh fails
