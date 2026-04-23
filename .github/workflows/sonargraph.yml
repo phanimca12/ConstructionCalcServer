@@ -1,6 +1,8 @@
 name: Sonargraph Report
 on:
   push:
+    branches: [ "develop", "main" ]
+  pull_request:
     branches: [ "develop", "release/*", "main", "feature/*" ]
   workflow_dispatch:
 jobs:
