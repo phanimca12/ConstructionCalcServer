@@ -245,7 +245,7 @@ public class SchemaController {
     }
 
     /**
-     * PUT /schemas/{nameSpace}/{id}/version/unpublish
+     * PUT /schemas/{nameSpace}/{id}/unpublish
      * Unpublish a schema by setting publish version to null
      */
     @PutMapping(ApiConstants.PATH_SCHEMA_VERSION_UNPUBLISH)

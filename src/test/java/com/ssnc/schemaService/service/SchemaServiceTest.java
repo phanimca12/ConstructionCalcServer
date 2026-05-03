@@ -338,6 +338,7 @@ class SchemaServiceTest {
         existingDraft.setSchmData("old content");
 
         testSchm.setDraftVersion(1);
+        testSchm.setLockBy(testUserId);  // Set lock to test that it's preserved
         when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         // Use argThat to match the SchmDataId with the correct schmId and version
         when(schmDataRepository.findById(argThat(schmDataId ->
@@ -346,6 +347,7 @@ class SchemaServiceTest {
                 Integer.valueOf(1).equals(schmDataId.getSchmVersion())
         ))).thenReturn(Optional.of(existingDraft));
         when(schmDataRepository.save(any(SchmData.class))).thenReturn(existingDraft);
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
         String newContent = "updated draft content";
         SchemaVersionDto result = schemaService.updateDraftContent(testNamespace, testSchmId, newContent);
@@ -356,8 +358,12 @@ class SchemaServiceTest {
                 newContent.equals(schmData.getSchmData()) &&
                 testUserId.equals(schmData.getUpdatedBy())  // Version updatedBy should be set
         ));
-        // Verify schema is NOT saved (draft_version pointer didn't change)
-        verify(schmRepository, never()).save(any(Schm.class));
+        // Verify schema IS saved to preserve LOCK_BY and update audit trail
+        // Even though draft_version didn't change, we need to preserve the lock
+        verify(schmRepository).save(argThat(schm ->
+                testUserId.equals(schm.getLockBy()) &&  // Lock should be preserved
+                testUserId.equals(schm.getUpdatedBy())  // Schema audit should be updated
+        ));
     }
 
     @Test

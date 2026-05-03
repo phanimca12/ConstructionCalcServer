@@ -710,9 +710,13 @@ public class SchemaService {
             // updatedDatetime is automatically set by @UpdateTimestamp
             SchmData updated = schmDataRepository.save(draft);
 
-            // NOTE: We do NOT save the schema entity here because draft_version didn't change
-            // The schema entity was fetched with pessimistic lock, but we're not modifying it
-            // Hibernate won't auto-flush it because we haven't changed any fields
+            // Save the schema entity to preserve LOCK_BY and update audit trail
+            // Even though draft_version didn't change, we need to:
+            // 1. Preserve the LOCK_BY field (it should not be cleared)
+            // 2. Update updatedBy to track who modified the draft content
+            // 3. Trigger @UpdateTimestamp for updatedDatetime
+            schema.setUpdatedBy(userName);
+            schmRepository.save(schema);
 
             return mapToVersionResponse(updated);
         } else {
