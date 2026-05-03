@@ -526,6 +526,16 @@ public class SchemaService {
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
                 ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
+        // Validate lock: If schema has a draft version and is locked by another user, prevent updates
+        // Exception: User can update lockBy field through this method (for lock/unlock operations)
+        // or SYSTEM_USER can always update
+        if (existing.getDraftVersion() != null && existing.getLockBy() != null
+                && !existing.getLockBy().equals(userName)
+                && !AppConstants.SYSTEM_USER.equals(userName)) {
+            throw new IllegalStateException(
+                    String.format(ErrorMessages.SCHEMA_ALREADY_LOCKED, schmId, existing.getLockBy()));
+        }
+
         // Update only editable fields (schmName is preserved from DB)
         existing.setSchmDesc(schemaDto.getDescription());
         existing.setSchemaType(schemaDto.getSchemaType());

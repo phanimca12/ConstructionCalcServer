@@ -288,6 +288,88 @@ class SchemaServiceTest {
     }
 
     @Test
+    void testUpdateSchema_SucceedsWhenNoDraftVersion() {
+        testSchm.setDraftVersion(null);  // No draft version
+        testSchm.setLockBy("someUser");  // Lock is irrelevant when no draft
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        SchemaDto updateDto = new SchemaDto();
+        updateDto.setDescription("Updated Description");
+
+        SchemaDto result = schemaService.updateSchema(testNamespace, testSchmId, updateDto);
+
+        assertNotNull(result);
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateSchema_SucceedsWhenNotLocked() {
+        testSchm.setDraftVersion(1);  // Has draft version
+        testSchm.setLockBy(null);  // Not locked
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        SchemaDto updateDto = new SchemaDto();
+        updateDto.setDescription("Updated Description");
+
+        SchemaDto result = schemaService.updateSchema(testNamespace, testSchmId, updateDto);
+
+        assertNotNull(result);
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateSchema_SucceedsWhenLockedBySameUser() {
+        testSchm.setDraftVersion(1);  // Has draft version
+        testSchm.setLockBy(testUserId);  // Locked by same user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        SchemaDto updateDto = new SchemaDto();
+        updateDto.setDescription("Updated Description");
+
+        SchemaDto result = schemaService.updateSchema(testNamespace, testSchmId, updateDto);
+
+        assertNotNull(result);
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateSchema_ThrowsException_WhenDraftLockedByDifferentUser() {
+        testSchm.setDraftVersion(1);  // Has draft version
+        testSchm.setLockBy("differentUser");  // Locked by different user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        SchemaDto updateDto = new SchemaDto();
+        updateDto.setDescription("Updated Description");
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
+                schemaService.updateSchema(testNamespace, testSchmId, updateDto)
+        );
+
+        assertTrue(exception.getMessage().contains("already locked by differentUser"));
+        verify(schmRepository, never()).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateSchema_SucceedsForSystemUser_WhenDraftLockedByAnotherUser() {
+        testSchm.setDraftVersion(1);  // Has draft version
+        testSchm.setLockBy("someUser");  // Locked by another user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+        when(jwtClaimsContext.getUserId()).thenReturn(AppConstants.SYSTEM_USER);
+
+        SchemaDto updateDto = new SchemaDto();
+        updateDto.setDescription("Updated by system");
+
+        SchemaDto result = schemaService.updateSchema(testNamespace, testSchmId, updateDto);
+
+        assertNotNull(result);
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
     void testUpdateDraftContent_CreatesNewVersion_WithJwtUser() {
         testSchm.setDraftVersion(null);
         when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));

@@ -194,6 +194,18 @@ class SchemaControllerTest {
     }
 
     @Test
+    void testUpdateSchema_ThrowsException_WhenDraftLockedByDifferentUser() {
+        when(schemaService.updateSchema(testNamespace, testSchemaId, testSchemaDto))
+                .thenThrow(new IllegalStateException("Schema " + testSchemaId + " is already locked by differentUser"));
+
+        assertThrows(IllegalStateException.class, () -> {
+            schemaController.updateSchema(testNamespace, testSchemaId.toString(), testSchemaDto);
+        });
+
+        verify(schemaService).updateSchema(testNamespace, testSchemaId, testSchemaDto);
+    }
+
+    @Test
     void testGetSchemaVersion_Found() {
         when(schemaService.getSchemaVersion(testNamespace, testSchemaId, 1))
                 .thenReturn(Optional.of(testVersionDto));
