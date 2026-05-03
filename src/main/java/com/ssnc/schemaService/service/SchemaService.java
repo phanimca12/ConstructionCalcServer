@@ -693,6 +693,16 @@ public class SchemaService {
         Schm schema = schmRepository.findWithLockBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
 
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+
+        // Validate lock: Only the user who locked the schema (or SYSTEM_USER) can update draft content
+        if (schema.getLockBy() != null && !schema.getLockBy().equals(userName)
+                && !AppConstants.SYSTEM_USER.equals(userName)) {
+            throw new IllegalStateException(
+                    String.format(ErrorMessages.SCHEMA_ALREADY_LOCKED, schmId, schema.getLockBy()));
+        }
+
         Optional<SchmData> draftOpt = Optional.empty();
         if (schema.getDraftVersion() != null) {
             draftOpt = schmDataRepository.findById(
@@ -701,8 +711,6 @@ public class SchemaService {
 
         if (draftOpt.isPresent()) {
             // Update existing draft content only (schema draft_version pointer stays the same)
-            String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
-                    ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
             SchmData draft = draftOpt.get();
             draft.setSchmData(content);
@@ -724,9 +732,6 @@ public class SchemaService {
             Integer latestVersion = schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(schmId)
                     .map(sd -> sd.getId().getSchmVersion())
                     .orElse(0);
-
-            String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
-                    ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
             SchmDataId newId = new SchmDataId();
             newId.setSchmId(schmId);

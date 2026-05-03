@@ -367,6 +367,130 @@ class SchemaServiceTest {
     }
 
     @Test
+    void testUpdateDraftContent_UpdatesExistingDraft_WhenNotLocked() {
+        SchmDataId id = new SchmDataId();
+        id.setSchmId(testSchmId);
+        id.setSchmVersion(1);
+
+        SchmData existingDraft = new SchmData();
+        existingDraft.setId(id);
+        existingDraft.setIsDraft(true);
+        existingDraft.setCreatedBy("oldUser");
+        existingDraft.setUpdatedBy("oldUser");
+        existingDraft.setSchmData("old content");
+
+        testSchm.setDraftVersion(1);
+        testSchm.setLockBy(null);  // No lock set
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmDataRepository.findById(argThat(schmDataId ->
+                schmDataId != null &&
+                testSchmId.equals(schmDataId.getSchmId()) &&
+                Integer.valueOf(1).equals(schmDataId.getSchmVersion())
+        ))).thenReturn(Optional.of(existingDraft));
+        when(schmDataRepository.save(any(SchmData.class))).thenReturn(existingDraft);
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        String newContent = "updated draft content";
+        SchemaVersionDto result = schemaService.updateDraftContent(testNamespace, testSchmId, newContent);
+
+        assertNotNull(result);
+        verify(schmDataRepository).save(any(SchmData.class));
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateDraftContent_ThrowsException_WhenLockedByDifferentUser() {
+        testSchm.setDraftVersion(1);
+        testSchm.setLockBy("differentUser");  // Locked by different user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        String newContent = "updated draft content";
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            schemaService.updateDraftContent(testNamespace, testSchmId, newContent);
+        });
+
+        assertTrue(exception.getMessage().contains("already locked by differentUser"));
+        // Verify no save operations were attempted
+        verify(schmDataRepository, never()).save(any(SchmData.class));
+        verify(schmRepository, never()).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateDraftContent_SucceedsForSystemUser_WhenLockedByAnotherUser() {
+        SchmDataId id = new SchmDataId();
+        id.setSchmId(testSchmId);
+        id.setSchmVersion(1);
+
+        SchmData existingDraft = new SchmData();
+        existingDraft.setId(id);
+        existingDraft.setIsDraft(true);
+        existingDraft.setSchmData("old content");
+
+        testSchm.setDraftVersion(1);
+        testSchm.setLockBy("someUser");  // Locked by another user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmDataRepository.findById(any(SchmDataId.class))).thenReturn(Optional.of(existingDraft));
+        when(schmDataRepository.save(any(SchmData.class))).thenReturn(existingDraft);
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        // Mock SYSTEM_USER context
+        when(jwtClaimsContext.getUserId()).thenReturn(AppConstants.SYSTEM_USER);
+
+        String newContent = "updated by system";
+        SchemaVersionDto result = schemaService.updateDraftContent(testNamespace, testSchmId, newContent);
+
+        assertNotNull(result);
+        // System user should be able to update even when locked by another user
+        verify(schmDataRepository).save(any(SchmData.class));
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateDraftContent_CreatesNewVersion_WhenLockedBySameUser() {
+        testSchm.setDraftVersion(null);  // No existing draft
+        testSchm.setLockBy(testUserId);  // Locked by same user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(testSchmId))
+                .thenReturn(Optional.empty());
+
+        SchmData savedSchmData = new SchmData();
+        SchmDataId id = new SchmDataId();
+        id.setSchmId(testSchmId);
+        id.setSchmVersion(1);
+        savedSchmData.setId(id);
+        savedSchmData.setIsDraft(true);
+
+        when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        String content = "new draft content";
+        SchemaVersionDto result = schemaService.updateDraftContent(testNamespace, testSchmId, content);
+
+        assertNotNull(result);
+        verify(schmDataRepository).save(any(SchmData.class));
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateDraftContent_CreatesNewVersion_ThrowsException_WhenLockedByDifferentUser() {
+        testSchm.setDraftVersion(null);  // No existing draft
+        testSchm.setLockBy("differentUser");  // Locked by different user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        String content = "new draft content";
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            schemaService.updateDraftContent(testNamespace, testSchmId, content);
+        });
+
+        assertTrue(exception.getMessage().contains("already locked by differentUser"));
+        // Verify no save operations were attempted
+        verify(schmDataRepository, never()).save(any(SchmData.class));
+        verify(schmRepository, never()).save(any(Schm.class));
+    }
+
+    @Test
     void testPublishSchemaVersion_Success() {
         SchmDataId id = new SchmDataId();
         id.setSchmId(testSchmId);
