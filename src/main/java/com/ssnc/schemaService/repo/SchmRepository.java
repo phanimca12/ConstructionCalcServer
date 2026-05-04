@@ -99,6 +99,10 @@ public interface SchmRepository extends JpaRepository<Schm, UUID>, JpaSpecificat
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Schm> findWithLockBySchmId(UUID schmId);
 
+    /**
+     * Find schema by exact name match (case-sensitive).
+     * Spring Data JPA method - performs exact match based on database collation.
+     */
     Optional<Schm> findBySchmName(String name);
 
     /**

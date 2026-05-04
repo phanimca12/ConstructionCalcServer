@@ -194,6 +194,18 @@ class SchemaControllerTest {
     }
 
     @Test
+    void testUpdateSchema_ThrowsException_WhenDraftLockedByDifferentUser() {
+        when(schemaService.updateSchema(testNamespace, testSchemaId, testSchemaDto))
+                .thenThrow(new IllegalStateException("Schema " + testSchemaId + " is already locked by differentUser"));
+
+        assertThrows(IllegalStateException.class, () -> {
+            schemaController.updateSchema(testNamespace, testSchemaId.toString(), testSchemaDto);
+        });
+
+        verify(schemaService).updateSchema(testNamespace, testSchemaId, testSchemaDto);
+    }
+
+    @Test
     void testGetSchemaVersion_Found() {
         when(schemaService.getSchemaVersion(testNamespace, testSchemaId, 1))
                 .thenReturn(Optional.of(testVersionDto));
@@ -335,6 +347,19 @@ class SchemaControllerTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(testVersionDto, response.getBody());
+        verify(schemaService).updateDraftContent(testNamespace, testSchemaId, content);
+    }
+
+    @Test
+    void testUpdateDraftContent_ThrowsException_WhenLockedByDifferentUser() {
+        String content = "updated draft content";
+        when(schemaService.updateDraftContent(testNamespace, testSchemaId, content))
+                .thenThrow(new IllegalStateException("Schema " + testSchemaId + " is already locked by differentUser"));
+
+        assertThrows(IllegalStateException.class, () -> {
+            schemaController.updateDraftContent(testNamespace, testSchemaId.toString(), content);
+        });
+
         verify(schemaService).updateDraftContent(testNamespace, testSchemaId, content);
     }
 
@@ -898,5 +923,93 @@ class SchemaControllerTest {
         assertEquals(2, response.getBody().getSchemas().size());
         assertEquals(2, response.getBody().getTotalElements());
         verify(schemaService).getSchemas(testNamespace, "Filtered", "FormData", "group1", null, null, null, "none", Pageable.unpaged());
+    }
+
+    @Test
+    void testGetPublishedContentByName_Found() {
+        String schemaName = "TestSchema";
+        String expectedContent = "published content";
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.of(expectedContent));
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedContent, response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
+    }
+
+    @Test
+    void testGetPublishedContentByName_NotFound() {
+        String schemaName = "NonExistentSchema";
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.empty());
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
+    }
+
+    @Test
+    void testGetPublishedContentByName_CaseSensitive() {
+        String schemaName = "testschema"; // lowercase
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.empty()); // Service returns empty due to case mismatch
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
+    }
+
+    @Test
+    void testGetPublishedContentByName_WithSpaces() {
+        String schemaName = "Test Schema With Spaces";
+        String expectedContent = "published content";
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.of(expectedContent));
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedContent, response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
+    }
+
+    @Test
+    void testGetPublishedContentByName_WithSpecialCharacters() {
+        String schemaName = "Schema (v2.0) - Test/Final";
+        String expectedContent = "published content";
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.of(expectedContent));
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedContent, response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
+    }
+
+    @Test
+    void testGetPublishedContentByName_WithUnicode() {
+        String schemaName = "数据模式测试";
+        String expectedContent = "published content";
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.of(expectedContent));
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedContent, response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
     }
 }

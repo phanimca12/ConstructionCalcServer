@@ -288,6 +288,88 @@ class SchemaServiceTest {
     }
 
     @Test
+    void testUpdateSchema_SucceedsWhenNoDraftVersion() {
+        testSchm.setDraftVersion(null);  // No draft version
+        testSchm.setLockBy("someUser");  // Lock is irrelevant when no draft
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        SchemaDto updateDto = new SchemaDto();
+        updateDto.setDescription("Updated Description");
+
+        SchemaDto result = schemaService.updateSchema(testNamespace, testSchmId, updateDto);
+
+        assertNotNull(result);
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateSchema_SucceedsWhenNotLocked() {
+        testSchm.setDraftVersion(1);  // Has draft version
+        testSchm.setLockBy(null);  // Not locked
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        SchemaDto updateDto = new SchemaDto();
+        updateDto.setDescription("Updated Description");
+
+        SchemaDto result = schemaService.updateSchema(testNamespace, testSchmId, updateDto);
+
+        assertNotNull(result);
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateSchema_SucceedsWhenLockedBySameUser() {
+        testSchm.setDraftVersion(1);  // Has draft version
+        testSchm.setLockBy(testUserId);  // Locked by same user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        SchemaDto updateDto = new SchemaDto();
+        updateDto.setDescription("Updated Description");
+
+        SchemaDto result = schemaService.updateSchema(testNamespace, testSchmId, updateDto);
+
+        assertNotNull(result);
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateSchema_ThrowsException_WhenDraftLockedByDifferentUser() {
+        testSchm.setDraftVersion(1);  // Has draft version
+        testSchm.setLockBy("differentUser");  // Locked by different user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        SchemaDto updateDto = new SchemaDto();
+        updateDto.setDescription("Updated Description");
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () ->
+                schemaService.updateSchema(testNamespace, testSchmId, updateDto)
+        );
+
+        assertTrue(exception.getMessage().contains("already locked by differentUser"));
+        verify(schmRepository, never()).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateSchema_SucceedsForSystemUser_WhenDraftLockedByAnotherUser() {
+        testSchm.setDraftVersion(1);  // Has draft version
+        testSchm.setLockBy("someUser");  // Locked by another user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+        when(jwtClaimsContext.getUserId()).thenReturn(AppConstants.SYSTEM_USER);
+
+        SchemaDto updateDto = new SchemaDto();
+        updateDto.setDescription("Updated by system");
+
+        SchemaDto result = schemaService.updateSchema(testNamespace, testSchmId, updateDto);
+
+        assertNotNull(result);
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
     void testUpdateDraftContent_CreatesNewVersion_WithJwtUser() {
         testSchm.setDraftVersion(null);
         when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
@@ -338,6 +420,7 @@ class SchemaServiceTest {
         existingDraft.setSchmData("old content");
 
         testSchm.setDraftVersion(1);
+        testSchm.setLockBy(testUserId);  // Set lock to test that it's preserved
         when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
         // Use argThat to match the SchmDataId with the correct schmId and version
         when(schmDataRepository.findById(argThat(schmDataId ->
@@ -346,6 +429,7 @@ class SchemaServiceTest {
                 Integer.valueOf(1).equals(schmDataId.getSchmVersion())
         ))).thenReturn(Optional.of(existingDraft));
         when(schmDataRepository.save(any(SchmData.class))).thenReturn(existingDraft);
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
 
         String newContent = "updated draft content";
         SchemaVersionDto result = schemaService.updateDraftContent(testNamespace, testSchmId, newContent);
@@ -356,7 +440,135 @@ class SchemaServiceTest {
                 newContent.equals(schmData.getSchmData()) &&
                 testUserId.equals(schmData.getUpdatedBy())  // Version updatedBy should be set
         ));
-        // Verify schema is NOT saved (draft_version pointer didn't change)
+        // Verify schema IS saved to preserve LOCK_BY and update audit trail
+        // Even though draft_version didn't change, we need to preserve the lock
+        verify(schmRepository).save(argThat(schm ->
+                testUserId.equals(schm.getLockBy()) &&  // Lock should be preserved
+                testUserId.equals(schm.getUpdatedBy())  // Schema audit should be updated
+        ));
+    }
+
+    @Test
+    void testUpdateDraftContent_UpdatesExistingDraft_WhenNotLocked() {
+        SchmDataId id = new SchmDataId();
+        id.setSchmId(testSchmId);
+        id.setSchmVersion(1);
+
+        SchmData existingDraft = new SchmData();
+        existingDraft.setId(id);
+        existingDraft.setIsDraft(true);
+        existingDraft.setCreatedBy("oldUser");
+        existingDraft.setUpdatedBy("oldUser");
+        existingDraft.setSchmData("old content");
+
+        testSchm.setDraftVersion(1);
+        testSchm.setLockBy(null);  // No lock set
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmDataRepository.findById(argThat(schmDataId ->
+                schmDataId != null &&
+                testSchmId.equals(schmDataId.getSchmId()) &&
+                Integer.valueOf(1).equals(schmDataId.getSchmVersion())
+        ))).thenReturn(Optional.of(existingDraft));
+        when(schmDataRepository.save(any(SchmData.class))).thenReturn(existingDraft);
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        String newContent = "updated draft content";
+        SchemaVersionDto result = schemaService.updateDraftContent(testNamespace, testSchmId, newContent);
+
+        assertNotNull(result);
+        verify(schmDataRepository).save(any(SchmData.class));
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateDraftContent_ThrowsException_WhenLockedByDifferentUser() {
+        testSchm.setDraftVersion(1);
+        testSchm.setLockBy("differentUser");  // Locked by different user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        String newContent = "updated draft content";
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            schemaService.updateDraftContent(testNamespace, testSchmId, newContent);
+        });
+
+        assertTrue(exception.getMessage().contains("already locked by differentUser"));
+        // Verify no save operations were attempted
+        verify(schmDataRepository, never()).save(any(SchmData.class));
+        verify(schmRepository, never()).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateDraftContent_SucceedsForSystemUser_WhenLockedByAnotherUser() {
+        SchmDataId id = new SchmDataId();
+        id.setSchmId(testSchmId);
+        id.setSchmVersion(1);
+
+        SchmData existingDraft = new SchmData();
+        existingDraft.setId(id);
+        existingDraft.setIsDraft(true);
+        existingDraft.setSchmData("old content");
+
+        testSchm.setDraftVersion(1);
+        testSchm.setLockBy("someUser");  // Locked by another user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmDataRepository.findById(any(SchmDataId.class))).thenReturn(Optional.of(existingDraft));
+        when(schmDataRepository.save(any(SchmData.class))).thenReturn(existingDraft);
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        // Mock SYSTEM_USER context
+        when(jwtClaimsContext.getUserId()).thenReturn(AppConstants.SYSTEM_USER);
+
+        String newContent = "updated by system";
+        SchemaVersionDto result = schemaService.updateDraftContent(testNamespace, testSchmId, newContent);
+
+        assertNotNull(result);
+        // System user should be able to update even when locked by another user
+        verify(schmDataRepository).save(any(SchmData.class));
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateDraftContent_CreatesNewVersion_WhenLockedBySameUser() {
+        testSchm.setDraftVersion(null);  // No existing draft
+        testSchm.setLockBy(testUserId);  // Locked by same user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(testSchmId))
+                .thenReturn(Optional.empty());
+
+        SchmData savedSchmData = new SchmData();
+        SchmDataId id = new SchmDataId();
+        id.setSchmId(testSchmId);
+        id.setSchmVersion(1);
+        savedSchmData.setId(id);
+        savedSchmData.setIsDraft(true);
+
+        when(schmDataRepository.save(any(SchmData.class))).thenReturn(savedSchmData);
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        String content = "new draft content";
+        SchemaVersionDto result = schemaService.updateDraftContent(testNamespace, testSchmId, content);
+
+        assertNotNull(result);
+        verify(schmDataRepository).save(any(SchmData.class));
+        verify(schmRepository).save(any(Schm.class));
+    }
+
+    @Test
+    void testUpdateDraftContent_CreatesNewVersion_ThrowsException_WhenLockedByDifferentUser() {
+        testSchm.setDraftVersion(null);  // No existing draft
+        testSchm.setLockBy("differentUser");  // Locked by different user
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+
+        String content = "new draft content";
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            schemaService.updateDraftContent(testNamespace, testSchmId, content);
+        });
+
+        assertTrue(exception.getMessage().contains("already locked by differentUser"));
+        // Verify no save operations were attempted
+        verify(schmDataRepository, never()).save(any(SchmData.class));
         verify(schmRepository, never()).save(any(Schm.class));
     }
 
@@ -1694,5 +1906,193 @@ class SchemaServiceTest {
         assertEquals(1, responses.size());
         assertFalse(responses.get(0).isSuccess());
         assertTrue(responses.get(0).getErrorMessage().contains("Schema name is required"));
+    }
+
+    @Test
+    void testGetPublishedContentByName_Success() {
+        String schemaName = "TestSchema";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(schemaName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertTrue(result.isPresent());
+        assertEquals(expectedContent, result.get());
+        verify(namespaceFilterManager).enableIfPresent(testNamespace);
+        verify(schmRepository).findBySchmName(schemaName);
+        verify(schmRepository).getPublishedVersion(testSchmId);
+    }
+
+    @Test
+    void testGetPublishedContentByName_SchemaNotFound() {
+        String schemaName = "NonExistentSchema";
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.empty());
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertFalse(result.isPresent());
+        verify(schmRepository).findBySchmName(schemaName);
+        verify(schmRepository, never()).getPublishedVersion(any());
+    }
+
+    @Test
+    void testGetPublishedContentByName_NoPublishedVersion() {
+        String schemaName = "TestSchema";
+
+        testSchm.setSchmName(schemaName);
+        testSchm.setPublishVersion(null);
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.empty());
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertFalse(result.isPresent());
+        verify(schmRepository).findBySchmName(schemaName);
+        verify(schmRepository).getPublishedVersion(testSchmId);
+    }
+
+    @Test
+    void testGetPublishedContentByName_CaseSensitive() {
+        String exactName = "TestSchema";
+        String differentCaseName = "testschema";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(exactName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        // Simulate database returning schema with different case (case-insensitive DB)
+        when(schmRepository.findBySchmName(differentCaseName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        // Service should filter out due to case mismatch
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, differentCaseName);
+
+        assertFalse(result.isPresent());
+        verify(schmRepository).findBySchmName(differentCaseName);
+        // getPublishedVersion should not be called due to filter
+        verify(schmRepository, never()).getPublishedVersion(any());
+    }
+
+    @Test
+    void testGetPublishedContentByName_ExactMatch() {
+        String exactName = "TestSchema";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(exactName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        when(schmRepository.findBySchmName(exactName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, exactName);
+
+        assertTrue(result.isPresent());
+        assertEquals(expectedContent, result.get());
+    }
+
+    @Test
+    void testGetPublishedContentByName_WithSpaces() {
+        String schemaName = "Test Schema With Spaces";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(schemaName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertTrue(result.isPresent());
+        assertEquals(expectedContent, result.get());
+    }
+
+    @Test
+    void testGetPublishedContentByName_WithSpecialCharacters() {
+        String schemaName = "Schema (v2.0) - Test/Final";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(schemaName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertTrue(result.isPresent());
+        assertEquals(expectedContent, result.get());
+    }
+
+    @Test
+    void testGetPublishedContentByName_WithUnicode() {
+        String schemaName = "数据模式测试";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(schemaName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertTrue(result.isPresent());
+        assertEquals(expectedContent, result.get());
     }
 }

@@ -519,14 +519,25 @@ public class SchemaService {
         namespaceFilterManager.enableIfPresent(namespace);
 
         // Use pessimistic locking to prevent lost updates during concurrent modifications
-        // Fetch existing entity - schmName is non-editable and always from DB
+        // The pessimistic write lock is held for the entire transaction, preventing race conditions
         Schm existing = schmRepository.findWithLockBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
 
         String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
                 ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
-        // Update only editable fields (schmName is preserved from DB)
+        // Validate lock before any modifications using original DB state
+        // If schema has a draft version and is locked by another user, prevent updates
+        // Exception: User can update lockBy field through this method (for lock/unlock operations)
+        // or SYSTEM_USER can always update
+        if (existing.getDraftVersion() != null && existing.getLockBy() != null
+                && !existing.getLockBy().equals(userName)
+                && !AppConstants.SYSTEM_USER.equals(userName)) {
+            throw new IllegalStateException(
+                    String.format(ErrorMessages.SCHEMA_ALREADY_LOCKED, schmId, existing.getLockBy()));
+        }
+
+        // Update editable fields (schmName is preserved from DB)
         existing.setSchmDesc(schemaDto.getDescription());
         existing.setSchemaType(schemaDto.getSchemaType());
         existing.setContentType(schemaDto.getContentType());
@@ -657,6 +668,17 @@ public class SchemaService {
     }
 
     /**
+     * Get published content by schema name (exact case-sensitive match)
+     */
+    public Optional<String> getPublishedContentByName(String namespace, String schemaName) {
+        namespaceFilterManager.enableIfPresent(namespace);
+        return schmRepository.findBySchmName(schemaName)
+                .filter(schema -> schema.getSchmName().equals(schemaName)) // Explicit case-sensitive exact match
+                .flatMap(schema -> schmRepository.getPublishedVersion(schema.getSchmId()))
+                .map(SchmData::getSchmData);
+    }
+
+    /**
      * Get version content
      */
     public Optional<String> getVersionContent(String namespace, UUID schmId, Integer versionNumber) {
@@ -689,9 +711,20 @@ public class SchemaService {
         namespaceFilterManager.enableIfPresent(namespace);
 
         // Use pessimistic locking to prevent race conditions during draft updates
-        // This ensures the read-modify-write sequence is atomic
+        // The pessimistic write lock is held for the entire transaction, preventing concurrent modifications
         Schm schema = schmRepository.findWithLockBySchmId(schmId)
                 .orElseThrow(() -> new IllegalArgumentException(String.format(ErrorMessages.SCHEMA_NOT_FOUND, schmId)));
+
+        String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
+                ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
+
+        // Validate lock before any modifications
+        // Only the user who locked the schema (or SYSTEM_USER) can update draft content
+        if (schema.getLockBy() != null && !schema.getLockBy().equals(userName)
+                && !AppConstants.SYSTEM_USER.equals(userName)) {
+            throw new IllegalStateException(
+                    String.format(ErrorMessages.SCHEMA_ALREADY_LOCKED, schmId, schema.getLockBy()));
+        }
 
         Optional<SchmData> draftOpt = Optional.empty();
         if (schema.getDraftVersion() != null) {
@@ -701,8 +734,6 @@ public class SchemaService {
 
         if (draftOpt.isPresent()) {
             // Update existing draft content only (schema draft_version pointer stays the same)
-            String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
-                    ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
             SchmData draft = draftOpt.get();
             draft.setSchmData(content);
@@ -710,9 +741,9 @@ public class SchemaService {
             // updatedDatetime is automatically set by @UpdateTimestamp
             SchmData updated = schmDataRepository.save(draft);
 
-            // NOTE: We do NOT save the schema entity here because draft_version didn't change
-            // The schema entity was fetched with pessimistic lock, but we're not modifying it
-            // Hibernate won't auto-flush it because we haven't changed any fields
+            // Update schema entity audit trail
+            schema.setUpdatedBy(userName);
+            schmRepository.save(schema);
 
             return mapToVersionResponse(updated);
         } else {
@@ -720,9 +751,6 @@ public class SchemaService {
             Integer latestVersion = schmDataRepository.findTopByIdSchmIdOrderByIdSchmVersionDesc(schmId)
                     .map(sd -> sd.getId().getSchmVersion())
                     .orElse(0);
-
-            String userName = jwtClaimsContext != null && jwtClaimsContext.getUserId() != null
-                    ? jwtClaimsContext.getUserId() : AppConstants.SYSTEM_USER;
 
             SchmDataId newId = new SchmDataId();
             newId.setSchmId(schmId);
@@ -740,10 +768,8 @@ public class SchemaService {
             SchmData saved = schmDataRepository.save(newVersion);
 
             // Update draft version in SCHM table WITH audit fields
-            // Creating a new draft IS a schema-level change
             schema.setDraftVersion(newId.getSchmVersion());
             schema.setUpdatedBy(userName);
-            // updatedDatetime is automatically set by @UpdateTimestamp
             schmRepository.save(schema);
 
             return mapToVersionResponse(saved);
