@@ -27,6 +27,7 @@ public final class ApiConstants {
     public static final String PATH_SCHEMA_VERSION_PUBLISHED = "/{id}/version/published";
     public static final String PATH_SCHEMA_VERSION_DRAFT = "/{id}/version/draft";
     public static final String PATH_SCHEMA_VERSION_PUBLISHED_CONTENT = "/{id}/version/published/content";
+    public static final String PATH_SCHEMA_VERSION_PUBLISHED_CONTENT_BY_NAME = "/name/{name}/version/published/content";
     public static final String PATH_SCHEMA_VERSION_CONTENT = "/{id}/version/{versionNumber}/content";
     public static final String PATH_SCHEMA_VERSION_DRAFT_CONTENT = "/{id}/version/draft/content";
     public static final String PATH_SCHEMA_LOCK = "/{id}/lock";
@@ -58,6 +59,7 @@ public final class ApiConstants {
     public static final String PARAM_EXT_REF_NAME = "extRefName";
     public static final String PARAM_EXT_REF_VERSION = "extRefVersion";
     public static final String PARAM_ID = "id";
+    public static final String PARAM_NAME = "name";
     public static final String PARAM_VERSION_NUMBER = "versionNumber";
     public static final String PARAM_TENANT_NAME = "tenantName";
     public static final String PARAM_NAMESPACE = "namespace";

@@ -667,6 +667,17 @@ public class SchemaService {
     }
 
     /**
+     * Get published content by schema name (exact case-sensitive match)
+     */
+    public Optional<String> getPublishedContentByName(String namespace, String schemaName) {
+        namespaceFilterManager.enableIfPresent(namespace);
+        return schmRepository.findBySchmName(schemaName)
+                .filter(schema -> schema.getSchmName().equals(schemaName)) // Explicit case-sensitive exact match
+                .flatMap(schema -> schmRepository.getPublishedVersion(schema.getSchmId()))
+                .map(SchmData::getSchmData);
+    }
+
+    /**
      * Get version content
      */
     public Optional<String> getVersionContent(String namespace, UUID schmId, Integer versionNumber) {

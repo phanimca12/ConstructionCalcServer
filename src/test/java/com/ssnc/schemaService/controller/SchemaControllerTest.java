@@ -924,4 +924,47 @@ class SchemaControllerTest {
         assertEquals(2, response.getBody().getTotalElements());
         verify(schemaService).getSchemas(testNamespace, "Filtered", "FormData", "group1", null, null, null, "none", Pageable.unpaged());
     }
+
+    @Test
+    void testGetPublishedContentByName_Found() {
+        String schemaName = "TestSchema";
+        String expectedContent = "published content";
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.of(expectedContent));
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedContent, response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
+    }
+
+    @Test
+    void testGetPublishedContentByName_NotFound() {
+        String schemaName = "NonExistentSchema";
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.empty());
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
+    }
+
+    @Test
+    void testGetPublishedContentByName_CaseSensitive() {
+        String schemaName = "testschema"; // lowercase
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.empty()); // Service returns empty due to case mismatch
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertNull(response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
+    }
 }

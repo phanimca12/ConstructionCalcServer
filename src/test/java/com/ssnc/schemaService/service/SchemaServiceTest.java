@@ -1907,4 +1907,117 @@ class SchemaServiceTest {
         assertFalse(responses.get(0).isSuccess());
         assertTrue(responses.get(0).getErrorMessage().contains("Schema name is required"));
     }
+
+    @Test
+    void testGetPublishedContentByName_Success() {
+        String schemaName = "TestSchema";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(schemaName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertTrue(result.isPresent());
+        assertEquals(expectedContent, result.get());
+        verify(namespaceFilterManager).enableIfPresent(testNamespace);
+        verify(schmRepository).findBySchmName(schemaName);
+        verify(schmRepository).getPublishedVersion(testSchmId);
+    }
+
+    @Test
+    void testGetPublishedContentByName_SchemaNotFound() {
+        String schemaName = "NonExistentSchema";
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.empty());
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertFalse(result.isPresent());
+        verify(schmRepository).findBySchmName(schemaName);
+        verify(schmRepository, never()).getPublishedVersion(any());
+    }
+
+    @Test
+    void testGetPublishedContentByName_NoPublishedVersion() {
+        String schemaName = "TestSchema";
+
+        testSchm.setSchmName(schemaName);
+        testSchm.setPublishVersion(null);
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.empty());
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertFalse(result.isPresent());
+        verify(schmRepository).findBySchmName(schemaName);
+        verify(schmRepository).getPublishedVersion(testSchmId);
+    }
+
+    @Test
+    void testGetPublishedContentByName_CaseSensitive() {
+        String exactName = "TestSchema";
+        String differentCaseName = "testschema";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(exactName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        // Simulate database returning schema with different case (case-insensitive DB)
+        when(schmRepository.findBySchmName(differentCaseName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        // Service should filter out due to case mismatch
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, differentCaseName);
+
+        assertFalse(result.isPresent());
+        verify(schmRepository).findBySchmName(differentCaseName);
+        // getPublishedVersion should not be called due to filter
+        verify(schmRepository, never()).getPublishedVersion(any());
+    }
+
+    @Test
+    void testGetPublishedContentByName_ExactMatch() {
+        String exactName = "TestSchema";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(exactName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        when(schmRepository.findBySchmName(exactName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, exactName);
+
+        assertTrue(result.isPresent());
+        assertEquals(expectedContent, result.get());
+    }
 }

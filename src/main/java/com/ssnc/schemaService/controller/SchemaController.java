@@ -296,6 +296,19 @@ public class SchemaController {
     }
 
     /**
+     * GET /schemas/{nameSpace}/name/{name}/version/published/content
+     * Get content of published schema version by schema name
+     */
+    @GetMapping(value = ApiConstants.PATH_SCHEMA_VERSION_PUBLISHED_CONTENT_BY_NAME, produces = MediaType.ALL_VALUE)
+    public ResponseEntity<String> getPublishedContentByName(
+            @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
+            @PathVariable(ApiConstants.PARAM_NAME) String name) {
+        return schemaService.getPublishedContentByName(nameSpace, name)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
      * GET /schemas/{nameSpace}/{id}/version/{versionNumber}/content
      * Get content of a specific schema version
      */
