@@ -296,13 +296,14 @@ public class SchemaController {
     }
 
     /**
-     * GET /schemas/{nameSpace}/name/{name}/version/published/content
+     * GET /schemas/{nameSpace}/version/published/content?name={name}
      * Get content of published schema version by schema name
+     * Uses query parameter to handle special characters and spaces in schema names
      */
     @GetMapping(value = ApiConstants.PATH_SCHEMA_VERSION_PUBLISHED_CONTENT_BY_NAME, produces = MediaType.ALL_VALUE)
     public ResponseEntity<String> getPublishedContentByName(
             @PathVariable(ApiConstants.PARAM_NAME_SPACE) String nameSpace,
-            @PathVariable(ApiConstants.PARAM_NAME) String name) {
+            @RequestParam(ApiConstants.QUERY_PARAM_NAME) String name) {
         return schemaService.getPublishedContentByName(nameSpace, name)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());

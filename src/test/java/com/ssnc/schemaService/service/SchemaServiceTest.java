@@ -2020,4 +2020,79 @@ class SchemaServiceTest {
         assertTrue(result.isPresent());
         assertEquals(expectedContent, result.get());
     }
+
+    @Test
+    void testGetPublishedContentByName_WithSpaces() {
+        String schemaName = "Test Schema With Spaces";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(schemaName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertTrue(result.isPresent());
+        assertEquals(expectedContent, result.get());
+    }
+
+    @Test
+    void testGetPublishedContentByName_WithSpecialCharacters() {
+        String schemaName = "Schema (v2.0) - Test/Final";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(schemaName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertTrue(result.isPresent());
+        assertEquals(expectedContent, result.get());
+    }
+
+    @Test
+    void testGetPublishedContentByName_WithUnicode() {
+        String schemaName = "数据模式测试";
+        String expectedContent = "published content";
+
+        testSchm.setSchmName(schemaName);
+        testSchm.setPublishVersion(1);
+
+        SchmDataId publishedId = new SchmDataId();
+        publishedId.setSchmId(testSchmId);
+        publishedId.setSchmVersion(1);
+
+        SchmData publishedData = new SchmData();
+        publishedData.setId(publishedId);
+        publishedData.setSchmData(expectedContent);
+
+        when(schmRepository.findBySchmName(schemaName)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.getPublishedVersion(testSchmId)).thenReturn(Optional.of(publishedData));
+
+        Optional<String> result = schemaService.getPublishedContentByName(testNamespace, schemaName);
+
+        assertTrue(result.isPresent());
+        assertEquals(expectedContent, result.get());
+    }
 }

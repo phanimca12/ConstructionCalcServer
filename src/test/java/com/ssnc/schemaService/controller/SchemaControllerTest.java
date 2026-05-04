@@ -967,4 +967,49 @@ class SchemaControllerTest {
         assertNull(response.getBody());
         verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
     }
+
+    @Test
+    void testGetPublishedContentByName_WithSpaces() {
+        String schemaName = "Test Schema With Spaces";
+        String expectedContent = "published content";
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.of(expectedContent));
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedContent, response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
+    }
+
+    @Test
+    void testGetPublishedContentByName_WithSpecialCharacters() {
+        String schemaName = "Schema (v2.0) - Test/Final";
+        String expectedContent = "published content";
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.of(expectedContent));
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedContent, response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
+    }
+
+    @Test
+    void testGetPublishedContentByName_WithUnicode() {
+        String schemaName = "数据模式测试";
+        String expectedContent = "published content";
+        when(schemaService.getPublishedContentByName(testNamespace, schemaName))
+                .thenReturn(Optional.of(expectedContent));
+
+        ResponseEntity<String> response = schemaController.getPublishedContentByName(
+                testNamespace, schemaName);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(expectedContent, response.getBody());
+        verify(schemaService).getPublishedContentByName(testNamespace, schemaName);
+    }
 }
