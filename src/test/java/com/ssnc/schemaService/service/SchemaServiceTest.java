@@ -370,6 +370,42 @@ class SchemaServiceTest {
     }
 
     @Test
+    void testUpdateSchema_OnlyUpdatesDescription() {
+        // Setup initial state with all fields populated
+        testSchm.setSchmDesc("Original Description");
+        testSchm.setSchemaType("OriginalType");
+        testSchm.setContentType("OriginalContentType");
+        testSchm.setSchmGroup("OriginalGroup");
+        testSchm.setLockBy("originalLockUser");
+
+        when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));
+        when(schmRepository.save(any(Schm.class))).thenReturn(testSchm);
+
+        // Try to update multiple fields via DTO
+        SchemaDto updateDto = new SchemaDto();
+        updateDto.setDescription("New Description");
+        updateDto.setSchemaType("NewType");
+        updateDto.setContentType("NewContentType");
+        updateDto.setSchmGroup("NewGroup");
+        updateDto.setLockBy("newLockUser");
+
+        SchemaDto result = schemaService.updateSchema(testNamespace, testSchmId, updateDto);
+
+        assertNotNull(result);
+
+        // Verify only description and updatedBy are modified
+        verify(schmRepository).save(argThat(schm ->
+                "New Description".equals(schm.getSchmDesc()) &&
+                testUserId.equals(schm.getUpdatedBy()) &&
+                // Verify other fields remain unchanged
+                "OriginalType".equals(schm.getSchemaType()) &&
+                "OriginalContentType".equals(schm.getContentType()) &&
+                "OriginalGroup".equals(schm.getSchmGroup()) &&
+                "originalLockUser".equals(schm.getLockBy())
+        ));
+    }
+
+    @Test
     void testUpdateDraftContent_CreatesNewVersion_WithJwtUser() {
         testSchm.setDraftVersion(null);
         when(schmRepository.findWithLockBySchmId(testSchmId)).thenReturn(Optional.of(testSchm));

@@ -536,11 +536,9 @@ public class SchemaService {
                     String.format(ErrorMessages.SCHEMA_ALREADY_LOCKED, schmId, existing.getLockBy()));
         }
 
-        // Update editable fields (schmName and lockBy are non-editable here)
+        // Update description only
+        // Note: schmName, schemaType, contentType, schmGroup, and lockBy are non-editable
         existing.setSchmDesc(schemaDto.getDescription());
-        existing.setSchemaType(schemaDto.getSchemaType());
-        existing.setContentType(schemaDto.getContentType());
-        existing.setSchmGroup(schemaDto.getSchmGroup());
         existing.setUpdatedBy(userName);
 
         Schm updated = schmRepository.save(existing);
