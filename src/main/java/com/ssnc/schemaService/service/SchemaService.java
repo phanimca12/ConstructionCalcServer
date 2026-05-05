@@ -528,8 +528,7 @@ public class SchemaService {
 
         // Validate lock before any modifications using original DB state
         // If schema has a draft version and is locked by another user, prevent updates
-        // Exception: User can update lockBy field through this method (for lock/unlock operations)
-        // or SYSTEM_USER can always update
+        // SYSTEM_USER can always update
         if (existing.getDraftVersion() != null && existing.getLockBy() != null
                 && !existing.getLockBy().equals(userName)
                 && !AppConstants.SYSTEM_USER.equals(userName)) {
@@ -537,12 +536,9 @@ public class SchemaService {
                     String.format(ErrorMessages.SCHEMA_ALREADY_LOCKED, schmId, existing.getLockBy()));
         }
 
-        // Update editable fields (schmName is preserved from DB)
+        // Update description only
+        // Note: schmName, schemaType, contentType, schmGroup, and lockBy are non-editable
         existing.setSchmDesc(schemaDto.getDescription());
-        existing.setSchemaType(schemaDto.getSchemaType());
-        existing.setContentType(schemaDto.getContentType());
-        existing.setSchmGroup(schemaDto.getSchmGroup());
-        existing.setLockBy(schemaDto.getLockBy());
         existing.setUpdatedBy(userName);
 
         Schm updated = schmRepository.save(existing);
