@@ -202,7 +202,8 @@ public class SchemaController {
 
     /**
      * PUT /schemas/{nameSpace}/{id}
-     * Update an existing schema information
+     * Update an existing schema
+     * 
      */
     @PutMapping(ApiConstants.PATH_SCHEMA_BY_ID)
     public ResponseEntity<SchemaDto> updateSchema(
