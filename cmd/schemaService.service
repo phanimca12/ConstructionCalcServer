@@ -9,12 +9,6 @@ WorkingDirectory=/opt/dst/schema-services/schemaservice
 
 EnvironmentFile=/etc/environment
 
-Environment="LOG_FILE_PATH=/opt/dst/schema-services/schemaservice/logs/schemaservice.log"
-Environment="JDBC_URL=jdbc:oracle:thin:@localhost:1521/AWD1"
-Environment="USERNAME=SCHMDB"
-Environment="PASSWORD=password"
-Environment="DB_NAME=oracle"
-
 #executable is a bash script which calls jar file
 ExecStart=/bin/bash /opt/dst/schema-services/schemaservice/run.sh
 

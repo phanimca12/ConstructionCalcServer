@@ -3,12 +3,6 @@
     <name>schemaService</name>
     <description>SchemaService Application</description>
     <env name="SchemaService_HOME" value="C:\opt\DST\schema-services"/>
-    <env name="LOG_FILE_PATH" value="C:/opt/dst/schema-services/schemaservice/logs/schemaservice.log"/>
-    <env name="JDBC_URL" value="jdbc:sqlserver://localhost:1433;DatabaseName=SCHEMASERVICE;encrypt=false"/>
-    <env name="USERNAME" value="SCHMDB"/>
-    <env name="PASSWORD" value="password@1"/>
-    <env name="DB_NAME" value="sqlserver"/>
-
     <executable>C:\Program Files\Amazon Corretto\java-21\bin\java.exe</executable>
     <arguments>-jar %SchemaService_HOME%\schema-service-1.0.jar --server.port=8082</arguments >
     <logmode>rotate</logmode>
