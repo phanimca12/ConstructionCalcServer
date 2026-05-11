@@ -9,7 +9,7 @@ IF "%FINDOUTPUT%"=="" (
 )
 del UXBuilder.txt
 
-powershell -command "Expand-Archive -Force C:\tmp\schema-services\schemaservice-windows-**.zip C:\tmp\schema-services"
+powershell -command "Expand-Archive -Force C:\tmp\schema-services\schemaservice-**.zip C:\tmp\schema-services"
 SET ES_HOME=C:\opt\dst\schema-services
 SET TMPES_HOME=C:\tmp\schema-services\schemaservice
 

@@ -1,6 +1,6 @@
 logging:
   file:
-    name: "C:/opt/dst/schema-services/schemaservice/logs/schemaservice.log"
+    name: ${LOG_FILE_PATH}
     max-size: "10MB"
   level:
     root: "INFO"
@@ -16,10 +16,10 @@ spring:
     console:
       enabled: true
   datasource:
-    url: "jdbc:sqlserver://localhost:1433;DatabaseName=SCHEMASERVICE;encrypt=false"
-    username: "SCHMDB"
-    password: "password@1"
-    name: "sqlserver"
+    url: ${JDBC_URL}
+    username: ${USERNAME}
+    password: ${PASSWORD}
+    name: ${DB_NAME}
     hikari:
       maximumPoolSize: 100
       minimumIdle: 10

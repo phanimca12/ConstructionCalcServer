@@ -9,8 +9,8 @@ then
   mkdir -p /opt/dst/schema-services
 fi
 echo 'copying schema services'
-cp /tmp/schema-services/**-linux**.zip /opt/dst/schema-services/
-JARFILENAME=$(ls -1 /opt/dst/schema-services/**-linux**.zip | xargs -n 1 basename)
+cp /tmp/schema-services/**schemaservice**.zip /opt/dst/schema-services/
+JARFILENAME=$(ls -1 /opt/dst/schema-services/**schemaservice**.zip | xargs -n 1 basename)
 echo $JARFILENAME
 unzip -o /opt/dst/schema-services/$JARFILENAME -d /opt/dst/schema-services
 rm -rf /opt/dst/schema-services/$JARFILENAME
