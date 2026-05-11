@@ -4,11 +4,7 @@ cp ./aws/linux_appspec.yml appspec.yml
 
 if [ "$AWD_TARGET" = "LinJboss" ] || [ "$AWD_TARGET" = "LinuxLiberty" ]
 then
-      # Set and export an environment variables
-      export JDBC_URL="jdbc:oracle:thin:@localhost:1521/AWD1"
-      export USERNAME="SCHMDB"
-      export PASSWORD="password"
-      cp ./aws/linux_appspec.yml appspec.yml
+  cp ./aws/linux_appspec.yml appspec.yml
 elif [ "$AWD_TARGET" = "WindowsLiberty" ] || [ "$AWD_TARGET" = "WindowsJboss" ]
 then
    cp ./aws/windows_appspec.yml appspec.yml
