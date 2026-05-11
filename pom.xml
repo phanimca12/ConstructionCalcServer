@@ -14,7 +14,7 @@
 	<name>schema-service</name>
 	<description>Schema Service </description>
 	<properties>
-		<java.version>21</java.version>
+		<maven.compiler.release>21</maven.compiler.release>
 		<schemaservice.version>1.0</schemaservice.version>
 		<jasypt.version>3.0.5</jasypt.version>
 		<lombok.version>edge-SNAPSHOT</lombok.version>
@@ -124,8 +124,6 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>3.15.0</version>
 				<configuration>
-					<source>21</source>
-					<target>21</target>
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.projectlombok</groupId>
@@ -221,29 +219,15 @@
 				<executions>
 					<execution>
 						<phase>package</phase>
-						<id>Linux</id>
+						<id>schemaservice-package</id>
 						<goals>
 							<goal>single</goal>
 						</goals>
 						<configuration>
-							<finalName>schemaservice-linux-${schemaservice.version}</finalName>
+							<finalName>schemaservice-${schemaservice.version}</finalName>
 							<appendAssemblyId>false</appendAssemblyId>
 							<descriptors>
-								<descriptor>schemaservice-assembly-linux.xml</descriptor>
-							</descriptors>
-						</configuration>
-					</execution>
-					<execution>
-						<phase>package</phase>
-						<id>Windows</id>
-						<goals>
-							<goal>single</goal>
-						</goals>
-						<configuration>
-							<finalName>schemaservice-windows-${schemaservice.version}</finalName>
-							<appendAssemblyId>false</appendAssemblyId>
-							<descriptors>
-								<descriptor>schemaservice-assembly-windows.xml</descriptor>
+								<descriptor>schemaservice-assembly.xml</descriptor>
 							</descriptors>
 						</configuration>
 					</execution>
