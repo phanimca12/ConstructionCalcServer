@@ -4,6 +4,11 @@ echo 'In deploy'
 chmod +x /tmp/schema-services/*.sh
 chmod +x /tmp/schema-services/*.service
 
+# Set and export an environment variables
+export JDBC_URL="jdbc:oracle:thin:@localhost:1521/AWD1"
+export USERNAME="SCHMDB"
+export PASSWORD="password"
+
 if [ ! -d "/opt/dst/schema-services" ]
 then
   mkdir -p /opt/dst/schema-services

@@ -1,6 +1,6 @@
 logging:
   file:
-    name: "C:/opt/dst/schema-services/schemaservice/logs/schemaservice.log"
+    name: "/opt/dst/schema-services/schemaservice/logs/schemaservice.log"
     max-size: "10MB"
   level:
     root: "INFO"
