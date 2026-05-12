@@ -9,6 +9,7 @@
     <id>schemaservice</id>
     <formats>
         <format>zip</format>
+        <format>tar.gz</format>
     </formats>
     <includeBaseDirectory>true</includeBaseDirectory>
     <baseDirectory>schemaservice</baseDirectory>
@@ -26,7 +27,15 @@
             <outputDirectory>/</outputDirectory>
         </file>
         <file>
-            <source> ${basedir}/src/main/resources/application.yml</source>
+            <source> ${basedir}/cmd/schemaService.exe</source>
+            <outputDirectory>/</outputDirectory>
+        </file>
+        <file>
+            <source> ${basedir}/cmd/schemaService.xml</source>
+            <outputDirectory>/</outputDirectory>
+        </file>
+        <file>
+            <source> ${basedir}/src/main/resources/application-prod.yml</source>
             <outputDirectory>/</outputDirectory>
             <destName>application.yml</destName>
         </file>
