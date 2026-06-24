@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: estimator
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/construction_estimator
+    username: root
+    password: root
+
+server:
+  port: 8080
