@@ -1,73 +1,16 @@
-logging:
-  file:
-    name: "/opt/dst/schema-services/schemaservice/logs/schemaservice.log"
-    max-size: "10MB"
-  level:
-    root: "INFO"
-server:
-  port: 8082
 spring:
   application:
-    name: schema-service
-  threads:
-    virtual:
-      enabled: true
-  h2:
-    console:
-      enabled: true
+    name: construction-estimator-api
+
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+
   datasource:
-    url: "jdbc:oracle:thin:@localhost:1521/AWD1"
-    username: "SCHMDB"
-    password: "password"
-    name: "oracle"
-    hikari:
-      maximumPoolSize: 100
-      minimumIdle: 10
-      connectionTimeout: 50000
-  flyway:
-    enabled: true
-    locations: "classpath:db/migration"
-    schemas: "SCHMDB"
-    placeholders:
-      clob: "${clob.${spring.datasource.name}_clob}"
-      timestamp: "${timestamp.${spring.datasource.name}_ts}"
-      guid: "${guid.${spring.datasource.name}_guid}"
-  jpa:
-    properties:
-      hibernate:
-        multiTenancy: DISCRIMINATOR
-        tenant_identifier_resolver: com.ssnc.schemaService.tenant.TenantIdentifierResolver
-        show_sql: true
-        format_sql: true
-clob:
-  oracle_clob: "CLOB"
-  sqlserver_clob: "NVARCHAR(max)"
-  postgresql_clob: "text"
-timestamp:
-  oracle_ts: "TIMESTAMP"
-  sqlserver_ts: "DATETIME2"
-  postgresql_ts: "DATE"
+    url: jdbc:mysql://localhost:3306/construction_estimator
+    username: root
+    password: root
 
-guid:
-  oracle_guid: "RAW(16)"
-  sqlserver_guid: "UNIQUEIDENTIFIER"
-  postgresql_guid: "UUID"
-
-bpm:
-  security:
-    jwt:
-      enabled: true
-      use-default-security-config: true
-      public-key-endpoint: "/awdServer/api/services/v1/publickey"
-      whitelist-paths:
-        - "/actuator/**"
-        - "/swagger-ui/**"
-
-cache:
-  caffeine:
-    tenant:
-      expire-after-write-minutes: 60
-      maximum-size: 1000
-    namespace:
-      expire-after-write-minutes: 60
-      maximum-size: 1000
+server:
+  port: 8080
